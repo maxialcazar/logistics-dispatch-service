@@ -1,0 +1,16 @@
+import { Response, NextFunction } from "express";
+import { AuthRequest } from "./auth.middleware";
+
+export function requireRole(...roles: ("dispatcher" | "driver")[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "unauthenticated" });
+    }
+
+    if (!roles.includes(req.user.role as any)) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+
+    next();
+  };
+}
