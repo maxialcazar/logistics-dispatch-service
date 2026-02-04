@@ -7,7 +7,7 @@ import {
   assignZonesToDriver,
 } from "../controllers/drivers.controller";
 
-export const driversRouter = Router();
+const driversRouter = Router();
 
 driversRouter.use(auth);
 driversRouter.use(requireRole("dispatcher"));
@@ -15,3 +15,5 @@ driversRouter.use(requireRole("dispatcher"));
 driversRouter.get("/", getDrivers);
 driversRouter.post("/", createDriver);
 driversRouter.post("/:driverId/zones", assignZonesToDriver);
+
+export default driversRouter;

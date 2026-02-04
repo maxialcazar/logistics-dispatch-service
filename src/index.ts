@@ -10,6 +10,6 @@ app.use("/api/drivers", driversRoutes);
 app.use("/api/zones", zonesRoutes);
 app.use("/api/packages", packagesRoutes);
 
-app.listen(3001, () => {  
+app.listen(3001, () => {
   console.log("API running on http://localhost:3001");
 });

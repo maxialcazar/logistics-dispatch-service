@@ -10,7 +10,7 @@ import {
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 
-export const packagesRouter = Router();
+const packagesRouter = Router();
 
 // Dispatcher
 
@@ -42,3 +42,5 @@ packagesRouter.patch(
   requireRole("driver"),
   updatePackageStatus
 );
+
+export default packagesRouter;
