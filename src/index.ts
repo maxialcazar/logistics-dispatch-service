@@ -10,9 +10,6 @@ import zonesRouter from "./routes/zones.routes";
 import authRouter from "./routes/auth.routes";
 import usersRouter from "./routes/users.routes";
 
-// Middlewares
-import { auth } from "./middlewares/auth.middleware";
-
 dotenv.config();
 
 const app = express();
