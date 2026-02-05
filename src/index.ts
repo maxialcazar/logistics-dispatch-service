@@ -1,10 +1,15 @@
+import { createServer } from "http";
 import app from "./app";
 import { prisma } from "./prisma";
 import { redis } from "./redis";
+import { initSocket } from "./websocket";
 
 const PORT = process.env.PORT || 3001;
 
-const server = app.listen(PORT, () => {
+const httpServer = createServer(app);
+const io = initSocket(httpServer);
+
+const server = httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
 

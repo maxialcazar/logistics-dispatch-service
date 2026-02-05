@@ -1,5 +1,6 @@
 import { prisma } from "../prisma";
 import { PackageStatus } from "@prisma/client";
+import { emitToAll } from "../websocket";
 
 export class PackageService {
   static async getAllPackages(filters: {
@@ -71,6 +72,8 @@ export class PackageService {
           }
         },
       });
+      
+      emitToAll("package-created", pkg);
       return pkg;
     });
   }
@@ -130,6 +133,7 @@ export class PackageService {
         }
       });
 
+      emitToAll("package-status-updated", { packageId, status });
       return updated;
     });
   }
@@ -171,6 +175,7 @@ export class PackageService {
         }
       });
 
+      emitToAll("package-assigned", { packageId, driverId, driverName: driver.name });
       return updated;
     });
   }

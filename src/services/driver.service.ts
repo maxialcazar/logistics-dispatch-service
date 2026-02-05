@@ -1,6 +1,7 @@
 import { prisma } from "../prisma";
 import bcrypt from "bcrypt";
 import { redis } from "../redis";
+import { emitToAll } from "../websocket";
 
 export class DriverService {
   static async getAllDrivers(filters: { name?: string; page?: number; limit?: number } = {}) {
@@ -98,6 +99,8 @@ export class DriverService {
       redis.delPrefix('drivers:'),
       redis.delPrefix('zones:'),
     ]);
+
+    emitToAll("zones-reassigned", { driverId, zoneIds });
 
     return result;
   }
