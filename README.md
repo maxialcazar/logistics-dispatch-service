@@ -4,9 +4,11 @@
 ![Express](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 
-**Logistics Dispatch Service** es un potente backend diseñado para gestionar la logística de despacho y entrega de paquetes. Permite una coordinación fluida entre despachadores y repartidores a través de un sistema de roles robusto y una arquitectura escalable.
+**Logistics Dispatch Service** es un backend de grado de producción diseñado para la gestión crítica de despacho y entrega de paquetes. Implementa una arquitectura robusta orientada a servicios, optimizada para alta disponibilidad y trazabilidad total.
 
 ---
 
@@ -14,22 +16,22 @@
 
 ### 👨‍💼 Panel de Despachadores (Dispatcher)
 
-- **Gestión Integral**: Usuarios, Zonas, Conductores y Paquetes.
-- **Validación de Datos**: Esquemas estrictos con **Zod** para prevenir datos corruptos.
-- **Paginación y Búsqueda**: Navegación eficiente por grandes volúmenes de datos.
-- **Documentación Viva**: API documentada con **Swagger** en `/api-docs`.
+- **Gestión Integral**: Control total sobre Usuarios, Zonas, Conductores y Paquetes.
+- **Auditoría Total (History)**: Cada acción sobre un paquete queda registrada en un historial inmutable, permitiendo saber quién hizo qué y cuándo.
+- **Paginación y Filtrado**: Endpoints optimizados para manejar miles de registros sin degradación de performance.
 
 ### 🚲 Perfil de Repartidores (Driver)
 
-- **Vista Especializada**: Acceso exclusivo a los paquetes de su zona asignada.
-- **Flujo de Entrega**: Reglas de negocio para cambios de estado (ej: no se puede "entregar" un paquete "cancelado").
-- **Alta Disponibilidad**: Capa de caché con **Redis** para consultas ultrarrápidas de zonas y perfiles.
+- **Inteligencia de Zonas**: Los conductores solo ven y gestionan paquetes asignados a sus zonas dinámicas.
+- **Seguridad de Estado**: Máquina de estados estricta que previene transiciones de entrega inválidas.
+- **Notificaciones Real-time**: Recibe actualizaciones instantáneas de asignación a través de WebSockets.
 
-### 🛡️ Core Arquitectónico
+### 🚀 Capacidades Avanzadas (Production Ready)
 
-- **Capa de Servicios**: Lógica de negocio desacoplada para máxima escalabilidad.
-- **Seguridad Avanzada**: Protección con **Helmet**, **Rate Limiting** y **Bcrypt**.
-- **Logging Estructurado**: Registro de eventos y errores con **Winston**.
+- **Arquitectura Reactiva**: Integración con **Socket.io** para emitir eventos en tiempo real (`package-status-updated`, `package-assigned`, etc.).
+- **Capa de Caché Inteligente**: Uso proactivo de **Redis** para acelerar lecturas, con invalidación automática basada en eventos.
+- **Resiliencia y Cierre Limpio**: Implementación de **Graceful Shutdown** para proteger conexiones a base de datos y caché durante despliegues.
+- **Performance**: Base de datos indexada en campos críticos (status, IDs) para búsquedas instantáneas.
 
 ---
 
@@ -37,13 +39,11 @@
 
 - **Runtime**: Node.js (v18+)
 - **Lenguaje**: TypeScript
-- **Framework**: Express.js
-- **Base de Datos**: PostgreSQL + **Redis** (Caché)
-- **ORM**: Prisma (v7+)
-- **Validación**: Zod
-- **Autenticación**: JWT
-- **Pruebas**: Jest + Supertest
-- **Logging**: Winston + Morgan
+- **Database**: PostgreSQL (Prisma ORM v7+)
+- **Caching**: Redis
+- **Real-time**: Socket.io
+- **Security**: Helmet, Express Rate Limit, Bcrypt, JWT.
+- **Logging**: Winston (Structured Logs) + Morgan.
 
 ---
 
@@ -51,36 +51,43 @@
 
 ```text
 src/
-├── controllers/    # Controladores de entrada (req/res)
-├── services/       # Lógica de negocio pura (Servicios)
-├── middlewares/    # Auth, Roles, Validación, Error Handler
-├── routes/         # Definición de endpoints
-├── schemas/        # Esquemas de validación Zod
-├── utils/          # Helpers (Logger, etc.)
-├── redis.ts        # Cliente de caché
-├── prisma.ts       # Cliente de base de datos
-└── app.ts          # Configuración de Express
+├── controllers/    # Parseo de entrada y respuesta HTTP
+├── services/       # Capa de Lógica de Negocio (Business logic)
+├── middlewares/    # Seguridad, Roles y Validación
+├── routes/         # Definición de rutas y OpenAPI docs
+├── schemas/        # Esquemas de validación (Zod)
+├── utils/          # Logger (Winston) y Helpers
+├── websocket.ts    # Gestor de eventos en tiempo real
+├── redis.ts        # Wrapper de cliente Redis
+├── prisma.ts       # Configuración de Prisma Client
+└── index.ts        # Entry point con Graceful Shutdown
 ```
 
 ---
 
-## 📡 API Reference & Swagger
+## 📡 Referencia de API & Eventos
 
-El servidor cuenta con documentación interactiva:
+### API Documentada
 
-- **Swagger UI**: [http://localhost:3001/api-docs](http://localhost:3001/api-docs)
-- **Health Check**: `/api/health`
+Accede a la documentación interactiva en: [http://localhost:3001/api-docs](http://localhost:3001/api-docs).
 
-Para una guía detallada de cómo probar cada endpoint y correr los tests automatizados, consulta nuestra [**Guía de Pruebas (TESTING_GUIDE.md)**](./TESTING_GUIDE.md).
+### Eventos WebSocket (Socket.io)
+
+El servidor emite los siguientes eventos globales:
+
+- `package-created`: Notifica la creación de un nuevo paquete.
+- `package-status-updated`: Actualización de estado en vivo.
+- `package-assigned`: Cuando un paquete es vinculado a un conductor.
+- `zones-reassigned`: Cambio en la configuración de zonas de un conductor.
 
 ---
 
-## 🤝 Contribución
+## 🧪 Pruebas y Monitoreo
 
-Las contribuciones son bienvenidas. Por favor, abre un _issue_ primero para discutir los cambios que deseas realizar.
+Para detalles sobre cómo ejecutar tests automatizados con **Jest** o cómo inspeccionar los logs estructurados, consulta la [**Guía de Pruebas (TESTING_GUIDE.md)**](./TESTING_GUIDE.md).
 
 ---
 
-## � Licencia
+## 🤝 Licencia
 
 Este proyecto está bajo la licencia [ISC](https://opensource.org/licenses/ISC).
