@@ -1,192 +1,142 @@
 # 🚚 Logistics Dispatch Service
 
-**Sistema de gestión logística de paquetes** para empresas de despacho.
+![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 
-Permite administrar paquetes, zonas y conductores, con:
-
-- Web app para despachadores
-- API lista para app móvil de conductores
-
-Construido con **Node.js + TypeScript + Express** y **JWT** para autenticación.
-
----
-
-## 🗂 Estructura del proyecto
-
-```
-src/
-├─ app/                   # Configuración principal
-├─ controllers/           # Lógica de endpoints
-├─ middlewares/           # Auth y roles
-├─ models/                # Modelos TypeScript (Package, Driver, User, Zone)
-├─ routes/                # Rutas de Express
-├─ storage/               # "Base de datos" en memoria
-├─ types/                 # Tipos compartidos
-└─ index.ts               # Entrada del servidor
-```
+**Logistics Dispatch Service** es un potente backend diseñado para gestionar la logística de despacho y entrega de paquetes. Permite una coordinación fluida entre despachadores y repartidores a través de un sistema de roles robusto y una arquitectura escalable.
 
 ---
 
-## 🔑 Funcionalidades actuales
+## ✨ Características Principales
 
-### 1️⃣ Autenticación (JWT)
+### 👨‍💼 Panel de Despachadores (Dispatcher)
 
-- Registro y login de usuarios
-- Roles:
-  - `dispatcher` → administra todo
-  - `driver` → ve solo sus paquetes
+- **Gestión de Usuarios**: Crear y administrar cuentas de administradores y repartidores.
+- **Control de Zonas**: Definir áreas geográficas de operación.
+- **Administración de Drivers**: Asignar repartidores a zonas específicas.
+- **Logística de Paquetes**: Crear paquetes, asignarlos a zonas y monitorear su estado global.
 
-- Contraseñas cifradas con `bcrypt`
-- Token JWT expira en 7 días
+### 🚲 Perfil de Repartidores (Driver)
 
-**Endpoints:**
-
-| Método | Ruta             | Descripción               | Rol requerido |
-| ------ | ---------------- | ------------------------- | ------------- |
-| POST   | `/auth/register` | Registrar usuario         | ninguno       |
-| POST   | `/auth/login`    | Login y obtener token JWT | ninguno       |
+- **Vista Personalizada**: Acceso exclusivo a zonas y paquetes asignados.
+- **Gestión de Entregas**: Actualización de estados de paquetes en tiempo real (`in_transit` → `delivered`).
+- **Seguridad Garantizada**: Los repartidores solo tienen acceso a la información que les compete.
 
 ---
 
-### 2️⃣ Drivers
+## 🛠️ Tech Stack
 
-- Administrar conductores y asignar zonas
-- Solo accesible a `dispatcher`
-
-**Endpoints:**
-
-| Método | Ruta                 | Descripción                | Rol        |
-| ------ | -------------------- | -------------------------- | ---------- |
-| GET    | `/drivers`           | Listar conductores         | dispatcher |
-| POST   | `/drivers`           | Crear conductor            | dispatcher |
-| POST   | `/drivers/:id/zones` | Asignar zonas al conductor | dispatcher |
+- **Runtime**: Node.js (v18+)
+- **Lenguaje**: TypeScript
+- **Framework**: Express.js
+- **Base de Datos**: PostgreSQL
+- **ORM**: Prisma (v7+)
+- **Autenticación**: JSON Web Tokens (JWT)
+- **Seguridad**: Bcrypt para hashing de contraseñas
 
 ---
 
-### 3️⃣ Zones
+## 📊 Modelo de Datos
 
-- Definición de zonas geográficas para paquetes
-- Solo accesible a `dispatcher`
-
-**Endpoints:**
-
-| Método | Ruta     | Descripción  | Rol        |
-| ------ | -------- | ------------ | ---------- |
-| GET    | `/zones` | Listar zonas | dispatcher |
-| POST   | `/zones` | Crear zona   | dispatcher |
-
----
-
-### 4️⃣ Packages
-
-- Gestión de paquetes, asignación a zonas y drivers
-- Estados: `pending`, `assigned`, `in_transit`, `delivered`, `cancelled`
-- Asignación:
-  - Por zona → driver hereda paquetes de sus zonas
-  - `driverId` explícito → prioridad sobre zona
-
-#### Dispatcher
-
-| Método | Ruta                   | Descripción                  |
-| ------ | ---------------------- | ---------------------------- |
-| GET    | `/packages`            | Listar todos los paquetes    |
-| POST   | `/packages`            | Crear paquete                |
-| POST   | `/packages/:id/assign` | Asignar paquete a driver     |
-| GET    | `/packages/driver/:id` | Listar paquetes de un driver |
-
-#### Driver
-
-| Método | Ruta                   | Descripción                                  |
-| ------ | ---------------------- | -------------------------------------------- |
-| GET    | `/packages/me`         | Listar mis paquetes (según driverId o zonas) |
-| PATCH  | `/packages/:id/status` | Actualizar estado de paquete (solo propios)  |
-
-**Transiciones de estado válidas:**
-
-| Rol        | Estados permitidos                                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------------------------- |
-| Driver     | `pending → assigned → in_transit → delivered`                                                                 |
-| Dispatcher | `pending → assigned/cancelled` <br> `assigned → in_transit/cancelled` <br> `in_transit → delivered/cancelled` |
-
-**Protección:**
-
-- Middleware `auth` valida token JWT
-- Middleware `requireRole` valida rol
-- Controller valida ownership (`driverId`) para drivers
-
----
-
-### 5️⃣ Seguridad y roles
-
-- Todos los endpoints están protegidos
-- Los drivers solo acceden a paquetes propios
-- Los despachadores pueden administrar todo
-- La seguridad se asegura **en backend**, no en frontend
-
----
-
-## 🧩 Modelo de datos
-
-```ts
-// Package
-interface Package {
-  id: string;
-  trackingCode: string;
-  zoneId: string;
-  driverId?: string; // opcional
-  status: "pending" | "assigned" | "in_transit" | "delivered" | "cancelled";
-}
-
-// Driver
-interface Driver {
-  id: string;
-  name: string;
-  zoneIds: string[];
-}
-
-// Zone
-interface Zone {
-  id: string;
-  name: string;
-}
-
-// User
-interface User {
-  id: string;
-  username: string;
-  passwordHash: string;
-  role: "dispatcher" | "driver";
-  driverId?: string;
-}
+```mermaid
+erDiagram
+    USER ||--o| DRIVER : "is a"
+    DRIVER ||--o{ ZONE : "manages"
+    ZONE ||--o{ PACKAGE : "contains"
+    USER {
+        string id PK
+        string username
+        string password
+        enum role
+    }
+    DRIVER {
+        string id PK
+        string name
+    }
+    ZONE {
+        string id PK
+        string name
+    }
+    PACKAGE {
+        string id PK
+        string trackingCode
+        string status
+    }
 ```
 
 ---
 
-## ⚡ Próximos pasos sugeridos
+## 🚀 Instalación y Configuración
 
-1. Preparar **app móvil** para drivers
-2. Migrar almacenamiento a **base de datos real** (Postgres + Prisma)
-3. Implementar **rutas de entrega** y trazabilidad
-4. Agregar **logs y auditoría** de cambios de estado
-
----
-
-## 🛠 Instalación y ejecución
+### 1. Clonar y preparar dependencias
 
 ```bash
-# Instalar dependencias
+git clone <repo-url>
+cd logistics-dispatch-service
 npm install
+```
 
-# Ejecutar en dev
-npm run dev
+### 2. Variables de Entorno
+
+Crea un archivo `.env` en la raíz con la siguiente configuración:
+
+```env
+PORT=3001
+DATABASE_URL="postgresql://USUARIO:PASSWORD@localhost:5432/TU_DB"
+JWT_SECRET="tu_secreto_super_seguro"
+JWT_EXPIRES_IN="24h"
+```
+
+### 3. Base de Datos y Cliente Prisma
+
+```bash
+# Sincronizar esquema y generar cliente
+npx prisma generate
+npx prisma migrate dev --name init
+
+# Opcional: Poblar base de datos con admin inicial (admin/1234)
+npx prisma db seed
 ```
 
 ---
 
-## 📡 Testeo de API
+## 📁 Estructura del Proyecto
 
-Se puede usar **Postman** o **Bruno / Thunder Client**:
+```text
+src/
+├── controllers/    # Lógica de negocio por entidad
+├── middlewares/    # Auth (JWT) y validación de Roles
+├── routes/         # Definición de rutas Express
+├── prisma.ts       # Configuración del cliente Prisma
+└── index.ts        # Punto de entrada del servidor
+```
 
-- Agregar `Authorization: Bearer <token>` en headers
-- Dispatcher prueba `/drivers`, `/zones`, `/packages`
-- Driver prueba `/packages/me` y `/packages/:id/status`
+---
+
+## 📡 API Reference
+
+Para una guía detallada de cómo probar cada endpoint, consulta nuestra [**Guía de Pruebas API**](./Testing%20Guide).
+
+| Método  | Endpoint                   | Acceso     | Descripción                  |
+| :------ | :------------------------- | :--------- | :--------------------------- |
+| `POST`  | `/api/auth/login`          | Público    | Obtener JWT Token            |
+| `POST`  | `/api/users`               | Dispatcher | Crear nuevos usuarios        |
+| `GET`   | `/api/zones`               | Dispatcher | Listar zonas operativas      |
+| `GET`   | `/api/drivers`             | Dispatcher | Ver lista de conductores     |
+| `PATCH` | `/api/packages/:id/status` | Mix        | Actualizar estado de entrega |
+| `GET`   | `/api/packages/me`         | Driver     | Ver paquetes del repartidor  |
+
+---
+
+## 🤝 Contribución
+
+Las contribuciones son bienvenidas. Por favor, abre un _issue_ primero para discutir los cambios que deseas realizar.
+
+---
+
+## � Licencia
+
+Este proyecto está bajo la licencia [ISC](https://opensource.org/licenses/ISC).
