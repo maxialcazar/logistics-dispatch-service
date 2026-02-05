@@ -1,13 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = "super-secret-key";
-
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     role: string;
-    driverId?: string;
+    driverId: string | null;
   };
 }
 
@@ -17,15 +15,23 @@ export function auth(req: AuthRequest, res: Response, next: NextFunction) {
     return res.status(401).json({ error: "missing token" });
   }
 
-  const token = header.replace("Bearer ", "");
+  const [, token] = header.split(" ");
+  if (!token) {
+    return res.status(401).json({ error: "invalid token format" });
+  }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as any;
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    
+    // Debug point
+    // console.log("Extracted JWT payload:", payload);
+
     req.user = {
-      id: payload.sub,
+      id: payload.userId, // Fixed: was sub
       role: payload.role,
       driverId: payload.driverId,
     };
+
     next();
   } catch {
     return res.status(401).json({ error: "invalid token" });

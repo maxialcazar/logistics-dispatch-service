@@ -1,0 +1,58 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider   = "prisma-client-js"
+  output     = "../generated/prisma"
+  engineType = "client"
+}
+
+model User {
+  id       String @id @default(uuid())
+  username String @unique
+  password String
+  role     Role
+
+  driverId String? @unique
+  driver   Driver? @relation(fields: [driverId], references: [id])
+}
+
+model Driver {
+  id   String @id @default(uuid())
+  name String
+
+  user     User?
+  zones    Zone[]    @relation("DriverZones")
+  packages Package[]
+}
+
+model Zone {
+  id       String    @id @default(uuid())
+  name     String
+  drivers  Driver[]  @relation("DriverZones")
+  packages Package[]
+}
+
+model Package {
+  id           String        @id @default(uuid())
+  trackingCode String        @unique
+  status       PackageStatus
+  zone         Zone          @relation(fields: [zoneId], references: [id])
+  zoneId       String
+  driver       Driver?       @relation(fields: [driverId], references: [id])
+  driverId     String?
+}
+
+enum Role {
+  dispatcher
+  driver
+}
+
+enum PackageStatus {
+  pending
+  assigned
+  in_transit
+  delivered
+  cancelled
+}

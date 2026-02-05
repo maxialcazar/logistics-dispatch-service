@@ -1,0 +1,7146 @@
+
+/**
+ * Client
+**/
+
+import * as runtime from './runtime/client.js';
+import $Types = runtime.Types // general types
+import $Public = runtime.Types.Public
+import $Utils = runtime.Types.Utils
+import $Extensions = runtime.Types.Extensions
+import $Result = runtime.Types.Result
+
+export type PrismaPromise<T> = $Public.PrismaPromise<T>
+
+
+/**
+ * Model User
+ * 
+ */
+export type User = $Result.DefaultSelection<Prisma.$UserPayload>
+/**
+ * Model Driver
+ * 
+ */
+export type Driver = $Result.DefaultSelection<Prisma.$DriverPayload>
+/**
+ * Model Zone
+ * 
+ */
+export type Zone = $Result.DefaultSelection<Prisma.$ZonePayload>
+/**
+ * Model Package
+ * 
+ */
+export type Package = $Result.DefaultSelection<Prisma.$PackagePayload>
+
+/**
+ * Enums
+ */
+export namespace $Enums {
+  export const Role: {
+  dispatcher: 'dispatcher',
+  driver: 'driver'
+};
+
+export type Role = (typeof Role)[keyof typeof Role]
+
+
+export const PackageStatus: {
+  pending: 'pending',
+  assigned: 'assigned',
+  in_transit: 'in_transit',
+  delivered: 'delivered',
+  cancelled: 'cancelled'
+};
+
+export type PackageStatus = (typeof PackageStatus)[keyof typeof PackageStatus]
+
+}
+
+export type Role = $Enums.Role
+
+export const Role: typeof $Enums.Role
+
+export type PackageStatus = $Enums.PackageStatus
+
+export const PackageStatus: typeof $Enums.PackageStatus
+
+/**
+ * ##  Prisma Client ʲˢ
+ *
+ * Type-safe database client for TypeScript & Node.js
+ * @example
+ * ```
+ * const prisma = new PrismaClient()
+ * // Fetch zero or more Users
+ * const users = await prisma.user.findMany()
+ * ```
+ *
+ *
+ * Read more in our [docs](https://pris.ly/d/client).
+ */
+export class PrismaClient<
+  ClientOptions extends Prisma.PrismaClientOptions = Prisma.PrismaClientOptions,
+  const U = 'log' extends keyof ClientOptions ? ClientOptions['log'] extends Array<Prisma.LogLevel | Prisma.LogDefinition> ? Prisma.GetEvents<ClientOptions['log']> : never : never,
+  ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs
+> {
+  [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['other'] }
+
+    /**
+   * ##  Prisma Client ʲˢ
+   *
+   * Type-safe database client for TypeScript & Node.js
+   * @example
+   * ```
+   * const prisma = new PrismaClient()
+   * // Fetch zero or more Users
+   * const users = await prisma.user.findMany()
+   * ```
+   *
+   *
+   * Read more in our [docs](https://pris.ly/d/client).
+   */
+
+  constructor(optionsArg ?: Prisma.Subset<ClientOptions, Prisma.PrismaClientOptions>);
+  $on<V extends U>(eventType: V, callback: (event: V extends 'query' ? Prisma.QueryEvent : Prisma.LogEvent) => void): PrismaClient;
+
+  /**
+   * Connect with the database
+   */
+  $connect(): $Utils.JsPromise<void>;
+
+  /**
+   * Disconnect from the database
+   */
+  $disconnect(): $Utils.JsPromise<void>;
+
+/**
+   * Executes a prepared raw query and returns the number of affected rows.
+   * @example
+   * ```
+   * const result = await prisma.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $executeRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<number>;
+
+  /**
+   * Executes a raw query and returns the number of affected rows.
+   * Susceptible to SQL injections, see documentation.
+   * @example
+   * ```
+   * const result = await prisma.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $executeRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<number>;
+
+  /**
+   * Performs a prepared raw query and returns the `SELECT` data.
+   * @example
+   * ```
+   * const result = await prisma.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $queryRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<T>;
+
+  /**
+   * Performs a raw query and returns the `SELECT` data.
+   * Susceptible to SQL injections, see documentation.
+   * @example
+   * ```
+   * const result = await prisma.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<T>;
+
+
+  /**
+   * Allows the running of a sequence of read/write operations that are guaranteed to either succeed or fail as a whole.
+   * @example
+   * ```
+   * const [george, bob, alice] = await prisma.$transaction([
+   *   prisma.user.create({ data: { name: 'George' } }),
+   *   prisma.user.create({ data: { name: 'Bob' } }),
+   *   prisma.user.create({ data: { name: 'Alice' } }),
+   * ])
+   * ```
+   * 
+   * Read more in our [docs](https://www.prisma.io/docs/concepts/components/prisma-client/transactions).
+   */
+  $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
+
+  $transaction<R>(fn: (prisma: Omit<PrismaClient, runtime.ITXClientDenyList>) => $Utils.JsPromise<R>, options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<R>
+
+  $extends: $Extensions.ExtendsHook<"extends", Prisma.TypeMapCb<ClientOptions>, ExtArgs, $Utils.Call<Prisma.TypeMapCb<ClientOptions>, {
+    extArgs: ExtArgs
+  }>>
+
+      /**
+   * `prisma.user`: Exposes CRUD operations for the **User** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Users
+    * const users = await prisma.user.findMany()
+    * ```
+    */
+  get user(): Prisma.UserDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.driver`: Exposes CRUD operations for the **Driver** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Drivers
+    * const drivers = await prisma.driver.findMany()
+    * ```
+    */
+  get driver(): Prisma.DriverDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.zone`: Exposes CRUD operations for the **Zone** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Zones
+    * const zones = await prisma.zone.findMany()
+    * ```
+    */
+  get zone(): Prisma.ZoneDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.package`: Exposes CRUD operations for the **Package** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Packages
+    * const packages = await prisma.package.findMany()
+    * ```
+    */
+  get package(): Prisma.PackageDelegate<ExtArgs, ClientOptions>;
+}
+
+export namespace Prisma {
+  export import DMMF = runtime.DMMF
+
+  export type PrismaPromise<T> = $Public.PrismaPromise<T>
+
+  /**
+   * Validator
+   */
+  export import validator = runtime.Public.validator
+
+  /**
+   * Prisma Errors
+   */
+  export import PrismaClientKnownRequestError = runtime.PrismaClientKnownRequestError
+  export import PrismaClientUnknownRequestError = runtime.PrismaClientUnknownRequestError
+  export import PrismaClientRustPanicError = runtime.PrismaClientRustPanicError
+  export import PrismaClientInitializationError = runtime.PrismaClientInitializationError
+  export import PrismaClientValidationError = runtime.PrismaClientValidationError
+
+  /**
+   * Re-export of sql-template-tag
+   */
+  export import sql = runtime.sqltag
+  export import empty = runtime.empty
+  export import join = runtime.join
+  export import raw = runtime.raw
+  export import Sql = runtime.Sql
+
+
+
+  /**
+   * Decimal.js
+   */
+  export import Decimal = runtime.Decimal
+
+  export type DecimalJsLike = runtime.DecimalJsLike
+
+  /**
+  * Extensions
+  */
+  export import Extension = $Extensions.UserArgs
+  export import getExtensionContext = runtime.Extensions.getExtensionContext
+  export import Args = $Public.Args
+  export import Payload = $Public.Payload
+  export import Result = $Public.Result
+  export import Exact = $Public.Exact
+
+  /**
+   * Prisma Client JS version: 7.3.0
+   * Query Engine version: 9d6ad21cbbceab97458517b147a6a09ff43aa735
+   */
+  export type PrismaVersion = {
+    client: string
+    engine: string
+  }
+
+  export const prismaVersion: PrismaVersion
+
+  /**
+   * Utility Types
+   */
+
+
+  export import Bytes = runtime.Bytes
+  export import JsonObject = runtime.JsonObject
+  export import JsonArray = runtime.JsonArray
+  export import JsonValue = runtime.JsonValue
+  export import InputJsonObject = runtime.InputJsonObject
+  export import InputJsonArray = runtime.InputJsonArray
+  export import InputJsonValue = runtime.InputJsonValue
+
+  /**
+   * Types of the values used to represent different kinds of `null` values when working with JSON fields.
+   *
+   * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+   */
+  namespace NullTypes {
+    /**
+    * Type of `Prisma.DbNull`.
+    *
+    * You cannot use other instances of this class. Please use the `Prisma.DbNull` value.
+    *
+    * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+    */
+    class DbNull {
+      private DbNull: never
+      private constructor()
+    }
+
+    /**
+    * Type of `Prisma.JsonNull`.
+    *
+    * You cannot use other instances of this class. Please use the `Prisma.JsonNull` value.
+    *
+    * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+    */
+    class JsonNull {
+      private JsonNull: never
+      private constructor()
+    }
+
+    /**
+    * Type of `Prisma.AnyNull`.
+    *
+    * You cannot use other instances of this class. Please use the `Prisma.AnyNull` value.
+    *
+    * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+    */
+    class AnyNull {
+      private AnyNull: never
+      private constructor()
+    }
+  }
+
+  /**
+   * Helper for filtering JSON entries that have `null` on the database (empty on the db)
+   *
+   * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+   */
+  export const DbNull: NullTypes.DbNull
+
+  /**
+   * Helper for filtering JSON entries that have JSON `null` values (not empty on the db)
+   *
+   * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+   */
+  export const JsonNull: NullTypes.JsonNull
+
+  /**
+   * Helper for filtering JSON entries that are `Prisma.DbNull` or `Prisma.JsonNull`
+   *
+   * @see https://www.prisma.io/docs/concepts/components/prisma-client/working-with-fields/working-with-json-fields#filtering-on-a-json-field
+   */
+  export const AnyNull: NullTypes.AnyNull
+
+  type SelectAndInclude = {
+    select: any
+    include: any
+  }
+
+  type SelectAndOmit = {
+    select: any
+    omit: any
+  }
+
+  /**
+   * Get the type of the value, that the Promise holds.
+   */
+  export type PromiseType<T extends PromiseLike<any>> = T extends PromiseLike<infer U> ? U : T;
+
+  /**
+   * Get the return type of a function which returns a Promise.
+   */
+  export type PromiseReturnType<T extends (...args: any) => $Utils.JsPromise<any>> = PromiseType<ReturnType<T>>
+
+  /**
+   * From T, pick a set of properties whose keys are in the union K
+   */
+  type Prisma__Pick<T, K extends keyof T> = {
+      [P in K]: T[P];
+  };
+
+
+  export type Enumerable<T> = T | Array<T>;
+
+  export type RequiredKeys<T> = {
+    [K in keyof T]-?: {} extends Prisma__Pick<T, K> ? never : K
+  }[keyof T]
+
+  export type TruthyKeys<T> = keyof {
+    [K in keyof T as T[K] extends false | undefined | null ? never : K]: K
+  }
+
+  export type TrueKeys<T> = TruthyKeys<Prisma__Pick<T, RequiredKeys<T>>>
+
+  /**
+   * Subset
+   * @desc From `T` pick properties that exist in `U`. Simple version of Intersection
+   */
+  export type Subset<T, U> = {
+    [key in keyof T]: key extends keyof U ? T[key] : never;
+  };
+
+  /**
+   * SelectSubset
+   * @desc From `T` pick properties that exist in `U`. Simple version of Intersection.
+   * Additionally, it validates, if both select and include are present. If the case, it errors.
+   */
+  export type SelectSubset<T, U> = {
+    [key in keyof T]: key extends keyof U ? T[key] : never
+  } &
+    (T extends SelectAndInclude
+      ? 'Please either choose `select` or `include`.'
+      : T extends SelectAndOmit
+        ? 'Please either choose `select` or `omit`.'
+        : {})
+
+  /**
+   * Subset + Intersection
+   * @desc From `T` pick properties that exist in `U` and intersect `K`
+   */
+  export type SubsetIntersection<T, U, K> = {
+    [key in keyof T]: key extends keyof U ? T[key] : never
+  } &
+    K
+
+  type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never };
+
+  /**
+   * XOR is needed to have a real mutually exclusive union type
+   * https://stackoverflow.com/questions/42123407/does-typescript-support-mutually-exclusive-types
+   */
+  type XOR<T, U> =
+    T extends object ?
+    U extends object ?
+      (Without<T, U> & U) | (Without<U, T> & T)
+    : U : T
+
+
+  /**
+   * Is T a Record?
+   */
+  type IsObject<T extends any> = T extends Array<any>
+  ? False
+  : T extends Date
+  ? False
+  : T extends Uint8Array
+  ? False
+  : T extends BigInt
+  ? False
+  : T extends object
+  ? True
+  : False
+
+
+  /**
+   * If it's T[], return T
+   */
+  export type UnEnumerate<T extends unknown> = T extends Array<infer U> ? U : T
+
+  /**
+   * From ts-toolbelt
+   */
+
+  type __Either<O extends object, K extends Key> = Omit<O, K> &
+    {
+      // Merge all but K
+      [P in K]: Prisma__Pick<O, P & keyof O> // With K possibilities
+    }[K]
+
+  type EitherStrict<O extends object, K extends Key> = Strict<__Either<O, K>>
+
+  type EitherLoose<O extends object, K extends Key> = ComputeRaw<__Either<O, K>>
+
+  type _Either<
+    O extends object,
+    K extends Key,
+    strict extends Boolean
+  > = {
+    1: EitherStrict<O, K>
+    0: EitherLoose<O, K>
+  }[strict]
+
+  type Either<
+    O extends object,
+    K extends Key,
+    strict extends Boolean = 1
+  > = O extends unknown ? _Either<O, K, strict> : never
+
+  export type Union = any
+
+  type PatchUndefined<O extends object, O1 extends object> = {
+    [K in keyof O]: O[K] extends undefined ? At<O1, K> : O[K]
+  } & {}
+
+  /** Helper Types for "Merge" **/
+  export type IntersectOf<U extends Union> = (
+    U extends unknown ? (k: U) => void : never
+  ) extends (k: infer I) => void
+    ? I
+    : never
+
+  export type Overwrite<O extends object, O1 extends object> = {
+      [K in keyof O]: K extends keyof O1 ? O1[K] : O[K];
+  } & {};
+
+  type _Merge<U extends object> = IntersectOf<Overwrite<U, {
+      [K in keyof U]-?: At<U, K>;
+  }>>;
+
+  type Key = string | number | symbol;
+  type AtBasic<O extends object, K extends Key> = K extends keyof O ? O[K] : never;
+  type AtStrict<O extends object, K extends Key> = O[K & keyof O];
+  type AtLoose<O extends object, K extends Key> = O extends unknown ? AtStrict<O, K> : never;
+  export type At<O extends object, K extends Key, strict extends Boolean = 1> = {
+      1: AtStrict<O, K>;
+      0: AtLoose<O, K>;
+  }[strict];
+
+  export type ComputeRaw<A extends any> = A extends Function ? A : {
+    [K in keyof A]: A[K];
+  } & {};
+
+  export type OptionalFlat<O> = {
+    [K in keyof O]?: O[K];
+  } & {};
+
+  type _Record<K extends keyof any, T> = {
+    [P in K]: T;
+  };
+
+  // cause typescript not to expand types and preserve names
+  type NoExpand<T> = T extends unknown ? T : never;
+
+  // this type assumes the passed object is entirely optional
+  type AtLeast<O extends object, K extends string> = NoExpand<
+    O extends unknown
+    ? | (K extends keyof O ? { [P in K]: O[P] } & O : O)
+      | {[P in keyof O as P extends K ? P : never]-?: O[P]} & O
+    : never>;
+
+  type _Strict<U, _U = U> = U extends unknown ? U & OptionalFlat<_Record<Exclude<Keys<_U>, keyof U>, never>> : never;
+
+  export type Strict<U extends object> = ComputeRaw<_Strict<U>>;
+  /** End Helper Types for "Merge" **/
+
+  export type Merge<U extends object> = ComputeRaw<_Merge<Strict<U>>>;
+
+  /**
+  A [[Boolean]]
+  */
+  export type Boolean = True | False
+
+  // /**
+  // 1
+  // */
+  export type True = 1
+
+  /**
+  0
+  */
+  export type False = 0
+
+  export type Not<B extends Boolean> = {
+    0: 1
+    1: 0
+  }[B]
+
+  export type Extends<A1 extends any, A2 extends any> = [A1] extends [never]
+    ? 0 // anything `never` is false
+    : A1 extends A2
+    ? 1
+    : 0
+
+  export type Has<U extends Union, U1 extends Union> = Not<
+    Extends<Exclude<U1, U>, U1>
+  >
+
+  export type Or<B1 extends Boolean, B2 extends Boolean> = {
+    0: {
+      0: 0
+      1: 1
+    }
+    1: {
+      0: 1
+      1: 1
+    }
+  }[B1][B2]
+
+  export type Keys<U extends Union> = U extends unknown ? keyof U : never
+
+  type Cast<A, B> = A extends B ? A : B;
+
+  export const type: unique symbol;
+
+
+
+  /**
+   * Used by group by
+   */
+
+  export type GetScalarType<T, O> = O extends object ? {
+    [P in keyof T]: P extends keyof O
+      ? O[P]
+      : never
+  } : never
+
+  type FieldPaths<
+    T,
+    U = Omit<T, '_avg' | '_sum' | '_count' | '_min' | '_max'>
+  > = IsObject<T> extends True ? U : T
+
+  type GetHavingFields<T> = {
+    [K in keyof T]: Or<
+      Or<Extends<'OR', K>, Extends<'AND', K>>,
+      Extends<'NOT', K>
+    > extends True
+      ? // infer is only needed to not hit TS limit
+        // based on the brilliant idea of Pierre-Antoine Mills
+        // https://github.com/microsoft/TypeScript/issues/30188#issuecomment-478938437
+        T[K] extends infer TK
+        ? GetHavingFields<UnEnumerate<TK> extends object ? Merge<UnEnumerate<TK>> : never>
+        : never
+      : {} extends FieldPaths<T[K]>
+      ? never
+      : K
+  }[keyof T]
+
+  /**
+   * Convert tuple to union
+   */
+  type _TupleToUnion<T> = T extends (infer E)[] ? E : never
+  type TupleToUnion<K extends readonly any[]> = _TupleToUnion<K>
+  type MaybeTupleToUnion<T> = T extends any[] ? TupleToUnion<T> : T
+
+  /**
+   * Like `Pick`, but additionally can also accept an array of keys
+   */
+  type PickEnumerable<T, K extends Enumerable<keyof T> | keyof T> = Prisma__Pick<T, MaybeTupleToUnion<K>>
+
+  /**
+   * Exclude all keys with underscores
+   */
+  type ExcludeUnderscoreKeys<T extends string> = T extends `_${string}` ? never : T
+
+
+  export type FieldRef<Model, FieldType> = runtime.FieldRef<Model, FieldType>
+
+  type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRef<Model, FieldType>
+
+
+  export const ModelName: {
+    User: 'User',
+    Driver: 'Driver',
+    Zone: 'Zone',
+    Package: 'Package'
+  };
+
+  export type ModelName = (typeof ModelName)[keyof typeof ModelName]
+
+
+
+  interface TypeMapCb<ClientOptions = {}> extends $Utils.Fn<{extArgs: $Extensions.InternalArgs }, $Utils.Record<string, any>> {
+    returns: Prisma.TypeMap<this['params']['extArgs'], ClientOptions extends { omit: infer OmitOptions } ? OmitOptions : {}>
+  }
+
+  export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> = {
+    globalOmitOptions: {
+      omit: GlobalOmitOptions
+    }
+    meta: {
+      modelProps: "user" | "driver" | "zone" | "package"
+      txIsolationLevel: Prisma.TransactionIsolationLevel
+    }
+    model: {
+      User: {
+        payload: Prisma.$UserPayload<ExtArgs>
+        fields: Prisma.UserFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.UserFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.UserFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          findFirst: {
+            args: Prisma.UserFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.UserFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          findMany: {
+            args: Prisma.UserFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>[]
+          }
+          create: {
+            args: Prisma.UserCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          createMany: {
+            args: Prisma.UserCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.UserCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>[]
+          }
+          delete: {
+            args: Prisma.UserDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          update: {
+            args: Prisma.UserUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          deleteMany: {
+            args: Prisma.UserDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.UserUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.UserUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>[]
+          }
+          upsert: {
+            args: Prisma.UserUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          aggregate: {
+            args: Prisma.UserAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateUser>
+          }
+          groupBy: {
+            args: Prisma.UserGroupByArgs<ExtArgs>
+            result: $Utils.Optional<UserGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.UserCountArgs<ExtArgs>
+            result: $Utils.Optional<UserCountAggregateOutputType> | number
+          }
+        }
+      }
+      Driver: {
+        payload: Prisma.$DriverPayload<ExtArgs>
+        fields: Prisma.DriverFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.DriverFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.DriverFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>
+          }
+          findFirst: {
+            args: Prisma.DriverFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.DriverFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>
+          }
+          findMany: {
+            args: Prisma.DriverFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>[]
+          }
+          create: {
+            args: Prisma.DriverCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>
+          }
+          createMany: {
+            args: Prisma.DriverCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.DriverCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>[]
+          }
+          delete: {
+            args: Prisma.DriverDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>
+          }
+          update: {
+            args: Prisma.DriverUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>
+          }
+          deleteMany: {
+            args: Prisma.DriverDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.DriverUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.DriverUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>[]
+          }
+          upsert: {
+            args: Prisma.DriverUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DriverPayload>
+          }
+          aggregate: {
+            args: Prisma.DriverAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateDriver>
+          }
+          groupBy: {
+            args: Prisma.DriverGroupByArgs<ExtArgs>
+            result: $Utils.Optional<DriverGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.DriverCountArgs<ExtArgs>
+            result: $Utils.Optional<DriverCountAggregateOutputType> | number
+          }
+        }
+      }
+      Zone: {
+        payload: Prisma.$ZonePayload<ExtArgs>
+        fields: Prisma.ZoneFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ZoneFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ZoneFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>
+          }
+          findFirst: {
+            args: Prisma.ZoneFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ZoneFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>
+          }
+          findMany: {
+            args: Prisma.ZoneFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>[]
+          }
+          create: {
+            args: Prisma.ZoneCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>
+          }
+          createMany: {
+            args: Prisma.ZoneCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ZoneCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>[]
+          }
+          delete: {
+            args: Prisma.ZoneDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>
+          }
+          update: {
+            args: Prisma.ZoneUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>
+          }
+          deleteMany: {
+            args: Prisma.ZoneDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ZoneUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ZoneUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>[]
+          }
+          upsert: {
+            args: Prisma.ZoneUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ZonePayload>
+          }
+          aggregate: {
+            args: Prisma.ZoneAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateZone>
+          }
+          groupBy: {
+            args: Prisma.ZoneGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ZoneGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ZoneCountArgs<ExtArgs>
+            result: $Utils.Optional<ZoneCountAggregateOutputType> | number
+          }
+        }
+      }
+      Package: {
+        payload: Prisma.$PackagePayload<ExtArgs>
+        fields: Prisma.PackageFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.PackageFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.PackageFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>
+          }
+          findFirst: {
+            args: Prisma.PackageFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.PackageFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>
+          }
+          findMany: {
+            args: Prisma.PackageFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>[]
+          }
+          create: {
+            args: Prisma.PackageCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>
+          }
+          createMany: {
+            args: Prisma.PackageCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.PackageCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>[]
+          }
+          delete: {
+            args: Prisma.PackageDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>
+          }
+          update: {
+            args: Prisma.PackageUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>
+          }
+          deleteMany: {
+            args: Prisma.PackageDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.PackageUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.PackageUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>[]
+          }
+          upsert: {
+            args: Prisma.PackageUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PackagePayload>
+          }
+          aggregate: {
+            args: Prisma.PackageAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregatePackage>
+          }
+          groupBy: {
+            args: Prisma.PackageGroupByArgs<ExtArgs>
+            result: $Utils.Optional<PackageGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.PackageCountArgs<ExtArgs>
+            result: $Utils.Optional<PackageCountAggregateOutputType> | number
+          }
+        }
+      }
+    }
+  } & {
+    other: {
+      payload: any
+      operations: {
+        $executeRaw: {
+          args: [query: TemplateStringsArray | Prisma.Sql, ...values: any[]],
+          result: any
+        }
+        $executeRawUnsafe: {
+          args: [query: string, ...values: any[]],
+          result: any
+        }
+        $queryRaw: {
+          args: [query: TemplateStringsArray | Prisma.Sql, ...values: any[]],
+          result: any
+        }
+        $queryRawUnsafe: {
+          args: [query: string, ...values: any[]],
+          result: any
+        }
+      }
+    }
+  }
+  export const defineExtension: $Extensions.ExtendsHook<"define", Prisma.TypeMapCb, $Extensions.DefaultArgs>
+  export type DefaultPrismaClient = PrismaClient
+  export type ErrorFormat = 'pretty' | 'colorless' | 'minimal'
+  export interface PrismaClientOptions {
+    /**
+     * @default "colorless"
+     */
+    errorFormat?: ErrorFormat
+    /**
+     * @example
+     * ```
+     * // Shorthand for `emit: 'stdout'`
+     * log: ['query', 'info', 'warn', 'error']
+     * 
+     * // Emit as events only
+     * log: [
+     *   { emit: 'event', level: 'query' },
+     *   { emit: 'event', level: 'info' },
+     *   { emit: 'event', level: 'warn' }
+     *   { emit: 'event', level: 'error' }
+     * ]
+     * 
+     * / Emit as events and log to stdout
+     * og: [
+     *  { emit: 'stdout', level: 'query' },
+     *  { emit: 'stdout', level: 'info' },
+     *  { emit: 'stdout', level: 'warn' }
+     *  { emit: 'stdout', level: 'error' }
+     * 
+     * ```
+     * Read more in our [docs](https://pris.ly/d/logging).
+     */
+    log?: (LogLevel | LogDefinition)[]
+    /**
+     * The default values for transactionOptions
+     * maxWait ?= 2000
+     * timeout ?= 5000
+     */
+    transactionOptions?: {
+      maxWait?: number
+      timeout?: number
+      isolationLevel?: Prisma.TransactionIsolationLevel
+    }
+    /**
+     * Instance of a Driver Adapter, e.g., like one provided by `@prisma/adapter-planetscale`
+     */
+    adapter?: runtime.SqlDriverAdapterFactory
+    /**
+     * Prisma Accelerate URL allowing the client to connect through Accelerate instead of a direct database.
+     */
+    accelerateUrl?: string
+    /**
+     * Global configuration for omitting model fields by default.
+     * 
+     * @example
+     * ```
+     * const prisma = new PrismaClient({
+     *   omit: {
+     *     user: {
+     *       password: true
+     *     }
+     *   }
+     * })
+     * ```
+     */
+    omit?: Prisma.GlobalOmitConfig
+    /**
+     * SQL commenter plugins that add metadata to SQL queries as comments.
+     * Comments follow the sqlcommenter format: https://google.github.io/sqlcommenter/
+     * 
+     * @example
+     * ```
+     * const prisma = new PrismaClient({
+     *   adapter,
+     *   comments: [
+     *     traceContext(),
+     *     queryInsights(),
+     *   ],
+     * })
+     * ```
+     */
+    comments?: runtime.SqlCommenterPlugin[]
+  }
+  export type GlobalOmitConfig = {
+    user?: UserOmit
+    driver?: DriverOmit
+    zone?: ZoneOmit
+    package?: PackageOmit
+  }
+
+  /* Types for Logging */
+  export type LogLevel = 'info' | 'query' | 'warn' | 'error'
+  export type LogDefinition = {
+    level: LogLevel
+    emit: 'stdout' | 'event'
+  }
+
+  export type CheckIsLogLevel<T> = T extends LogLevel ? T : never;
+
+  export type GetLogType<T> = CheckIsLogLevel<
+    T extends LogDefinition ? T['level'] : T
+  >;
+
+  export type GetEvents<T extends any[]> = T extends Array<LogLevel | LogDefinition>
+    ? GetLogType<T[number]>
+    : never;
+
+  export type QueryEvent = {
+    timestamp: Date
+    query: string
+    params: string
+    duration: number
+    target: string
+  }
+
+  export type LogEvent = {
+    timestamp: Date
+    message: string
+    target: string
+  }
+  /* End Types for Logging */
+
+
+  export type PrismaAction =
+    | 'findUnique'
+    | 'findUniqueOrThrow'
+    | 'findMany'
+    | 'findFirst'
+    | 'findFirstOrThrow'
+    | 'create'
+    | 'createMany'
+    | 'createManyAndReturn'
+    | 'update'
+    | 'updateMany'
+    | 'updateManyAndReturn'
+    | 'upsert'
+    | 'delete'
+    | 'deleteMany'
+    | 'executeRaw'
+    | 'queryRaw'
+    | 'aggregate'
+    | 'count'
+    | 'runCommandRaw'
+    | 'findRaw'
+    | 'groupBy'
+
+  // tested in getLogLevel.test.ts
+  export function getLogLevel(log: Array<LogLevel | LogDefinition>): LogLevel | undefined;
+
+  /**
+   * `PrismaClient` proxy available in interactive transactions.
+   */
+  export type TransactionClient = Omit<Prisma.DefaultPrismaClient, runtime.ITXClientDenyList>
+
+  export type Datasource = {
+    url?: string
+  }
+
+  /**
+   * Count Types
+   */
+
+
+  /**
+   * Count Type DriverCountOutputType
+   */
+
+  export type DriverCountOutputType = {
+    zones: number
+    packages: number
+  }
+
+  export type DriverCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    zones?: boolean | DriverCountOutputTypeCountZonesArgs
+    packages?: boolean | DriverCountOutputTypeCountPackagesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * DriverCountOutputType without action
+   */
+  export type DriverCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DriverCountOutputType
+     */
+    select?: DriverCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * DriverCountOutputType without action
+   */
+  export type DriverCountOutputTypeCountZonesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ZoneWhereInput
+  }
+
+  /**
+   * DriverCountOutputType without action
+   */
+  export type DriverCountOutputTypeCountPackagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PackageWhereInput
+  }
+
+
+  /**
+   * Count Type ZoneCountOutputType
+   */
+
+  export type ZoneCountOutputType = {
+    drivers: number
+    packages: number
+  }
+
+  export type ZoneCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    drivers?: boolean | ZoneCountOutputTypeCountDriversArgs
+    packages?: boolean | ZoneCountOutputTypeCountPackagesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * ZoneCountOutputType without action
+   */
+  export type ZoneCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ZoneCountOutputType
+     */
+    select?: ZoneCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * ZoneCountOutputType without action
+   */
+  export type ZoneCountOutputTypeCountDriversArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: DriverWhereInput
+  }
+
+  /**
+   * ZoneCountOutputType without action
+   */
+  export type ZoneCountOutputTypeCountPackagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PackageWhereInput
+  }
+
+
+  /**
+   * Models
+   */
+
+  /**
+   * Model User
+   */
+
+  export type AggregateUser = {
+    _count: UserCountAggregateOutputType | null
+    _min: UserMinAggregateOutputType | null
+    _max: UserMaxAggregateOutputType | null
+  }
+
+  export type UserMinAggregateOutputType = {
+    id: string | null
+    username: string | null
+    password: string | null
+    role: $Enums.Role | null
+    driverId: string | null
+  }
+
+  export type UserMaxAggregateOutputType = {
+    id: string | null
+    username: string | null
+    password: string | null
+    role: $Enums.Role | null
+    driverId: string | null
+  }
+
+  export type UserCountAggregateOutputType = {
+    id: number
+    username: number
+    password: number
+    role: number
+    driverId: number
+    _all: number
+  }
+
+
+  export type UserMinAggregateInputType = {
+    id?: true
+    username?: true
+    password?: true
+    role?: true
+    driverId?: true
+  }
+
+  export type UserMaxAggregateInputType = {
+    id?: true
+    username?: true
+    password?: true
+    role?: true
+    driverId?: true
+  }
+
+  export type UserCountAggregateInputType = {
+    id?: true
+    username?: true
+    password?: true
+    role?: true
+    driverId?: true
+    _all?: true
+  }
+
+  export type UserAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which User to aggregate.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Users
+    **/
+    _count?: true | UserCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: UserMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: UserMaxAggregateInputType
+  }
+
+  export type GetUserAggregateType<T extends UserAggregateArgs> = {
+        [P in keyof T & keyof AggregateUser]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateUser[P]>
+      : GetScalarType<T[P], AggregateUser[P]>
+  }
+
+
+
+
+  export type UserGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: UserWhereInput
+    orderBy?: UserOrderByWithAggregationInput | UserOrderByWithAggregationInput[]
+    by: UserScalarFieldEnum[] | UserScalarFieldEnum
+    having?: UserScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: UserCountAggregateInputType | true
+    _min?: UserMinAggregateInputType
+    _max?: UserMaxAggregateInputType
+  }
+
+  export type UserGroupByOutputType = {
+    id: string
+    username: string
+    password: string
+    role: $Enums.Role
+    driverId: string | null
+    _count: UserCountAggregateOutputType | null
+    _min: UserMinAggregateOutputType | null
+    _max: UserMaxAggregateOutputType | null
+  }
+
+  type GetUserGroupByPayload<T extends UserGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<UserGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof UserGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], UserGroupByOutputType[P]>
+            : GetScalarType<T[P], UserGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type UserSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    username?: boolean
+    password?: boolean
+    role?: boolean
+    driverId?: boolean
+    driver?: boolean | User$driverArgs<ExtArgs>
+  }, ExtArgs["result"]["user"]>
+
+  export type UserSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    username?: boolean
+    password?: boolean
+    role?: boolean
+    driverId?: boolean
+    driver?: boolean | User$driverArgs<ExtArgs>
+  }, ExtArgs["result"]["user"]>
+
+  export type UserSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    username?: boolean
+    password?: boolean
+    role?: boolean
+    driverId?: boolean
+    driver?: boolean | User$driverArgs<ExtArgs>
+  }, ExtArgs["result"]["user"]>
+
+  export type UserSelectScalar = {
+    id?: boolean
+    username?: boolean
+    password?: boolean
+    role?: boolean
+    driverId?: boolean
+  }
+
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "username" | "password" | "role" | "driverId", ExtArgs["result"]["user"]>
+  export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    driver?: boolean | User$driverArgs<ExtArgs>
+  }
+  export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    driver?: boolean | User$driverArgs<ExtArgs>
+  }
+  export type UserIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    driver?: boolean | User$driverArgs<ExtArgs>
+  }
+
+  export type $UserPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "User"
+    objects: {
+      driver: Prisma.$DriverPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      username: string
+      password: string
+      role: $Enums.Role
+      driverId: string | null
+    }, ExtArgs["result"]["user"]>
+    composites: {}
+  }
+
+  type UserGetPayload<S extends boolean | null | undefined | UserDefaultArgs> = $Result.GetResult<Prisma.$UserPayload, S>
+
+  type UserCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<UserFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: UserCountAggregateInputType | true
+    }
+
+  export interface UserDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['User'], meta: { name: 'User' } }
+    /**
+     * Find zero or one User that matches the filter.
+     * @param {UserFindUniqueArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends UserFindUniqueArgs>(args: SelectSubset<T, UserFindUniqueArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one User that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {UserFindUniqueOrThrowArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends UserFindUniqueOrThrowArgs>(args: SelectSubset<T, UserFindUniqueOrThrowArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first User that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserFindFirstArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends UserFindFirstArgs>(args?: SelectSubset<T, UserFindFirstArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first User that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserFindFirstOrThrowArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends UserFindFirstOrThrowArgs>(args?: SelectSubset<T, UserFindFirstOrThrowArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Users that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Users
+     * const users = await prisma.user.findMany()
+     * 
+     * // Get first 10 Users
+     * const users = await prisma.user.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const userWithIdOnly = await prisma.user.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends UserFindManyArgs>(args?: SelectSubset<T, UserFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a User.
+     * @param {UserCreateArgs} args - Arguments to create a User.
+     * @example
+     * // Create one User
+     * const User = await prisma.user.create({
+     *   data: {
+     *     // ... data to create a User
+     *   }
+     * })
+     * 
+     */
+    create<T extends UserCreateArgs>(args: SelectSubset<T, UserCreateArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Users.
+     * @param {UserCreateManyArgs} args - Arguments to create many Users.
+     * @example
+     * // Create many Users
+     * const user = await prisma.user.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends UserCreateManyArgs>(args?: SelectSubset<T, UserCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Users and returns the data saved in the database.
+     * @param {UserCreateManyAndReturnArgs} args - Arguments to create many Users.
+     * @example
+     * // Create many Users
+     * const user = await prisma.user.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Users and only return the `id`
+     * const userWithIdOnly = await prisma.user.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends UserCreateManyAndReturnArgs>(args?: SelectSubset<T, UserCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a User.
+     * @param {UserDeleteArgs} args - Arguments to delete one User.
+     * @example
+     * // Delete one User
+     * const User = await prisma.user.delete({
+     *   where: {
+     *     // ... filter to delete one User
+     *   }
+     * })
+     * 
+     */
+    delete<T extends UserDeleteArgs>(args: SelectSubset<T, UserDeleteArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one User.
+     * @param {UserUpdateArgs} args - Arguments to update one User.
+     * @example
+     * // Update one User
+     * const user = await prisma.user.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends UserUpdateArgs>(args: SelectSubset<T, UserUpdateArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Users.
+     * @param {UserDeleteManyArgs} args - Arguments to filter Users to delete.
+     * @example
+     * // Delete a few Users
+     * const { count } = await prisma.user.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends UserDeleteManyArgs>(args?: SelectSubset<T, UserDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Users.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Users
+     * const user = await prisma.user.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends UserUpdateManyArgs>(args: SelectSubset<T, UserUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Users and returns the data updated in the database.
+     * @param {UserUpdateManyAndReturnArgs} args - Arguments to update many Users.
+     * @example
+     * // Update many Users
+     * const user = await prisma.user.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Users and only return the `id`
+     * const userWithIdOnly = await prisma.user.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends UserUpdateManyAndReturnArgs>(args: SelectSubset<T, UserUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one User.
+     * @param {UserUpsertArgs} args - Arguments to update or create a User.
+     * @example
+     * // Update or create a User
+     * const user = await prisma.user.upsert({
+     *   create: {
+     *     // ... data to create a User
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the User we want to update
+     *   }
+     * })
+     */
+    upsert<T extends UserUpsertArgs>(args: SelectSubset<T, UserUpsertArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Users.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserCountArgs} args - Arguments to filter Users to count.
+     * @example
+     * // Count the number of Users
+     * const count = await prisma.user.count({
+     *   where: {
+     *     // ... the filter for the Users we want to count
+     *   }
+     * })
+    **/
+    count<T extends UserCountArgs>(
+      args?: Subset<T, UserCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], UserCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a User.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends UserAggregateArgs>(args: Subset<T, UserAggregateArgs>): Prisma.PrismaPromise<GetUserAggregateType<T>>
+
+    /**
+     * Group by User.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends UserGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: UserGroupByArgs['orderBy'] }
+        : { orderBy?: UserGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, UserGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetUserGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the User model
+   */
+  readonly fields: UserFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for User.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    driver<T extends User$driverArgs<ExtArgs> = {}>(args?: Subset<T, User$driverArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the User model
+   */
+  interface UserFieldRefs {
+    readonly id: FieldRef<"User", 'String'>
+    readonly username: FieldRef<"User", 'String'>
+    readonly password: FieldRef<"User", 'String'>
+    readonly role: FieldRef<"User", 'Role'>
+    readonly driverId: FieldRef<"User", 'String'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * User findUnique
+   */
+  export type UserFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User findUniqueOrThrow
+   */
+  export type UserFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User findFirst
+   */
+  export type UserFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Users.
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Users.
+     */
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
+  }
+
+  /**
+   * User findFirstOrThrow
+   */
+  export type UserFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Users.
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Users.
+     */
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
+  }
+
+  /**
+   * User findMany
+   */
+  export type UserFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which Users to fetch.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Users.
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
+  }
+
+  /**
+   * User create
+   */
+  export type UserCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * The data needed to create a User.
+     */
+    data: XOR<UserCreateInput, UserUncheckedCreateInput>
+  }
+
+  /**
+   * User createMany
+   */
+  export type UserCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Users.
+     */
+    data: UserCreateManyInput | UserCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * User createManyAndReturn
+   */
+  export type UserCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * The data used to create many Users.
+     */
+    data: UserCreateManyInput | UserCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * User update
+   */
+  export type UserUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * The data needed to update a User.
+     */
+    data: XOR<UserUpdateInput, UserUncheckedUpdateInput>
+    /**
+     * Choose, which User to update.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User updateMany
+   */
+  export type UserUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Users.
+     */
+    data: XOR<UserUpdateManyMutationInput, UserUncheckedUpdateManyInput>
+    /**
+     * Filter which Users to update
+     */
+    where?: UserWhereInput
+    /**
+     * Limit how many Users to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * User updateManyAndReturn
+   */
+  export type UserUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * The data used to update Users.
+     */
+    data: XOR<UserUpdateManyMutationInput, UserUncheckedUpdateManyInput>
+    /**
+     * Filter which Users to update
+     */
+    where?: UserWhereInput
+    /**
+     * Limit how many Users to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * User upsert
+   */
+  export type UserUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * The filter to search for the User to update in case it exists.
+     */
+    where: UserWhereUniqueInput
+    /**
+     * In case the User found by the `where` argument doesn't exist, create a new User with this data.
+     */
+    create: XOR<UserCreateInput, UserUncheckedCreateInput>
+    /**
+     * In case the User was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<UserUpdateInput, UserUncheckedUpdateInput>
+  }
+
+  /**
+   * User delete
+   */
+  export type UserDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter which User to delete.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User deleteMany
+   */
+  export type UserDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Users to delete
+     */
+    where?: UserWhereInput
+    /**
+     * Limit how many Users to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * User.driver
+   */
+  export type User$driverArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    where?: DriverWhereInput
+  }
+
+  /**
+   * User without action
+   */
+  export type UserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Driver
+   */
+
+  export type AggregateDriver = {
+    _count: DriverCountAggregateOutputType | null
+    _min: DriverMinAggregateOutputType | null
+    _max: DriverMaxAggregateOutputType | null
+  }
+
+  export type DriverMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+  }
+
+  export type DriverMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+  }
+
+  export type DriverCountAggregateOutputType = {
+    id: number
+    name: number
+    _all: number
+  }
+
+
+  export type DriverMinAggregateInputType = {
+    id?: true
+    name?: true
+  }
+
+  export type DriverMaxAggregateInputType = {
+    id?: true
+    name?: true
+  }
+
+  export type DriverCountAggregateInputType = {
+    id?: true
+    name?: true
+    _all?: true
+  }
+
+  export type DriverAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Driver to aggregate.
+     */
+    where?: DriverWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Drivers to fetch.
+     */
+    orderBy?: DriverOrderByWithRelationInput | DriverOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: DriverWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Drivers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Drivers.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Drivers
+    **/
+    _count?: true | DriverCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: DriverMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: DriverMaxAggregateInputType
+  }
+
+  export type GetDriverAggregateType<T extends DriverAggregateArgs> = {
+        [P in keyof T & keyof AggregateDriver]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateDriver[P]>
+      : GetScalarType<T[P], AggregateDriver[P]>
+  }
+
+
+
+
+  export type DriverGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: DriverWhereInput
+    orderBy?: DriverOrderByWithAggregationInput | DriverOrderByWithAggregationInput[]
+    by: DriverScalarFieldEnum[] | DriverScalarFieldEnum
+    having?: DriverScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: DriverCountAggregateInputType | true
+    _min?: DriverMinAggregateInputType
+    _max?: DriverMaxAggregateInputType
+  }
+
+  export type DriverGroupByOutputType = {
+    id: string
+    name: string
+    _count: DriverCountAggregateOutputType | null
+    _min: DriverMinAggregateOutputType | null
+    _max: DriverMaxAggregateOutputType | null
+  }
+
+  type GetDriverGroupByPayload<T extends DriverGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<DriverGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof DriverGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], DriverGroupByOutputType[P]>
+            : GetScalarType<T[P], DriverGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type DriverSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    user?: boolean | Driver$userArgs<ExtArgs>
+    zones?: boolean | Driver$zonesArgs<ExtArgs>
+    packages?: boolean | Driver$packagesArgs<ExtArgs>
+    _count?: boolean | DriverCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["driver"]>
+
+  export type DriverSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+  }, ExtArgs["result"]["driver"]>
+
+  export type DriverSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+  }, ExtArgs["result"]["driver"]>
+
+  export type DriverSelectScalar = {
+    id?: boolean
+    name?: boolean
+  }
+
+  export type DriverOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name", ExtArgs["result"]["driver"]>
+  export type DriverInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | Driver$userArgs<ExtArgs>
+    zones?: boolean | Driver$zonesArgs<ExtArgs>
+    packages?: boolean | Driver$packagesArgs<ExtArgs>
+    _count?: boolean | DriverCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type DriverIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type DriverIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+
+  export type $DriverPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Driver"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs> | null
+      zones: Prisma.$ZonePayload<ExtArgs>[]
+      packages: Prisma.$PackagePayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+    }, ExtArgs["result"]["driver"]>
+    composites: {}
+  }
+
+  type DriverGetPayload<S extends boolean | null | undefined | DriverDefaultArgs> = $Result.GetResult<Prisma.$DriverPayload, S>
+
+  type DriverCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<DriverFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: DriverCountAggregateInputType | true
+    }
+
+  export interface DriverDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Driver'], meta: { name: 'Driver' } }
+    /**
+     * Find zero or one Driver that matches the filter.
+     * @param {DriverFindUniqueArgs} args - Arguments to find a Driver
+     * @example
+     * // Get one Driver
+     * const driver = await prisma.driver.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends DriverFindUniqueArgs>(args: SelectSubset<T, DriverFindUniqueArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Driver that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {DriverFindUniqueOrThrowArgs} args - Arguments to find a Driver
+     * @example
+     * // Get one Driver
+     * const driver = await prisma.driver.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends DriverFindUniqueOrThrowArgs>(args: SelectSubset<T, DriverFindUniqueOrThrowArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Driver that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DriverFindFirstArgs} args - Arguments to find a Driver
+     * @example
+     * // Get one Driver
+     * const driver = await prisma.driver.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends DriverFindFirstArgs>(args?: SelectSubset<T, DriverFindFirstArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Driver that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DriverFindFirstOrThrowArgs} args - Arguments to find a Driver
+     * @example
+     * // Get one Driver
+     * const driver = await prisma.driver.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends DriverFindFirstOrThrowArgs>(args?: SelectSubset<T, DriverFindFirstOrThrowArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Drivers that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DriverFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Drivers
+     * const drivers = await prisma.driver.findMany()
+     * 
+     * // Get first 10 Drivers
+     * const drivers = await prisma.driver.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const driverWithIdOnly = await prisma.driver.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends DriverFindManyArgs>(args?: SelectSubset<T, DriverFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Driver.
+     * @param {DriverCreateArgs} args - Arguments to create a Driver.
+     * @example
+     * // Create one Driver
+     * const Driver = await prisma.driver.create({
+     *   data: {
+     *     // ... data to create a Driver
+     *   }
+     * })
+     * 
+     */
+    create<T extends DriverCreateArgs>(args: SelectSubset<T, DriverCreateArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Drivers.
+     * @param {DriverCreateManyArgs} args - Arguments to create many Drivers.
+     * @example
+     * // Create many Drivers
+     * const driver = await prisma.driver.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends DriverCreateManyArgs>(args?: SelectSubset<T, DriverCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Drivers and returns the data saved in the database.
+     * @param {DriverCreateManyAndReturnArgs} args - Arguments to create many Drivers.
+     * @example
+     * // Create many Drivers
+     * const driver = await prisma.driver.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Drivers and only return the `id`
+     * const driverWithIdOnly = await prisma.driver.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends DriverCreateManyAndReturnArgs>(args?: SelectSubset<T, DriverCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Driver.
+     * @param {DriverDeleteArgs} args - Arguments to delete one Driver.
+     * @example
+     * // Delete one Driver
+     * const Driver = await prisma.driver.delete({
+     *   where: {
+     *     // ... filter to delete one Driver
+     *   }
+     * })
+     * 
+     */
+    delete<T extends DriverDeleteArgs>(args: SelectSubset<T, DriverDeleteArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Driver.
+     * @param {DriverUpdateArgs} args - Arguments to update one Driver.
+     * @example
+     * // Update one Driver
+     * const driver = await prisma.driver.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends DriverUpdateArgs>(args: SelectSubset<T, DriverUpdateArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Drivers.
+     * @param {DriverDeleteManyArgs} args - Arguments to filter Drivers to delete.
+     * @example
+     * // Delete a few Drivers
+     * const { count } = await prisma.driver.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends DriverDeleteManyArgs>(args?: SelectSubset<T, DriverDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Drivers.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DriverUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Drivers
+     * const driver = await prisma.driver.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends DriverUpdateManyArgs>(args: SelectSubset<T, DriverUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Drivers and returns the data updated in the database.
+     * @param {DriverUpdateManyAndReturnArgs} args - Arguments to update many Drivers.
+     * @example
+     * // Update many Drivers
+     * const driver = await prisma.driver.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Drivers and only return the `id`
+     * const driverWithIdOnly = await prisma.driver.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends DriverUpdateManyAndReturnArgs>(args: SelectSubset<T, DriverUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Driver.
+     * @param {DriverUpsertArgs} args - Arguments to update or create a Driver.
+     * @example
+     * // Update or create a Driver
+     * const driver = await prisma.driver.upsert({
+     *   create: {
+     *     // ... data to create a Driver
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Driver we want to update
+     *   }
+     * })
+     */
+    upsert<T extends DriverUpsertArgs>(args: SelectSubset<T, DriverUpsertArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Drivers.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DriverCountArgs} args - Arguments to filter Drivers to count.
+     * @example
+     * // Count the number of Drivers
+     * const count = await prisma.driver.count({
+     *   where: {
+     *     // ... the filter for the Drivers we want to count
+     *   }
+     * })
+    **/
+    count<T extends DriverCountArgs>(
+      args?: Subset<T, DriverCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], DriverCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Driver.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DriverAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends DriverAggregateArgs>(args: Subset<T, DriverAggregateArgs>): Prisma.PrismaPromise<GetDriverAggregateType<T>>
+
+    /**
+     * Group by Driver.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DriverGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends DriverGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: DriverGroupByArgs['orderBy'] }
+        : { orderBy?: DriverGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, DriverGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetDriverGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Driver model
+   */
+  readonly fields: DriverFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Driver.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__DriverClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends Driver$userArgs<ExtArgs> = {}>(args?: Subset<T, Driver$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    zones<T extends Driver$zonesArgs<ExtArgs> = {}>(args?: Subset<T, Driver$zonesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    packages<T extends Driver$packagesArgs<ExtArgs> = {}>(args?: Subset<T, Driver$packagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Driver model
+   */
+  interface DriverFieldRefs {
+    readonly id: FieldRef<"Driver", 'String'>
+    readonly name: FieldRef<"Driver", 'String'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Driver findUnique
+   */
+  export type DriverFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * Filter, which Driver to fetch.
+     */
+    where: DriverWhereUniqueInput
+  }
+
+  /**
+   * Driver findUniqueOrThrow
+   */
+  export type DriverFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * Filter, which Driver to fetch.
+     */
+    where: DriverWhereUniqueInput
+  }
+
+  /**
+   * Driver findFirst
+   */
+  export type DriverFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * Filter, which Driver to fetch.
+     */
+    where?: DriverWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Drivers to fetch.
+     */
+    orderBy?: DriverOrderByWithRelationInput | DriverOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Drivers.
+     */
+    cursor?: DriverWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Drivers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Drivers.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Drivers.
+     */
+    distinct?: DriverScalarFieldEnum | DriverScalarFieldEnum[]
+  }
+
+  /**
+   * Driver findFirstOrThrow
+   */
+  export type DriverFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * Filter, which Driver to fetch.
+     */
+    where?: DriverWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Drivers to fetch.
+     */
+    orderBy?: DriverOrderByWithRelationInput | DriverOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Drivers.
+     */
+    cursor?: DriverWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Drivers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Drivers.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Drivers.
+     */
+    distinct?: DriverScalarFieldEnum | DriverScalarFieldEnum[]
+  }
+
+  /**
+   * Driver findMany
+   */
+  export type DriverFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * Filter, which Drivers to fetch.
+     */
+    where?: DriverWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Drivers to fetch.
+     */
+    orderBy?: DriverOrderByWithRelationInput | DriverOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Drivers.
+     */
+    cursor?: DriverWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Drivers from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Drivers.
+     */
+    skip?: number
+    distinct?: DriverScalarFieldEnum | DriverScalarFieldEnum[]
+  }
+
+  /**
+   * Driver create
+   */
+  export type DriverCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Driver.
+     */
+    data: XOR<DriverCreateInput, DriverUncheckedCreateInput>
+  }
+
+  /**
+   * Driver createMany
+   */
+  export type DriverCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Drivers.
+     */
+    data: DriverCreateManyInput | DriverCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Driver createManyAndReturn
+   */
+  export type DriverCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * The data used to create many Drivers.
+     */
+    data: DriverCreateManyInput | DriverCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Driver update
+   */
+  export type DriverUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Driver.
+     */
+    data: XOR<DriverUpdateInput, DriverUncheckedUpdateInput>
+    /**
+     * Choose, which Driver to update.
+     */
+    where: DriverWhereUniqueInput
+  }
+
+  /**
+   * Driver updateMany
+   */
+  export type DriverUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Drivers.
+     */
+    data: XOR<DriverUpdateManyMutationInput, DriverUncheckedUpdateManyInput>
+    /**
+     * Filter which Drivers to update
+     */
+    where?: DriverWhereInput
+    /**
+     * Limit how many Drivers to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Driver updateManyAndReturn
+   */
+  export type DriverUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * The data used to update Drivers.
+     */
+    data: XOR<DriverUpdateManyMutationInput, DriverUncheckedUpdateManyInput>
+    /**
+     * Filter which Drivers to update
+     */
+    where?: DriverWhereInput
+    /**
+     * Limit how many Drivers to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Driver upsert
+   */
+  export type DriverUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Driver to update in case it exists.
+     */
+    where: DriverWhereUniqueInput
+    /**
+     * In case the Driver found by the `where` argument doesn't exist, create a new Driver with this data.
+     */
+    create: XOR<DriverCreateInput, DriverUncheckedCreateInput>
+    /**
+     * In case the Driver was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<DriverUpdateInput, DriverUncheckedUpdateInput>
+  }
+
+  /**
+   * Driver delete
+   */
+  export type DriverDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    /**
+     * Filter which Driver to delete.
+     */
+    where: DriverWhereUniqueInput
+  }
+
+  /**
+   * Driver deleteMany
+   */
+  export type DriverDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Drivers to delete
+     */
+    where?: DriverWhereInput
+    /**
+     * Limit how many Drivers to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Driver.user
+   */
+  export type Driver$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * Driver.zones
+   */
+  export type Driver$zonesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    where?: ZoneWhereInput
+    orderBy?: ZoneOrderByWithRelationInput | ZoneOrderByWithRelationInput[]
+    cursor?: ZoneWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ZoneScalarFieldEnum | ZoneScalarFieldEnum[]
+  }
+
+  /**
+   * Driver.packages
+   */
+  export type Driver$packagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    where?: PackageWhereInput
+    orderBy?: PackageOrderByWithRelationInput | PackageOrderByWithRelationInput[]
+    cursor?: PackageWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: PackageScalarFieldEnum | PackageScalarFieldEnum[]
+  }
+
+  /**
+   * Driver without action
+   */
+  export type DriverDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Zone
+   */
+
+  export type AggregateZone = {
+    _count: ZoneCountAggregateOutputType | null
+    _min: ZoneMinAggregateOutputType | null
+    _max: ZoneMaxAggregateOutputType | null
+  }
+
+  export type ZoneMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+  }
+
+  export type ZoneMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+  }
+
+  export type ZoneCountAggregateOutputType = {
+    id: number
+    name: number
+    _all: number
+  }
+
+
+  export type ZoneMinAggregateInputType = {
+    id?: true
+    name?: true
+  }
+
+  export type ZoneMaxAggregateInputType = {
+    id?: true
+    name?: true
+  }
+
+  export type ZoneCountAggregateInputType = {
+    id?: true
+    name?: true
+    _all?: true
+  }
+
+  export type ZoneAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Zone to aggregate.
+     */
+    where?: ZoneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Zones to fetch.
+     */
+    orderBy?: ZoneOrderByWithRelationInput | ZoneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ZoneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Zones from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Zones.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Zones
+    **/
+    _count?: true | ZoneCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ZoneMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ZoneMaxAggregateInputType
+  }
+
+  export type GetZoneAggregateType<T extends ZoneAggregateArgs> = {
+        [P in keyof T & keyof AggregateZone]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateZone[P]>
+      : GetScalarType<T[P], AggregateZone[P]>
+  }
+
+
+
+
+  export type ZoneGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ZoneWhereInput
+    orderBy?: ZoneOrderByWithAggregationInput | ZoneOrderByWithAggregationInput[]
+    by: ZoneScalarFieldEnum[] | ZoneScalarFieldEnum
+    having?: ZoneScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ZoneCountAggregateInputType | true
+    _min?: ZoneMinAggregateInputType
+    _max?: ZoneMaxAggregateInputType
+  }
+
+  export type ZoneGroupByOutputType = {
+    id: string
+    name: string
+    _count: ZoneCountAggregateOutputType | null
+    _min: ZoneMinAggregateOutputType | null
+    _max: ZoneMaxAggregateOutputType | null
+  }
+
+  type GetZoneGroupByPayload<T extends ZoneGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ZoneGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ZoneGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ZoneGroupByOutputType[P]>
+            : GetScalarType<T[P], ZoneGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ZoneSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    drivers?: boolean | Zone$driversArgs<ExtArgs>
+    packages?: boolean | Zone$packagesArgs<ExtArgs>
+    _count?: boolean | ZoneCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["zone"]>
+
+  export type ZoneSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+  }, ExtArgs["result"]["zone"]>
+
+  export type ZoneSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+  }, ExtArgs["result"]["zone"]>
+
+  export type ZoneSelectScalar = {
+    id?: boolean
+    name?: boolean
+  }
+
+  export type ZoneOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name", ExtArgs["result"]["zone"]>
+  export type ZoneInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    drivers?: boolean | Zone$driversArgs<ExtArgs>
+    packages?: boolean | Zone$packagesArgs<ExtArgs>
+    _count?: boolean | ZoneCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type ZoneIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type ZoneIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+
+  export type $ZonePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Zone"
+    objects: {
+      drivers: Prisma.$DriverPayload<ExtArgs>[]
+      packages: Prisma.$PackagePayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+    }, ExtArgs["result"]["zone"]>
+    composites: {}
+  }
+
+  type ZoneGetPayload<S extends boolean | null | undefined | ZoneDefaultArgs> = $Result.GetResult<Prisma.$ZonePayload, S>
+
+  type ZoneCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ZoneFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ZoneCountAggregateInputType | true
+    }
+
+  export interface ZoneDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Zone'], meta: { name: 'Zone' } }
+    /**
+     * Find zero or one Zone that matches the filter.
+     * @param {ZoneFindUniqueArgs} args - Arguments to find a Zone
+     * @example
+     * // Get one Zone
+     * const zone = await prisma.zone.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ZoneFindUniqueArgs>(args: SelectSubset<T, ZoneFindUniqueArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Zone that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ZoneFindUniqueOrThrowArgs} args - Arguments to find a Zone
+     * @example
+     * // Get one Zone
+     * const zone = await prisma.zone.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ZoneFindUniqueOrThrowArgs>(args: SelectSubset<T, ZoneFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Zone that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ZoneFindFirstArgs} args - Arguments to find a Zone
+     * @example
+     * // Get one Zone
+     * const zone = await prisma.zone.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ZoneFindFirstArgs>(args?: SelectSubset<T, ZoneFindFirstArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Zone that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ZoneFindFirstOrThrowArgs} args - Arguments to find a Zone
+     * @example
+     * // Get one Zone
+     * const zone = await prisma.zone.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ZoneFindFirstOrThrowArgs>(args?: SelectSubset<T, ZoneFindFirstOrThrowArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Zones that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ZoneFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Zones
+     * const zones = await prisma.zone.findMany()
+     * 
+     * // Get first 10 Zones
+     * const zones = await prisma.zone.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const zoneWithIdOnly = await prisma.zone.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ZoneFindManyArgs>(args?: SelectSubset<T, ZoneFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Zone.
+     * @param {ZoneCreateArgs} args - Arguments to create a Zone.
+     * @example
+     * // Create one Zone
+     * const Zone = await prisma.zone.create({
+     *   data: {
+     *     // ... data to create a Zone
+     *   }
+     * })
+     * 
+     */
+    create<T extends ZoneCreateArgs>(args: SelectSubset<T, ZoneCreateArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Zones.
+     * @param {ZoneCreateManyArgs} args - Arguments to create many Zones.
+     * @example
+     * // Create many Zones
+     * const zone = await prisma.zone.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ZoneCreateManyArgs>(args?: SelectSubset<T, ZoneCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Zones and returns the data saved in the database.
+     * @param {ZoneCreateManyAndReturnArgs} args - Arguments to create many Zones.
+     * @example
+     * // Create many Zones
+     * const zone = await prisma.zone.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Zones and only return the `id`
+     * const zoneWithIdOnly = await prisma.zone.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ZoneCreateManyAndReturnArgs>(args?: SelectSubset<T, ZoneCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Zone.
+     * @param {ZoneDeleteArgs} args - Arguments to delete one Zone.
+     * @example
+     * // Delete one Zone
+     * const Zone = await prisma.zone.delete({
+     *   where: {
+     *     // ... filter to delete one Zone
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ZoneDeleteArgs>(args: SelectSubset<T, ZoneDeleteArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Zone.
+     * @param {ZoneUpdateArgs} args - Arguments to update one Zone.
+     * @example
+     * // Update one Zone
+     * const zone = await prisma.zone.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ZoneUpdateArgs>(args: SelectSubset<T, ZoneUpdateArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Zones.
+     * @param {ZoneDeleteManyArgs} args - Arguments to filter Zones to delete.
+     * @example
+     * // Delete a few Zones
+     * const { count } = await prisma.zone.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ZoneDeleteManyArgs>(args?: SelectSubset<T, ZoneDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Zones.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ZoneUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Zones
+     * const zone = await prisma.zone.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ZoneUpdateManyArgs>(args: SelectSubset<T, ZoneUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Zones and returns the data updated in the database.
+     * @param {ZoneUpdateManyAndReturnArgs} args - Arguments to update many Zones.
+     * @example
+     * // Update many Zones
+     * const zone = await prisma.zone.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Zones and only return the `id`
+     * const zoneWithIdOnly = await prisma.zone.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ZoneUpdateManyAndReturnArgs>(args: SelectSubset<T, ZoneUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Zone.
+     * @param {ZoneUpsertArgs} args - Arguments to update or create a Zone.
+     * @example
+     * // Update or create a Zone
+     * const zone = await prisma.zone.upsert({
+     *   create: {
+     *     // ... data to create a Zone
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Zone we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ZoneUpsertArgs>(args: SelectSubset<T, ZoneUpsertArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Zones.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ZoneCountArgs} args - Arguments to filter Zones to count.
+     * @example
+     * // Count the number of Zones
+     * const count = await prisma.zone.count({
+     *   where: {
+     *     // ... the filter for the Zones we want to count
+     *   }
+     * })
+    **/
+    count<T extends ZoneCountArgs>(
+      args?: Subset<T, ZoneCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ZoneCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Zone.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ZoneAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ZoneAggregateArgs>(args: Subset<T, ZoneAggregateArgs>): Prisma.PrismaPromise<GetZoneAggregateType<T>>
+
+    /**
+     * Group by Zone.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ZoneGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ZoneGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ZoneGroupByArgs['orderBy'] }
+        : { orderBy?: ZoneGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ZoneGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetZoneGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Zone model
+   */
+  readonly fields: ZoneFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Zone.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ZoneClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    drivers<T extends Zone$driversArgs<ExtArgs> = {}>(args?: Subset<T, Zone$driversArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    packages<T extends Zone$packagesArgs<ExtArgs> = {}>(args?: Subset<T, Zone$packagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Zone model
+   */
+  interface ZoneFieldRefs {
+    readonly id: FieldRef<"Zone", 'String'>
+    readonly name: FieldRef<"Zone", 'String'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Zone findUnique
+   */
+  export type ZoneFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * Filter, which Zone to fetch.
+     */
+    where: ZoneWhereUniqueInput
+  }
+
+  /**
+   * Zone findUniqueOrThrow
+   */
+  export type ZoneFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * Filter, which Zone to fetch.
+     */
+    where: ZoneWhereUniqueInput
+  }
+
+  /**
+   * Zone findFirst
+   */
+  export type ZoneFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * Filter, which Zone to fetch.
+     */
+    where?: ZoneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Zones to fetch.
+     */
+    orderBy?: ZoneOrderByWithRelationInput | ZoneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Zones.
+     */
+    cursor?: ZoneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Zones from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Zones.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Zones.
+     */
+    distinct?: ZoneScalarFieldEnum | ZoneScalarFieldEnum[]
+  }
+
+  /**
+   * Zone findFirstOrThrow
+   */
+  export type ZoneFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * Filter, which Zone to fetch.
+     */
+    where?: ZoneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Zones to fetch.
+     */
+    orderBy?: ZoneOrderByWithRelationInput | ZoneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Zones.
+     */
+    cursor?: ZoneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Zones from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Zones.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Zones.
+     */
+    distinct?: ZoneScalarFieldEnum | ZoneScalarFieldEnum[]
+  }
+
+  /**
+   * Zone findMany
+   */
+  export type ZoneFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * Filter, which Zones to fetch.
+     */
+    where?: ZoneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Zones to fetch.
+     */
+    orderBy?: ZoneOrderByWithRelationInput | ZoneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Zones.
+     */
+    cursor?: ZoneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Zones from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Zones.
+     */
+    skip?: number
+    distinct?: ZoneScalarFieldEnum | ZoneScalarFieldEnum[]
+  }
+
+  /**
+   * Zone create
+   */
+  export type ZoneCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Zone.
+     */
+    data: XOR<ZoneCreateInput, ZoneUncheckedCreateInput>
+  }
+
+  /**
+   * Zone createMany
+   */
+  export type ZoneCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Zones.
+     */
+    data: ZoneCreateManyInput | ZoneCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Zone createManyAndReturn
+   */
+  export type ZoneCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * The data used to create many Zones.
+     */
+    data: ZoneCreateManyInput | ZoneCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Zone update
+   */
+  export type ZoneUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Zone.
+     */
+    data: XOR<ZoneUpdateInput, ZoneUncheckedUpdateInput>
+    /**
+     * Choose, which Zone to update.
+     */
+    where: ZoneWhereUniqueInput
+  }
+
+  /**
+   * Zone updateMany
+   */
+  export type ZoneUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Zones.
+     */
+    data: XOR<ZoneUpdateManyMutationInput, ZoneUncheckedUpdateManyInput>
+    /**
+     * Filter which Zones to update
+     */
+    where?: ZoneWhereInput
+    /**
+     * Limit how many Zones to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Zone updateManyAndReturn
+   */
+  export type ZoneUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * The data used to update Zones.
+     */
+    data: XOR<ZoneUpdateManyMutationInput, ZoneUncheckedUpdateManyInput>
+    /**
+     * Filter which Zones to update
+     */
+    where?: ZoneWhereInput
+    /**
+     * Limit how many Zones to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Zone upsert
+   */
+  export type ZoneUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Zone to update in case it exists.
+     */
+    where: ZoneWhereUniqueInput
+    /**
+     * In case the Zone found by the `where` argument doesn't exist, create a new Zone with this data.
+     */
+    create: XOR<ZoneCreateInput, ZoneUncheckedCreateInput>
+    /**
+     * In case the Zone was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ZoneUpdateInput, ZoneUncheckedUpdateInput>
+  }
+
+  /**
+   * Zone delete
+   */
+  export type ZoneDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+    /**
+     * Filter which Zone to delete.
+     */
+    where: ZoneWhereUniqueInput
+  }
+
+  /**
+   * Zone deleteMany
+   */
+  export type ZoneDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Zones to delete
+     */
+    where?: ZoneWhereInput
+    /**
+     * Limit how many Zones to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Zone.drivers
+   */
+  export type Zone$driversArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    where?: DriverWhereInput
+    orderBy?: DriverOrderByWithRelationInput | DriverOrderByWithRelationInput[]
+    cursor?: DriverWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: DriverScalarFieldEnum | DriverScalarFieldEnum[]
+  }
+
+  /**
+   * Zone.packages
+   */
+  export type Zone$packagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    where?: PackageWhereInput
+    orderBy?: PackageOrderByWithRelationInput | PackageOrderByWithRelationInput[]
+    cursor?: PackageWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: PackageScalarFieldEnum | PackageScalarFieldEnum[]
+  }
+
+  /**
+   * Zone without action
+   */
+  export type ZoneDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Zone
+     */
+    select?: ZoneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Zone
+     */
+    omit?: ZoneOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ZoneInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Package
+   */
+
+  export type AggregatePackage = {
+    _count: PackageCountAggregateOutputType | null
+    _min: PackageMinAggregateOutputType | null
+    _max: PackageMaxAggregateOutputType | null
+  }
+
+  export type PackageMinAggregateOutputType = {
+    id: string | null
+    trackingCode: string | null
+    status: $Enums.PackageStatus | null
+    zoneId: string | null
+    driverId: string | null
+  }
+
+  export type PackageMaxAggregateOutputType = {
+    id: string | null
+    trackingCode: string | null
+    status: $Enums.PackageStatus | null
+    zoneId: string | null
+    driverId: string | null
+  }
+
+  export type PackageCountAggregateOutputType = {
+    id: number
+    trackingCode: number
+    status: number
+    zoneId: number
+    driverId: number
+    _all: number
+  }
+
+
+  export type PackageMinAggregateInputType = {
+    id?: true
+    trackingCode?: true
+    status?: true
+    zoneId?: true
+    driverId?: true
+  }
+
+  export type PackageMaxAggregateInputType = {
+    id?: true
+    trackingCode?: true
+    status?: true
+    zoneId?: true
+    driverId?: true
+  }
+
+  export type PackageCountAggregateInputType = {
+    id?: true
+    trackingCode?: true
+    status?: true
+    zoneId?: true
+    driverId?: true
+    _all?: true
+  }
+
+  export type PackageAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Package to aggregate.
+     */
+    where?: PackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Packages to fetch.
+     */
+    orderBy?: PackageOrderByWithRelationInput | PackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: PackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Packages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Packages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Packages
+    **/
+    _count?: true | PackageCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: PackageMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: PackageMaxAggregateInputType
+  }
+
+  export type GetPackageAggregateType<T extends PackageAggregateArgs> = {
+        [P in keyof T & keyof AggregatePackage]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregatePackage[P]>
+      : GetScalarType<T[P], AggregatePackage[P]>
+  }
+
+
+
+
+  export type PackageGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PackageWhereInput
+    orderBy?: PackageOrderByWithAggregationInput | PackageOrderByWithAggregationInput[]
+    by: PackageScalarFieldEnum[] | PackageScalarFieldEnum
+    having?: PackageScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: PackageCountAggregateInputType | true
+    _min?: PackageMinAggregateInputType
+    _max?: PackageMaxAggregateInputType
+  }
+
+  export type PackageGroupByOutputType = {
+    id: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    zoneId: string
+    driverId: string | null
+    _count: PackageCountAggregateOutputType | null
+    _min: PackageMinAggregateOutputType | null
+    _max: PackageMaxAggregateOutputType | null
+  }
+
+  type GetPackageGroupByPayload<T extends PackageGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<PackageGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof PackageGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], PackageGroupByOutputType[P]>
+            : GetScalarType<T[P], PackageGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type PackageSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    trackingCode?: boolean
+    status?: boolean
+    zoneId?: boolean
+    driverId?: boolean
+    zone?: boolean | ZoneDefaultArgs<ExtArgs>
+    driver?: boolean | Package$driverArgs<ExtArgs>
+  }, ExtArgs["result"]["package"]>
+
+  export type PackageSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    trackingCode?: boolean
+    status?: boolean
+    zoneId?: boolean
+    driverId?: boolean
+    zone?: boolean | ZoneDefaultArgs<ExtArgs>
+    driver?: boolean | Package$driverArgs<ExtArgs>
+  }, ExtArgs["result"]["package"]>
+
+  export type PackageSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    trackingCode?: boolean
+    status?: boolean
+    zoneId?: boolean
+    driverId?: boolean
+    zone?: boolean | ZoneDefaultArgs<ExtArgs>
+    driver?: boolean | Package$driverArgs<ExtArgs>
+  }, ExtArgs["result"]["package"]>
+
+  export type PackageSelectScalar = {
+    id?: boolean
+    trackingCode?: boolean
+    status?: boolean
+    zoneId?: boolean
+    driverId?: boolean
+  }
+
+  export type PackageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "trackingCode" | "status" | "zoneId" | "driverId", ExtArgs["result"]["package"]>
+  export type PackageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    zone?: boolean | ZoneDefaultArgs<ExtArgs>
+    driver?: boolean | Package$driverArgs<ExtArgs>
+  }
+  export type PackageIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    zone?: boolean | ZoneDefaultArgs<ExtArgs>
+    driver?: boolean | Package$driverArgs<ExtArgs>
+  }
+  export type PackageIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    zone?: boolean | ZoneDefaultArgs<ExtArgs>
+    driver?: boolean | Package$driverArgs<ExtArgs>
+  }
+
+  export type $PackagePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Package"
+    objects: {
+      zone: Prisma.$ZonePayload<ExtArgs>
+      driver: Prisma.$DriverPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      trackingCode: string
+      status: $Enums.PackageStatus
+      zoneId: string
+      driverId: string | null
+    }, ExtArgs["result"]["package"]>
+    composites: {}
+  }
+
+  type PackageGetPayload<S extends boolean | null | undefined | PackageDefaultArgs> = $Result.GetResult<Prisma.$PackagePayload, S>
+
+  type PackageCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<PackageFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: PackageCountAggregateInputType | true
+    }
+
+  export interface PackageDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Package'], meta: { name: 'Package' } }
+    /**
+     * Find zero or one Package that matches the filter.
+     * @param {PackageFindUniqueArgs} args - Arguments to find a Package
+     * @example
+     * // Get one Package
+     * const package = await prisma.package.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends PackageFindUniqueArgs>(args: SelectSubset<T, PackageFindUniqueArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Package that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {PackageFindUniqueOrThrowArgs} args - Arguments to find a Package
+     * @example
+     * // Get one Package
+     * const package = await prisma.package.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends PackageFindUniqueOrThrowArgs>(args: SelectSubset<T, PackageFindUniqueOrThrowArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Package that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PackageFindFirstArgs} args - Arguments to find a Package
+     * @example
+     * // Get one Package
+     * const package = await prisma.package.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends PackageFindFirstArgs>(args?: SelectSubset<T, PackageFindFirstArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Package that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PackageFindFirstOrThrowArgs} args - Arguments to find a Package
+     * @example
+     * // Get one Package
+     * const package = await prisma.package.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends PackageFindFirstOrThrowArgs>(args?: SelectSubset<T, PackageFindFirstOrThrowArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Packages that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PackageFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Packages
+     * const packages = await prisma.package.findMany()
+     * 
+     * // Get first 10 Packages
+     * const packages = await prisma.package.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const packageWithIdOnly = await prisma.package.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends PackageFindManyArgs>(args?: SelectSubset<T, PackageFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Package.
+     * @param {PackageCreateArgs} args - Arguments to create a Package.
+     * @example
+     * // Create one Package
+     * const Package = await prisma.package.create({
+     *   data: {
+     *     // ... data to create a Package
+     *   }
+     * })
+     * 
+     */
+    create<T extends PackageCreateArgs>(args: SelectSubset<T, PackageCreateArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Packages.
+     * @param {PackageCreateManyArgs} args - Arguments to create many Packages.
+     * @example
+     * // Create many Packages
+     * const package = await prisma.package.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends PackageCreateManyArgs>(args?: SelectSubset<T, PackageCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Packages and returns the data saved in the database.
+     * @param {PackageCreateManyAndReturnArgs} args - Arguments to create many Packages.
+     * @example
+     * // Create many Packages
+     * const package = await prisma.package.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Packages and only return the `id`
+     * const packageWithIdOnly = await prisma.package.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends PackageCreateManyAndReturnArgs>(args?: SelectSubset<T, PackageCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Package.
+     * @param {PackageDeleteArgs} args - Arguments to delete one Package.
+     * @example
+     * // Delete one Package
+     * const Package = await prisma.package.delete({
+     *   where: {
+     *     // ... filter to delete one Package
+     *   }
+     * })
+     * 
+     */
+    delete<T extends PackageDeleteArgs>(args: SelectSubset<T, PackageDeleteArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Package.
+     * @param {PackageUpdateArgs} args - Arguments to update one Package.
+     * @example
+     * // Update one Package
+     * const package = await prisma.package.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends PackageUpdateArgs>(args: SelectSubset<T, PackageUpdateArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Packages.
+     * @param {PackageDeleteManyArgs} args - Arguments to filter Packages to delete.
+     * @example
+     * // Delete a few Packages
+     * const { count } = await prisma.package.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends PackageDeleteManyArgs>(args?: SelectSubset<T, PackageDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Packages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PackageUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Packages
+     * const package = await prisma.package.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends PackageUpdateManyArgs>(args: SelectSubset<T, PackageUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Packages and returns the data updated in the database.
+     * @param {PackageUpdateManyAndReturnArgs} args - Arguments to update many Packages.
+     * @example
+     * // Update many Packages
+     * const package = await prisma.package.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Packages and only return the `id`
+     * const packageWithIdOnly = await prisma.package.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends PackageUpdateManyAndReturnArgs>(args: SelectSubset<T, PackageUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Package.
+     * @param {PackageUpsertArgs} args - Arguments to update or create a Package.
+     * @example
+     * // Update or create a Package
+     * const package = await prisma.package.upsert({
+     *   create: {
+     *     // ... data to create a Package
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Package we want to update
+     *   }
+     * })
+     */
+    upsert<T extends PackageUpsertArgs>(args: SelectSubset<T, PackageUpsertArgs<ExtArgs>>): Prisma__PackageClient<$Result.GetResult<Prisma.$PackagePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Packages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PackageCountArgs} args - Arguments to filter Packages to count.
+     * @example
+     * // Count the number of Packages
+     * const count = await prisma.package.count({
+     *   where: {
+     *     // ... the filter for the Packages we want to count
+     *   }
+     * })
+    **/
+    count<T extends PackageCountArgs>(
+      args?: Subset<T, PackageCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], PackageCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Package.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PackageAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends PackageAggregateArgs>(args: Subset<T, PackageAggregateArgs>): Prisma.PrismaPromise<GetPackageAggregateType<T>>
+
+    /**
+     * Group by Package.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PackageGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends PackageGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: PackageGroupByArgs['orderBy'] }
+        : { orderBy?: PackageGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, PackageGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetPackageGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Package model
+   */
+  readonly fields: PackageFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Package.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__PackageClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    zone<T extends ZoneDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ZoneDefaultArgs<ExtArgs>>): Prisma__ZoneClient<$Result.GetResult<Prisma.$ZonePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    driver<T extends Package$driverArgs<ExtArgs> = {}>(args?: Subset<T, Package$driverArgs<ExtArgs>>): Prisma__DriverClient<$Result.GetResult<Prisma.$DriverPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Package model
+   */
+  interface PackageFieldRefs {
+    readonly id: FieldRef<"Package", 'String'>
+    readonly trackingCode: FieldRef<"Package", 'String'>
+    readonly status: FieldRef<"Package", 'PackageStatus'>
+    readonly zoneId: FieldRef<"Package", 'String'>
+    readonly driverId: FieldRef<"Package", 'String'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Package findUnique
+   */
+  export type PackageFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * Filter, which Package to fetch.
+     */
+    where: PackageWhereUniqueInput
+  }
+
+  /**
+   * Package findUniqueOrThrow
+   */
+  export type PackageFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * Filter, which Package to fetch.
+     */
+    where: PackageWhereUniqueInput
+  }
+
+  /**
+   * Package findFirst
+   */
+  export type PackageFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * Filter, which Package to fetch.
+     */
+    where?: PackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Packages to fetch.
+     */
+    orderBy?: PackageOrderByWithRelationInput | PackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Packages.
+     */
+    cursor?: PackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Packages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Packages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Packages.
+     */
+    distinct?: PackageScalarFieldEnum | PackageScalarFieldEnum[]
+  }
+
+  /**
+   * Package findFirstOrThrow
+   */
+  export type PackageFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * Filter, which Package to fetch.
+     */
+    where?: PackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Packages to fetch.
+     */
+    orderBy?: PackageOrderByWithRelationInput | PackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Packages.
+     */
+    cursor?: PackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Packages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Packages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Packages.
+     */
+    distinct?: PackageScalarFieldEnum | PackageScalarFieldEnum[]
+  }
+
+  /**
+   * Package findMany
+   */
+  export type PackageFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * Filter, which Packages to fetch.
+     */
+    where?: PackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Packages to fetch.
+     */
+    orderBy?: PackageOrderByWithRelationInput | PackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Packages.
+     */
+    cursor?: PackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Packages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Packages.
+     */
+    skip?: number
+    distinct?: PackageScalarFieldEnum | PackageScalarFieldEnum[]
+  }
+
+  /**
+   * Package create
+   */
+  export type PackageCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Package.
+     */
+    data: XOR<PackageCreateInput, PackageUncheckedCreateInput>
+  }
+
+  /**
+   * Package createMany
+   */
+  export type PackageCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Packages.
+     */
+    data: PackageCreateManyInput | PackageCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Package createManyAndReturn
+   */
+  export type PackageCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * The data used to create many Packages.
+     */
+    data: PackageCreateManyInput | PackageCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Package update
+   */
+  export type PackageUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Package.
+     */
+    data: XOR<PackageUpdateInput, PackageUncheckedUpdateInput>
+    /**
+     * Choose, which Package to update.
+     */
+    where: PackageWhereUniqueInput
+  }
+
+  /**
+   * Package updateMany
+   */
+  export type PackageUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Packages.
+     */
+    data: XOR<PackageUpdateManyMutationInput, PackageUncheckedUpdateManyInput>
+    /**
+     * Filter which Packages to update
+     */
+    where?: PackageWhereInput
+    /**
+     * Limit how many Packages to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Package updateManyAndReturn
+   */
+  export type PackageUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * The data used to update Packages.
+     */
+    data: XOR<PackageUpdateManyMutationInput, PackageUncheckedUpdateManyInput>
+    /**
+     * Filter which Packages to update
+     */
+    where?: PackageWhereInput
+    /**
+     * Limit how many Packages to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Package upsert
+   */
+  export type PackageUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Package to update in case it exists.
+     */
+    where: PackageWhereUniqueInput
+    /**
+     * In case the Package found by the `where` argument doesn't exist, create a new Package with this data.
+     */
+    create: XOR<PackageCreateInput, PackageUncheckedCreateInput>
+    /**
+     * In case the Package was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<PackageUpdateInput, PackageUncheckedUpdateInput>
+  }
+
+  /**
+   * Package delete
+   */
+  export type PackageDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+    /**
+     * Filter which Package to delete.
+     */
+    where: PackageWhereUniqueInput
+  }
+
+  /**
+   * Package deleteMany
+   */
+  export type PackageDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Packages to delete
+     */
+    where?: PackageWhereInput
+    /**
+     * Limit how many Packages to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Package.driver
+   */
+  export type Package$driverArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Driver
+     */
+    select?: DriverSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Driver
+     */
+    omit?: DriverOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DriverInclude<ExtArgs> | null
+    where?: DriverWhereInput
+  }
+
+  /**
+   * Package without action
+   */
+  export type PackageDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Package
+     */
+    select?: PackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Package
+     */
+    omit?: PackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PackageInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Enums
+   */
+
+  export const TransactionIsolationLevel: {
+    ReadUncommitted: 'ReadUncommitted',
+    ReadCommitted: 'ReadCommitted',
+    RepeatableRead: 'RepeatableRead',
+    Serializable: 'Serializable'
+  };
+
+  export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
+
+
+  export const UserScalarFieldEnum: {
+    id: 'id',
+    username: 'username',
+    password: 'password',
+    role: 'role',
+    driverId: 'driverId'
+  };
+
+  export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+  export const DriverScalarFieldEnum: {
+    id: 'id',
+    name: 'name'
+  };
+
+  export type DriverScalarFieldEnum = (typeof DriverScalarFieldEnum)[keyof typeof DriverScalarFieldEnum]
+
+
+  export const ZoneScalarFieldEnum: {
+    id: 'id',
+    name: 'name'
+  };
+
+  export type ZoneScalarFieldEnum = (typeof ZoneScalarFieldEnum)[keyof typeof ZoneScalarFieldEnum]
+
+
+  export const PackageScalarFieldEnum: {
+    id: 'id',
+    trackingCode: 'trackingCode',
+    status: 'status',
+    zoneId: 'zoneId',
+    driverId: 'driverId'
+  };
+
+  export type PackageScalarFieldEnum = (typeof PackageScalarFieldEnum)[keyof typeof PackageScalarFieldEnum]
+
+
+  export const SortOrder: {
+    asc: 'asc',
+    desc: 'desc'
+  };
+
+  export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+  export const QueryMode: {
+    default: 'default',
+    insensitive: 'insensitive'
+  };
+
+  export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
+
+
+  export const NullsOrder: {
+    first: 'first',
+    last: 'last'
+  };
+
+  export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+  /**
+   * Field references
+   */
+
+
+  /**
+   * Reference to a field of type 'String'
+   */
+  export type StringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'String'>
+    
+
+
+  /**
+   * Reference to a field of type 'String[]'
+   */
+  export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'String[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'Role'
+   */
+  export type EnumRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Role'>
+    
+
+
+  /**
+   * Reference to a field of type 'Role[]'
+   */
+  export type ListEnumRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Role[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'PackageStatus'
+   */
+  export type EnumPackageStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PackageStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'PackageStatus[]'
+   */
+  export type ListEnumPackageStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PackageStatus[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'Int'
+   */
+  export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+  /**
+   * Reference to a field of type 'Int[]'
+   */
+  export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+  /**
+   * Deep Input Types
+   */
+
+
+  export type UserWhereInput = {
+    AND?: UserWhereInput | UserWhereInput[]
+    OR?: UserWhereInput[]
+    NOT?: UserWhereInput | UserWhereInput[]
+    id?: StringFilter<"User"> | string
+    username?: StringFilter<"User"> | string
+    password?: StringFilter<"User"> | string
+    role?: EnumRoleFilter<"User"> | $Enums.Role
+    driverId?: StringNullableFilter<"User"> | string | null
+    driver?: XOR<DriverNullableScalarRelationFilter, DriverWhereInput> | null
+  }
+
+  export type UserOrderByWithRelationInput = {
+    id?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    role?: SortOrder
+    driverId?: SortOrderInput | SortOrder
+    driver?: DriverOrderByWithRelationInput
+  }
+
+  export type UserWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    username?: string
+    driverId?: string
+    AND?: UserWhereInput | UserWhereInput[]
+    OR?: UserWhereInput[]
+    NOT?: UserWhereInput | UserWhereInput[]
+    password?: StringFilter<"User"> | string
+    role?: EnumRoleFilter<"User"> | $Enums.Role
+    driver?: XOR<DriverNullableScalarRelationFilter, DriverWhereInput> | null
+  }, "id" | "username" | "driverId">
+
+  export type UserOrderByWithAggregationInput = {
+    id?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    role?: SortOrder
+    driverId?: SortOrderInput | SortOrder
+    _count?: UserCountOrderByAggregateInput
+    _max?: UserMaxOrderByAggregateInput
+    _min?: UserMinOrderByAggregateInput
+  }
+
+  export type UserScalarWhereWithAggregatesInput = {
+    AND?: UserScalarWhereWithAggregatesInput | UserScalarWhereWithAggregatesInput[]
+    OR?: UserScalarWhereWithAggregatesInput[]
+    NOT?: UserScalarWhereWithAggregatesInput | UserScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"User"> | string
+    username?: StringWithAggregatesFilter<"User"> | string
+    password?: StringWithAggregatesFilter<"User"> | string
+    role?: EnumRoleWithAggregatesFilter<"User"> | $Enums.Role
+    driverId?: StringNullableWithAggregatesFilter<"User"> | string | null
+  }
+
+  export type DriverWhereInput = {
+    AND?: DriverWhereInput | DriverWhereInput[]
+    OR?: DriverWhereInput[]
+    NOT?: DriverWhereInput | DriverWhereInput[]
+    id?: StringFilter<"Driver"> | string
+    name?: StringFilter<"Driver"> | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    zones?: ZoneListRelationFilter
+    packages?: PackageListRelationFilter
+  }
+
+  export type DriverOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    user?: UserOrderByWithRelationInput
+    zones?: ZoneOrderByRelationAggregateInput
+    packages?: PackageOrderByRelationAggregateInput
+  }
+
+  export type DriverWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: DriverWhereInput | DriverWhereInput[]
+    OR?: DriverWhereInput[]
+    NOT?: DriverWhereInput | DriverWhereInput[]
+    name?: StringFilter<"Driver"> | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    zones?: ZoneListRelationFilter
+    packages?: PackageListRelationFilter
+  }, "id">
+
+  export type DriverOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    _count?: DriverCountOrderByAggregateInput
+    _max?: DriverMaxOrderByAggregateInput
+    _min?: DriverMinOrderByAggregateInput
+  }
+
+  export type DriverScalarWhereWithAggregatesInput = {
+    AND?: DriverScalarWhereWithAggregatesInput | DriverScalarWhereWithAggregatesInput[]
+    OR?: DriverScalarWhereWithAggregatesInput[]
+    NOT?: DriverScalarWhereWithAggregatesInput | DriverScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Driver"> | string
+    name?: StringWithAggregatesFilter<"Driver"> | string
+  }
+
+  export type ZoneWhereInput = {
+    AND?: ZoneWhereInput | ZoneWhereInput[]
+    OR?: ZoneWhereInput[]
+    NOT?: ZoneWhereInput | ZoneWhereInput[]
+    id?: StringFilter<"Zone"> | string
+    name?: StringFilter<"Zone"> | string
+    drivers?: DriverListRelationFilter
+    packages?: PackageListRelationFilter
+  }
+
+  export type ZoneOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    drivers?: DriverOrderByRelationAggregateInput
+    packages?: PackageOrderByRelationAggregateInput
+  }
+
+  export type ZoneWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: ZoneWhereInput | ZoneWhereInput[]
+    OR?: ZoneWhereInput[]
+    NOT?: ZoneWhereInput | ZoneWhereInput[]
+    name?: StringFilter<"Zone"> | string
+    drivers?: DriverListRelationFilter
+    packages?: PackageListRelationFilter
+  }, "id">
+
+  export type ZoneOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    _count?: ZoneCountOrderByAggregateInput
+    _max?: ZoneMaxOrderByAggregateInput
+    _min?: ZoneMinOrderByAggregateInput
+  }
+
+  export type ZoneScalarWhereWithAggregatesInput = {
+    AND?: ZoneScalarWhereWithAggregatesInput | ZoneScalarWhereWithAggregatesInput[]
+    OR?: ZoneScalarWhereWithAggregatesInput[]
+    NOT?: ZoneScalarWhereWithAggregatesInput | ZoneScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Zone"> | string
+    name?: StringWithAggregatesFilter<"Zone"> | string
+  }
+
+  export type PackageWhereInput = {
+    AND?: PackageWhereInput | PackageWhereInput[]
+    OR?: PackageWhereInput[]
+    NOT?: PackageWhereInput | PackageWhereInput[]
+    id?: StringFilter<"Package"> | string
+    trackingCode?: StringFilter<"Package"> | string
+    status?: EnumPackageStatusFilter<"Package"> | $Enums.PackageStatus
+    zoneId?: StringFilter<"Package"> | string
+    driverId?: StringNullableFilter<"Package"> | string | null
+    zone?: XOR<ZoneScalarRelationFilter, ZoneWhereInput>
+    driver?: XOR<DriverNullableScalarRelationFilter, DriverWhereInput> | null
+  }
+
+  export type PackageOrderByWithRelationInput = {
+    id?: SortOrder
+    trackingCode?: SortOrder
+    status?: SortOrder
+    zoneId?: SortOrder
+    driverId?: SortOrderInput | SortOrder
+    zone?: ZoneOrderByWithRelationInput
+    driver?: DriverOrderByWithRelationInput
+  }
+
+  export type PackageWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    trackingCode?: string
+    AND?: PackageWhereInput | PackageWhereInput[]
+    OR?: PackageWhereInput[]
+    NOT?: PackageWhereInput | PackageWhereInput[]
+    status?: EnumPackageStatusFilter<"Package"> | $Enums.PackageStatus
+    zoneId?: StringFilter<"Package"> | string
+    driverId?: StringNullableFilter<"Package"> | string | null
+    zone?: XOR<ZoneScalarRelationFilter, ZoneWhereInput>
+    driver?: XOR<DriverNullableScalarRelationFilter, DriverWhereInput> | null
+  }, "id" | "trackingCode">
+
+  export type PackageOrderByWithAggregationInput = {
+    id?: SortOrder
+    trackingCode?: SortOrder
+    status?: SortOrder
+    zoneId?: SortOrder
+    driverId?: SortOrderInput | SortOrder
+    _count?: PackageCountOrderByAggregateInput
+    _max?: PackageMaxOrderByAggregateInput
+    _min?: PackageMinOrderByAggregateInput
+  }
+
+  export type PackageScalarWhereWithAggregatesInput = {
+    AND?: PackageScalarWhereWithAggregatesInput | PackageScalarWhereWithAggregatesInput[]
+    OR?: PackageScalarWhereWithAggregatesInput[]
+    NOT?: PackageScalarWhereWithAggregatesInput | PackageScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Package"> | string
+    trackingCode?: StringWithAggregatesFilter<"Package"> | string
+    status?: EnumPackageStatusWithAggregatesFilter<"Package"> | $Enums.PackageStatus
+    zoneId?: StringWithAggregatesFilter<"Package"> | string
+    driverId?: StringNullableWithAggregatesFilter<"Package"> | string | null
+  }
+
+  export type UserCreateInput = {
+    id?: string
+    username: string
+    password: string
+    role: $Enums.Role
+    driver?: DriverCreateNestedOneWithoutUserInput
+  }
+
+  export type UserUncheckedCreateInput = {
+    id?: string
+    username: string
+    password: string
+    role: $Enums.Role
+    driverId?: string | null
+  }
+
+  export type UserUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    driver?: DriverUpdateOneWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    driverId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type UserCreateManyInput = {
+    id?: string
+    username: string
+    password: string
+    role: $Enums.Role
+    driverId?: string | null
+  }
+
+  export type UserUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  }
+
+  export type UserUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    driverId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type DriverCreateInput = {
+    id?: string
+    name: string
+    user?: UserCreateNestedOneWithoutDriverInput
+    zones?: ZoneCreateNestedManyWithoutDriversInput
+    packages?: PackageCreateNestedManyWithoutDriverInput
+  }
+
+  export type DriverUncheckedCreateInput = {
+    id?: string
+    name: string
+    user?: UserUncheckedCreateNestedOneWithoutDriverInput
+    zones?: ZoneUncheckedCreateNestedManyWithoutDriversInput
+    packages?: PackageUncheckedCreateNestedManyWithoutDriverInput
+  }
+
+  export type DriverUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    user?: UserUpdateOneWithoutDriverNestedInput
+    zones?: ZoneUpdateManyWithoutDriversNestedInput
+    packages?: PackageUpdateManyWithoutDriverNestedInput
+  }
+
+  export type DriverUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    user?: UserUncheckedUpdateOneWithoutDriverNestedInput
+    zones?: ZoneUncheckedUpdateManyWithoutDriversNestedInput
+    packages?: PackageUncheckedUpdateManyWithoutDriverNestedInput
+  }
+
+  export type DriverCreateManyInput = {
+    id?: string
+    name: string
+  }
+
+  export type DriverUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type DriverUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ZoneCreateInput = {
+    id?: string
+    name: string
+    drivers?: DriverCreateNestedManyWithoutZonesInput
+    packages?: PackageCreateNestedManyWithoutZoneInput
+  }
+
+  export type ZoneUncheckedCreateInput = {
+    id?: string
+    name: string
+    drivers?: DriverUncheckedCreateNestedManyWithoutZonesInput
+    packages?: PackageUncheckedCreateNestedManyWithoutZoneInput
+  }
+
+  export type ZoneUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    drivers?: DriverUpdateManyWithoutZonesNestedInput
+    packages?: PackageUpdateManyWithoutZoneNestedInput
+  }
+
+  export type ZoneUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    drivers?: DriverUncheckedUpdateManyWithoutZonesNestedInput
+    packages?: PackageUncheckedUpdateManyWithoutZoneNestedInput
+  }
+
+  export type ZoneCreateManyInput = {
+    id?: string
+    name: string
+  }
+
+  export type ZoneUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type ZoneUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PackageCreateInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    zone: ZoneCreateNestedOneWithoutPackagesInput
+    driver?: DriverCreateNestedOneWithoutPackagesInput
+  }
+
+  export type PackageUncheckedCreateInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    zoneId: string
+    driverId?: string | null
+  }
+
+  export type PackageUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    zone?: ZoneUpdateOneRequiredWithoutPackagesNestedInput
+    driver?: DriverUpdateOneWithoutPackagesNestedInput
+  }
+
+  export type PackageUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    zoneId?: StringFieldUpdateOperationsInput | string
+    driverId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type PackageCreateManyInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    zoneId: string
+    driverId?: string | null
+  }
+
+  export type PackageUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+  }
+
+  export type PackageUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    zoneId?: StringFieldUpdateOperationsInput | string
+    driverId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type StringFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel>
+    in?: string[] | ListStringFieldRefInput<$PrismaModel>
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel>
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringFilter<$PrismaModel> | string
+  }
+
+  export type EnumRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleFilter<$PrismaModel> | $Enums.Role
+  }
+
+  export type StringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type DriverNullableScalarRelationFilter = {
+    is?: DriverWhereInput | null
+    isNot?: DriverWhereInput | null
+  }
+
+  export type SortOrderInput = {
+    sort: SortOrder
+    nulls?: NullsOrder
+  }
+
+  export type UserCountOrderByAggregateInput = {
+    id?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    role?: SortOrder
+    driverId?: SortOrder
+  }
+
+  export type UserMaxOrderByAggregateInput = {
+    id?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    role?: SortOrder
+    driverId?: SortOrder
+  }
+
+  export type UserMinOrderByAggregateInput = {
+    id?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    role?: SortOrder
+    driverId?: SortOrder
+  }
+
+  export type StringWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel>
+    in?: string[] | ListStringFieldRefInput<$PrismaModel>
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel>
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringWithAggregatesFilter<$PrismaModel> | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedStringFilter<$PrismaModel>
+    _max?: NestedStringFilter<$PrismaModel>
+  }
+
+  export type EnumRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleWithAggregatesFilter<$PrismaModel> | $Enums.Role
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumRoleFilter<$PrismaModel>
+    _max?: NestedEnumRoleFilter<$PrismaModel>
+  }
+
+  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedStringNullableFilter<$PrismaModel>
+    _max?: NestedStringNullableFilter<$PrismaModel>
+  }
+
+  export type UserNullableScalarRelationFilter = {
+    is?: UserWhereInput | null
+    isNot?: UserWhereInput | null
+  }
+
+  export type ZoneListRelationFilter = {
+    every?: ZoneWhereInput
+    some?: ZoneWhereInput
+    none?: ZoneWhereInput
+  }
+
+  export type PackageListRelationFilter = {
+    every?: PackageWhereInput
+    some?: PackageWhereInput
+    none?: PackageWhereInput
+  }
+
+  export type ZoneOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type PackageOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type DriverCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+  }
+
+  export type DriverMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+  }
+
+  export type DriverMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+  }
+
+  export type DriverListRelationFilter = {
+    every?: DriverWhereInput
+    some?: DriverWhereInput
+    none?: DriverWhereInput
+  }
+
+  export type DriverOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ZoneCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+  }
+
+  export type ZoneMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+  }
+
+  export type ZoneMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+  }
+
+  export type EnumPackageStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageStatus | EnumPackageStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageStatusFilter<$PrismaModel> | $Enums.PackageStatus
+  }
+
+  export type ZoneScalarRelationFilter = {
+    is?: ZoneWhereInput
+    isNot?: ZoneWhereInput
+  }
+
+  export type PackageCountOrderByAggregateInput = {
+    id?: SortOrder
+    trackingCode?: SortOrder
+    status?: SortOrder
+    zoneId?: SortOrder
+    driverId?: SortOrder
+  }
+
+  export type PackageMaxOrderByAggregateInput = {
+    id?: SortOrder
+    trackingCode?: SortOrder
+    status?: SortOrder
+    zoneId?: SortOrder
+    driverId?: SortOrder
+  }
+
+  export type PackageMinOrderByAggregateInput = {
+    id?: SortOrder
+    trackingCode?: SortOrder
+    status?: SortOrder
+    zoneId?: SortOrder
+    driverId?: SortOrder
+  }
+
+  export type EnumPackageStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageStatus | EnumPackageStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageStatusWithAggregatesFilter<$PrismaModel> | $Enums.PackageStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumPackageStatusFilter<$PrismaModel>
+    _max?: NestedEnumPackageStatusFilter<$PrismaModel>
+  }
+
+  export type DriverCreateNestedOneWithoutUserInput = {
+    create?: XOR<DriverCreateWithoutUserInput, DriverUncheckedCreateWithoutUserInput>
+    connectOrCreate?: DriverCreateOrConnectWithoutUserInput
+    connect?: DriverWhereUniqueInput
+  }
+
+  export type StringFieldUpdateOperationsInput = {
+    set?: string
+  }
+
+  export type EnumRoleFieldUpdateOperationsInput = {
+    set?: $Enums.Role
+  }
+
+  export type DriverUpdateOneWithoutUserNestedInput = {
+    create?: XOR<DriverCreateWithoutUserInput, DriverUncheckedCreateWithoutUserInput>
+    connectOrCreate?: DriverCreateOrConnectWithoutUserInput
+    upsert?: DriverUpsertWithoutUserInput
+    disconnect?: DriverWhereInput | boolean
+    delete?: DriverWhereInput | boolean
+    connect?: DriverWhereUniqueInput
+    update?: XOR<XOR<DriverUpdateToOneWithWhereWithoutUserInput, DriverUpdateWithoutUserInput>, DriverUncheckedUpdateWithoutUserInput>
+  }
+
+  export type NullableStringFieldUpdateOperationsInput = {
+    set?: string | null
+  }
+
+  export type UserCreateNestedOneWithoutDriverInput = {
+    create?: XOR<UserCreateWithoutDriverInput, UserUncheckedCreateWithoutDriverInput>
+    connectOrCreate?: UserCreateOrConnectWithoutDriverInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ZoneCreateNestedManyWithoutDriversInput = {
+    create?: XOR<ZoneCreateWithoutDriversInput, ZoneUncheckedCreateWithoutDriversInput> | ZoneCreateWithoutDriversInput[] | ZoneUncheckedCreateWithoutDriversInput[]
+    connectOrCreate?: ZoneCreateOrConnectWithoutDriversInput | ZoneCreateOrConnectWithoutDriversInput[]
+    connect?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+  }
+
+  export type PackageCreateNestedManyWithoutDriverInput = {
+    create?: XOR<PackageCreateWithoutDriverInput, PackageUncheckedCreateWithoutDriverInput> | PackageCreateWithoutDriverInput[] | PackageUncheckedCreateWithoutDriverInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutDriverInput | PackageCreateOrConnectWithoutDriverInput[]
+    createMany?: PackageCreateManyDriverInputEnvelope
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+  }
+
+  export type UserUncheckedCreateNestedOneWithoutDriverInput = {
+    create?: XOR<UserCreateWithoutDriverInput, UserUncheckedCreateWithoutDriverInput>
+    connectOrCreate?: UserCreateOrConnectWithoutDriverInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ZoneUncheckedCreateNestedManyWithoutDriversInput = {
+    create?: XOR<ZoneCreateWithoutDriversInput, ZoneUncheckedCreateWithoutDriversInput> | ZoneCreateWithoutDriversInput[] | ZoneUncheckedCreateWithoutDriversInput[]
+    connectOrCreate?: ZoneCreateOrConnectWithoutDriversInput | ZoneCreateOrConnectWithoutDriversInput[]
+    connect?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+  }
+
+  export type PackageUncheckedCreateNestedManyWithoutDriverInput = {
+    create?: XOR<PackageCreateWithoutDriverInput, PackageUncheckedCreateWithoutDriverInput> | PackageCreateWithoutDriverInput[] | PackageUncheckedCreateWithoutDriverInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutDriverInput | PackageCreateOrConnectWithoutDriverInput[]
+    createMany?: PackageCreateManyDriverInputEnvelope
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+  }
+
+  export type UserUpdateOneWithoutDriverNestedInput = {
+    create?: XOR<UserCreateWithoutDriverInput, UserUncheckedCreateWithoutDriverInput>
+    connectOrCreate?: UserCreateOrConnectWithoutDriverInput
+    upsert?: UserUpsertWithoutDriverInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutDriverInput, UserUpdateWithoutDriverInput>, UserUncheckedUpdateWithoutDriverInput>
+  }
+
+  export type ZoneUpdateManyWithoutDriversNestedInput = {
+    create?: XOR<ZoneCreateWithoutDriversInput, ZoneUncheckedCreateWithoutDriversInput> | ZoneCreateWithoutDriversInput[] | ZoneUncheckedCreateWithoutDriversInput[]
+    connectOrCreate?: ZoneCreateOrConnectWithoutDriversInput | ZoneCreateOrConnectWithoutDriversInput[]
+    upsert?: ZoneUpsertWithWhereUniqueWithoutDriversInput | ZoneUpsertWithWhereUniqueWithoutDriversInput[]
+    set?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    disconnect?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    delete?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    connect?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    update?: ZoneUpdateWithWhereUniqueWithoutDriversInput | ZoneUpdateWithWhereUniqueWithoutDriversInput[]
+    updateMany?: ZoneUpdateManyWithWhereWithoutDriversInput | ZoneUpdateManyWithWhereWithoutDriversInput[]
+    deleteMany?: ZoneScalarWhereInput | ZoneScalarWhereInput[]
+  }
+
+  export type PackageUpdateManyWithoutDriverNestedInput = {
+    create?: XOR<PackageCreateWithoutDriverInput, PackageUncheckedCreateWithoutDriverInput> | PackageCreateWithoutDriverInput[] | PackageUncheckedCreateWithoutDriverInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutDriverInput | PackageCreateOrConnectWithoutDriverInput[]
+    upsert?: PackageUpsertWithWhereUniqueWithoutDriverInput | PackageUpsertWithWhereUniqueWithoutDriverInput[]
+    createMany?: PackageCreateManyDriverInputEnvelope
+    set?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    disconnect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    delete?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    update?: PackageUpdateWithWhereUniqueWithoutDriverInput | PackageUpdateWithWhereUniqueWithoutDriverInput[]
+    updateMany?: PackageUpdateManyWithWhereWithoutDriverInput | PackageUpdateManyWithWhereWithoutDriverInput[]
+    deleteMany?: PackageScalarWhereInput | PackageScalarWhereInput[]
+  }
+
+  export type UserUncheckedUpdateOneWithoutDriverNestedInput = {
+    create?: XOR<UserCreateWithoutDriverInput, UserUncheckedCreateWithoutDriverInput>
+    connectOrCreate?: UserCreateOrConnectWithoutDriverInput
+    upsert?: UserUpsertWithoutDriverInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutDriverInput, UserUpdateWithoutDriverInput>, UserUncheckedUpdateWithoutDriverInput>
+  }
+
+  export type ZoneUncheckedUpdateManyWithoutDriversNestedInput = {
+    create?: XOR<ZoneCreateWithoutDriversInput, ZoneUncheckedCreateWithoutDriversInput> | ZoneCreateWithoutDriversInput[] | ZoneUncheckedCreateWithoutDriversInput[]
+    connectOrCreate?: ZoneCreateOrConnectWithoutDriversInput | ZoneCreateOrConnectWithoutDriversInput[]
+    upsert?: ZoneUpsertWithWhereUniqueWithoutDriversInput | ZoneUpsertWithWhereUniqueWithoutDriversInput[]
+    set?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    disconnect?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    delete?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    connect?: ZoneWhereUniqueInput | ZoneWhereUniqueInput[]
+    update?: ZoneUpdateWithWhereUniqueWithoutDriversInput | ZoneUpdateWithWhereUniqueWithoutDriversInput[]
+    updateMany?: ZoneUpdateManyWithWhereWithoutDriversInput | ZoneUpdateManyWithWhereWithoutDriversInput[]
+    deleteMany?: ZoneScalarWhereInput | ZoneScalarWhereInput[]
+  }
+
+  export type PackageUncheckedUpdateManyWithoutDriverNestedInput = {
+    create?: XOR<PackageCreateWithoutDriverInput, PackageUncheckedCreateWithoutDriverInput> | PackageCreateWithoutDriverInput[] | PackageUncheckedCreateWithoutDriverInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutDriverInput | PackageCreateOrConnectWithoutDriverInput[]
+    upsert?: PackageUpsertWithWhereUniqueWithoutDriverInput | PackageUpsertWithWhereUniqueWithoutDriverInput[]
+    createMany?: PackageCreateManyDriverInputEnvelope
+    set?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    disconnect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    delete?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    update?: PackageUpdateWithWhereUniqueWithoutDriverInput | PackageUpdateWithWhereUniqueWithoutDriverInput[]
+    updateMany?: PackageUpdateManyWithWhereWithoutDriverInput | PackageUpdateManyWithWhereWithoutDriverInput[]
+    deleteMany?: PackageScalarWhereInput | PackageScalarWhereInput[]
+  }
+
+  export type DriverCreateNestedManyWithoutZonesInput = {
+    create?: XOR<DriverCreateWithoutZonesInput, DriverUncheckedCreateWithoutZonesInput> | DriverCreateWithoutZonesInput[] | DriverUncheckedCreateWithoutZonesInput[]
+    connectOrCreate?: DriverCreateOrConnectWithoutZonesInput | DriverCreateOrConnectWithoutZonesInput[]
+    connect?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+  }
+
+  export type PackageCreateNestedManyWithoutZoneInput = {
+    create?: XOR<PackageCreateWithoutZoneInput, PackageUncheckedCreateWithoutZoneInput> | PackageCreateWithoutZoneInput[] | PackageUncheckedCreateWithoutZoneInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutZoneInput | PackageCreateOrConnectWithoutZoneInput[]
+    createMany?: PackageCreateManyZoneInputEnvelope
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+  }
+
+  export type DriverUncheckedCreateNestedManyWithoutZonesInput = {
+    create?: XOR<DriverCreateWithoutZonesInput, DriverUncheckedCreateWithoutZonesInput> | DriverCreateWithoutZonesInput[] | DriverUncheckedCreateWithoutZonesInput[]
+    connectOrCreate?: DriverCreateOrConnectWithoutZonesInput | DriverCreateOrConnectWithoutZonesInput[]
+    connect?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+  }
+
+  export type PackageUncheckedCreateNestedManyWithoutZoneInput = {
+    create?: XOR<PackageCreateWithoutZoneInput, PackageUncheckedCreateWithoutZoneInput> | PackageCreateWithoutZoneInput[] | PackageUncheckedCreateWithoutZoneInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutZoneInput | PackageCreateOrConnectWithoutZoneInput[]
+    createMany?: PackageCreateManyZoneInputEnvelope
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+  }
+
+  export type DriverUpdateManyWithoutZonesNestedInput = {
+    create?: XOR<DriverCreateWithoutZonesInput, DriverUncheckedCreateWithoutZonesInput> | DriverCreateWithoutZonesInput[] | DriverUncheckedCreateWithoutZonesInput[]
+    connectOrCreate?: DriverCreateOrConnectWithoutZonesInput | DriverCreateOrConnectWithoutZonesInput[]
+    upsert?: DriverUpsertWithWhereUniqueWithoutZonesInput | DriverUpsertWithWhereUniqueWithoutZonesInput[]
+    set?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    disconnect?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    delete?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    connect?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    update?: DriverUpdateWithWhereUniqueWithoutZonesInput | DriverUpdateWithWhereUniqueWithoutZonesInput[]
+    updateMany?: DriverUpdateManyWithWhereWithoutZonesInput | DriverUpdateManyWithWhereWithoutZonesInput[]
+    deleteMany?: DriverScalarWhereInput | DriverScalarWhereInput[]
+  }
+
+  export type PackageUpdateManyWithoutZoneNestedInput = {
+    create?: XOR<PackageCreateWithoutZoneInput, PackageUncheckedCreateWithoutZoneInput> | PackageCreateWithoutZoneInput[] | PackageUncheckedCreateWithoutZoneInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutZoneInput | PackageCreateOrConnectWithoutZoneInput[]
+    upsert?: PackageUpsertWithWhereUniqueWithoutZoneInput | PackageUpsertWithWhereUniqueWithoutZoneInput[]
+    createMany?: PackageCreateManyZoneInputEnvelope
+    set?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    disconnect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    delete?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    update?: PackageUpdateWithWhereUniqueWithoutZoneInput | PackageUpdateWithWhereUniqueWithoutZoneInput[]
+    updateMany?: PackageUpdateManyWithWhereWithoutZoneInput | PackageUpdateManyWithWhereWithoutZoneInput[]
+    deleteMany?: PackageScalarWhereInput | PackageScalarWhereInput[]
+  }
+
+  export type DriverUncheckedUpdateManyWithoutZonesNestedInput = {
+    create?: XOR<DriverCreateWithoutZonesInput, DriverUncheckedCreateWithoutZonesInput> | DriverCreateWithoutZonesInput[] | DriverUncheckedCreateWithoutZonesInput[]
+    connectOrCreate?: DriverCreateOrConnectWithoutZonesInput | DriverCreateOrConnectWithoutZonesInput[]
+    upsert?: DriverUpsertWithWhereUniqueWithoutZonesInput | DriverUpsertWithWhereUniqueWithoutZonesInput[]
+    set?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    disconnect?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    delete?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    connect?: DriverWhereUniqueInput | DriverWhereUniqueInput[]
+    update?: DriverUpdateWithWhereUniqueWithoutZonesInput | DriverUpdateWithWhereUniqueWithoutZonesInput[]
+    updateMany?: DriverUpdateManyWithWhereWithoutZonesInput | DriverUpdateManyWithWhereWithoutZonesInput[]
+    deleteMany?: DriverScalarWhereInput | DriverScalarWhereInput[]
+  }
+
+  export type PackageUncheckedUpdateManyWithoutZoneNestedInput = {
+    create?: XOR<PackageCreateWithoutZoneInput, PackageUncheckedCreateWithoutZoneInput> | PackageCreateWithoutZoneInput[] | PackageUncheckedCreateWithoutZoneInput[]
+    connectOrCreate?: PackageCreateOrConnectWithoutZoneInput | PackageCreateOrConnectWithoutZoneInput[]
+    upsert?: PackageUpsertWithWhereUniqueWithoutZoneInput | PackageUpsertWithWhereUniqueWithoutZoneInput[]
+    createMany?: PackageCreateManyZoneInputEnvelope
+    set?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    disconnect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    delete?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    connect?: PackageWhereUniqueInput | PackageWhereUniqueInput[]
+    update?: PackageUpdateWithWhereUniqueWithoutZoneInput | PackageUpdateWithWhereUniqueWithoutZoneInput[]
+    updateMany?: PackageUpdateManyWithWhereWithoutZoneInput | PackageUpdateManyWithWhereWithoutZoneInput[]
+    deleteMany?: PackageScalarWhereInput | PackageScalarWhereInput[]
+  }
+
+  export type ZoneCreateNestedOneWithoutPackagesInput = {
+    create?: XOR<ZoneCreateWithoutPackagesInput, ZoneUncheckedCreateWithoutPackagesInput>
+    connectOrCreate?: ZoneCreateOrConnectWithoutPackagesInput
+    connect?: ZoneWhereUniqueInput
+  }
+
+  export type DriverCreateNestedOneWithoutPackagesInput = {
+    create?: XOR<DriverCreateWithoutPackagesInput, DriverUncheckedCreateWithoutPackagesInput>
+    connectOrCreate?: DriverCreateOrConnectWithoutPackagesInput
+    connect?: DriverWhereUniqueInput
+  }
+
+  export type EnumPackageStatusFieldUpdateOperationsInput = {
+    set?: $Enums.PackageStatus
+  }
+
+  export type ZoneUpdateOneRequiredWithoutPackagesNestedInput = {
+    create?: XOR<ZoneCreateWithoutPackagesInput, ZoneUncheckedCreateWithoutPackagesInput>
+    connectOrCreate?: ZoneCreateOrConnectWithoutPackagesInput
+    upsert?: ZoneUpsertWithoutPackagesInput
+    connect?: ZoneWhereUniqueInput
+    update?: XOR<XOR<ZoneUpdateToOneWithWhereWithoutPackagesInput, ZoneUpdateWithoutPackagesInput>, ZoneUncheckedUpdateWithoutPackagesInput>
+  }
+
+  export type DriverUpdateOneWithoutPackagesNestedInput = {
+    create?: XOR<DriverCreateWithoutPackagesInput, DriverUncheckedCreateWithoutPackagesInput>
+    connectOrCreate?: DriverCreateOrConnectWithoutPackagesInput
+    upsert?: DriverUpsertWithoutPackagesInput
+    disconnect?: DriverWhereInput | boolean
+    delete?: DriverWhereInput | boolean
+    connect?: DriverWhereUniqueInput
+    update?: XOR<XOR<DriverUpdateToOneWithWhereWithoutPackagesInput, DriverUpdateWithoutPackagesInput>, DriverUncheckedUpdateWithoutPackagesInput>
+  }
+
+  export type NestedStringFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel>
+    in?: string[] | ListStringFieldRefInput<$PrismaModel>
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel>
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    not?: NestedStringFilter<$PrismaModel> | string
+  }
+
+  export type NestedEnumRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleFilter<$PrismaModel> | $Enums.Role
+  }
+
+  export type NestedStringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type NestedStringWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel>
+    in?: string[] | ListStringFieldRefInput<$PrismaModel>
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel>
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    not?: NestedStringWithAggregatesFilter<$PrismaModel> | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedStringFilter<$PrismaModel>
+    _max?: NestedStringFilter<$PrismaModel>
+  }
+
+  export type NestedIntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type NestedEnumRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleWithAggregatesFilter<$PrismaModel> | $Enums.Role
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumRoleFilter<$PrismaModel>
+    _max?: NestedEnumRoleFilter<$PrismaModel>
+  }
+
+  export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedStringNullableFilter<$PrismaModel>
+    _max?: NestedStringNullableFilter<$PrismaModel>
+  }
+
+  export type NestedIntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type NestedEnumPackageStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageStatus | EnumPackageStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageStatusFilter<$PrismaModel> | $Enums.PackageStatus
+  }
+
+  export type NestedEnumPackageStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.PackageStatus | EnumPackageStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.PackageStatus[] | ListEnumPackageStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumPackageStatusWithAggregatesFilter<$PrismaModel> | $Enums.PackageStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumPackageStatusFilter<$PrismaModel>
+    _max?: NestedEnumPackageStatusFilter<$PrismaModel>
+  }
+
+  export type DriverCreateWithoutUserInput = {
+    id?: string
+    name: string
+    zones?: ZoneCreateNestedManyWithoutDriversInput
+    packages?: PackageCreateNestedManyWithoutDriverInput
+  }
+
+  export type DriverUncheckedCreateWithoutUserInput = {
+    id?: string
+    name: string
+    zones?: ZoneUncheckedCreateNestedManyWithoutDriversInput
+    packages?: PackageUncheckedCreateNestedManyWithoutDriverInput
+  }
+
+  export type DriverCreateOrConnectWithoutUserInput = {
+    where: DriverWhereUniqueInput
+    create: XOR<DriverCreateWithoutUserInput, DriverUncheckedCreateWithoutUserInput>
+  }
+
+  export type DriverUpsertWithoutUserInput = {
+    update: XOR<DriverUpdateWithoutUserInput, DriverUncheckedUpdateWithoutUserInput>
+    create: XOR<DriverCreateWithoutUserInput, DriverUncheckedCreateWithoutUserInput>
+    where?: DriverWhereInput
+  }
+
+  export type DriverUpdateToOneWithWhereWithoutUserInput = {
+    where?: DriverWhereInput
+    data: XOR<DriverUpdateWithoutUserInput, DriverUncheckedUpdateWithoutUserInput>
+  }
+
+  export type DriverUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    zones?: ZoneUpdateManyWithoutDriversNestedInput
+    packages?: PackageUpdateManyWithoutDriverNestedInput
+  }
+
+  export type DriverUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    zones?: ZoneUncheckedUpdateManyWithoutDriversNestedInput
+    packages?: PackageUncheckedUpdateManyWithoutDriverNestedInput
+  }
+
+  export type UserCreateWithoutDriverInput = {
+    id?: string
+    username: string
+    password: string
+    role: $Enums.Role
+  }
+
+  export type UserUncheckedCreateWithoutDriverInput = {
+    id?: string
+    username: string
+    password: string
+    role: $Enums.Role
+  }
+
+  export type UserCreateOrConnectWithoutDriverInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutDriverInput, UserUncheckedCreateWithoutDriverInput>
+  }
+
+  export type ZoneCreateWithoutDriversInput = {
+    id?: string
+    name: string
+    packages?: PackageCreateNestedManyWithoutZoneInput
+  }
+
+  export type ZoneUncheckedCreateWithoutDriversInput = {
+    id?: string
+    name: string
+    packages?: PackageUncheckedCreateNestedManyWithoutZoneInput
+  }
+
+  export type ZoneCreateOrConnectWithoutDriversInput = {
+    where: ZoneWhereUniqueInput
+    create: XOR<ZoneCreateWithoutDriversInput, ZoneUncheckedCreateWithoutDriversInput>
+  }
+
+  export type PackageCreateWithoutDriverInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    zone: ZoneCreateNestedOneWithoutPackagesInput
+  }
+
+  export type PackageUncheckedCreateWithoutDriverInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    zoneId: string
+  }
+
+  export type PackageCreateOrConnectWithoutDriverInput = {
+    where: PackageWhereUniqueInput
+    create: XOR<PackageCreateWithoutDriverInput, PackageUncheckedCreateWithoutDriverInput>
+  }
+
+  export type PackageCreateManyDriverInputEnvelope = {
+    data: PackageCreateManyDriverInput | PackageCreateManyDriverInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutDriverInput = {
+    update: XOR<UserUpdateWithoutDriverInput, UserUncheckedUpdateWithoutDriverInput>
+    create: XOR<UserCreateWithoutDriverInput, UserUncheckedCreateWithoutDriverInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutDriverInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutDriverInput, UserUncheckedUpdateWithoutDriverInput>
+  }
+
+  export type UserUpdateWithoutDriverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  }
+
+  export type UserUncheckedUpdateWithoutDriverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+  }
+
+  export type ZoneUpsertWithWhereUniqueWithoutDriversInput = {
+    where: ZoneWhereUniqueInput
+    update: XOR<ZoneUpdateWithoutDriversInput, ZoneUncheckedUpdateWithoutDriversInput>
+    create: XOR<ZoneCreateWithoutDriversInput, ZoneUncheckedCreateWithoutDriversInput>
+  }
+
+  export type ZoneUpdateWithWhereUniqueWithoutDriversInput = {
+    where: ZoneWhereUniqueInput
+    data: XOR<ZoneUpdateWithoutDriversInput, ZoneUncheckedUpdateWithoutDriversInput>
+  }
+
+  export type ZoneUpdateManyWithWhereWithoutDriversInput = {
+    where: ZoneScalarWhereInput
+    data: XOR<ZoneUpdateManyMutationInput, ZoneUncheckedUpdateManyWithoutDriversInput>
+  }
+
+  export type ZoneScalarWhereInput = {
+    AND?: ZoneScalarWhereInput | ZoneScalarWhereInput[]
+    OR?: ZoneScalarWhereInput[]
+    NOT?: ZoneScalarWhereInput | ZoneScalarWhereInput[]
+    id?: StringFilter<"Zone"> | string
+    name?: StringFilter<"Zone"> | string
+  }
+
+  export type PackageUpsertWithWhereUniqueWithoutDriverInput = {
+    where: PackageWhereUniqueInput
+    update: XOR<PackageUpdateWithoutDriverInput, PackageUncheckedUpdateWithoutDriverInput>
+    create: XOR<PackageCreateWithoutDriverInput, PackageUncheckedCreateWithoutDriverInput>
+  }
+
+  export type PackageUpdateWithWhereUniqueWithoutDriverInput = {
+    where: PackageWhereUniqueInput
+    data: XOR<PackageUpdateWithoutDriverInput, PackageUncheckedUpdateWithoutDriverInput>
+  }
+
+  export type PackageUpdateManyWithWhereWithoutDriverInput = {
+    where: PackageScalarWhereInput
+    data: XOR<PackageUpdateManyMutationInput, PackageUncheckedUpdateManyWithoutDriverInput>
+  }
+
+  export type PackageScalarWhereInput = {
+    AND?: PackageScalarWhereInput | PackageScalarWhereInput[]
+    OR?: PackageScalarWhereInput[]
+    NOT?: PackageScalarWhereInput | PackageScalarWhereInput[]
+    id?: StringFilter<"Package"> | string
+    trackingCode?: StringFilter<"Package"> | string
+    status?: EnumPackageStatusFilter<"Package"> | $Enums.PackageStatus
+    zoneId?: StringFilter<"Package"> | string
+    driverId?: StringNullableFilter<"Package"> | string | null
+  }
+
+  export type DriverCreateWithoutZonesInput = {
+    id?: string
+    name: string
+    user?: UserCreateNestedOneWithoutDriverInput
+    packages?: PackageCreateNestedManyWithoutDriverInput
+  }
+
+  export type DriverUncheckedCreateWithoutZonesInput = {
+    id?: string
+    name: string
+    user?: UserUncheckedCreateNestedOneWithoutDriverInput
+    packages?: PackageUncheckedCreateNestedManyWithoutDriverInput
+  }
+
+  export type DriverCreateOrConnectWithoutZonesInput = {
+    where: DriverWhereUniqueInput
+    create: XOR<DriverCreateWithoutZonesInput, DriverUncheckedCreateWithoutZonesInput>
+  }
+
+  export type PackageCreateWithoutZoneInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    driver?: DriverCreateNestedOneWithoutPackagesInput
+  }
+
+  export type PackageUncheckedCreateWithoutZoneInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    driverId?: string | null
+  }
+
+  export type PackageCreateOrConnectWithoutZoneInput = {
+    where: PackageWhereUniqueInput
+    create: XOR<PackageCreateWithoutZoneInput, PackageUncheckedCreateWithoutZoneInput>
+  }
+
+  export type PackageCreateManyZoneInputEnvelope = {
+    data: PackageCreateManyZoneInput | PackageCreateManyZoneInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type DriverUpsertWithWhereUniqueWithoutZonesInput = {
+    where: DriverWhereUniqueInput
+    update: XOR<DriverUpdateWithoutZonesInput, DriverUncheckedUpdateWithoutZonesInput>
+    create: XOR<DriverCreateWithoutZonesInput, DriverUncheckedCreateWithoutZonesInput>
+  }
+
+  export type DriverUpdateWithWhereUniqueWithoutZonesInput = {
+    where: DriverWhereUniqueInput
+    data: XOR<DriverUpdateWithoutZonesInput, DriverUncheckedUpdateWithoutZonesInput>
+  }
+
+  export type DriverUpdateManyWithWhereWithoutZonesInput = {
+    where: DriverScalarWhereInput
+    data: XOR<DriverUpdateManyMutationInput, DriverUncheckedUpdateManyWithoutZonesInput>
+  }
+
+  export type DriverScalarWhereInput = {
+    AND?: DriverScalarWhereInput | DriverScalarWhereInput[]
+    OR?: DriverScalarWhereInput[]
+    NOT?: DriverScalarWhereInput | DriverScalarWhereInput[]
+    id?: StringFilter<"Driver"> | string
+    name?: StringFilter<"Driver"> | string
+  }
+
+  export type PackageUpsertWithWhereUniqueWithoutZoneInput = {
+    where: PackageWhereUniqueInput
+    update: XOR<PackageUpdateWithoutZoneInput, PackageUncheckedUpdateWithoutZoneInput>
+    create: XOR<PackageCreateWithoutZoneInput, PackageUncheckedCreateWithoutZoneInput>
+  }
+
+  export type PackageUpdateWithWhereUniqueWithoutZoneInput = {
+    where: PackageWhereUniqueInput
+    data: XOR<PackageUpdateWithoutZoneInput, PackageUncheckedUpdateWithoutZoneInput>
+  }
+
+  export type PackageUpdateManyWithWhereWithoutZoneInput = {
+    where: PackageScalarWhereInput
+    data: XOR<PackageUpdateManyMutationInput, PackageUncheckedUpdateManyWithoutZoneInput>
+  }
+
+  export type ZoneCreateWithoutPackagesInput = {
+    id?: string
+    name: string
+    drivers?: DriverCreateNestedManyWithoutZonesInput
+  }
+
+  export type ZoneUncheckedCreateWithoutPackagesInput = {
+    id?: string
+    name: string
+    drivers?: DriverUncheckedCreateNestedManyWithoutZonesInput
+  }
+
+  export type ZoneCreateOrConnectWithoutPackagesInput = {
+    where: ZoneWhereUniqueInput
+    create: XOR<ZoneCreateWithoutPackagesInput, ZoneUncheckedCreateWithoutPackagesInput>
+  }
+
+  export type DriverCreateWithoutPackagesInput = {
+    id?: string
+    name: string
+    user?: UserCreateNestedOneWithoutDriverInput
+    zones?: ZoneCreateNestedManyWithoutDriversInput
+  }
+
+  export type DriverUncheckedCreateWithoutPackagesInput = {
+    id?: string
+    name: string
+    user?: UserUncheckedCreateNestedOneWithoutDriverInput
+    zones?: ZoneUncheckedCreateNestedManyWithoutDriversInput
+  }
+
+  export type DriverCreateOrConnectWithoutPackagesInput = {
+    where: DriverWhereUniqueInput
+    create: XOR<DriverCreateWithoutPackagesInput, DriverUncheckedCreateWithoutPackagesInput>
+  }
+
+  export type ZoneUpsertWithoutPackagesInput = {
+    update: XOR<ZoneUpdateWithoutPackagesInput, ZoneUncheckedUpdateWithoutPackagesInput>
+    create: XOR<ZoneCreateWithoutPackagesInput, ZoneUncheckedCreateWithoutPackagesInput>
+    where?: ZoneWhereInput
+  }
+
+  export type ZoneUpdateToOneWithWhereWithoutPackagesInput = {
+    where?: ZoneWhereInput
+    data: XOR<ZoneUpdateWithoutPackagesInput, ZoneUncheckedUpdateWithoutPackagesInput>
+  }
+
+  export type ZoneUpdateWithoutPackagesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    drivers?: DriverUpdateManyWithoutZonesNestedInput
+  }
+
+  export type ZoneUncheckedUpdateWithoutPackagesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    drivers?: DriverUncheckedUpdateManyWithoutZonesNestedInput
+  }
+
+  export type DriverUpsertWithoutPackagesInput = {
+    update: XOR<DriverUpdateWithoutPackagesInput, DriverUncheckedUpdateWithoutPackagesInput>
+    create: XOR<DriverCreateWithoutPackagesInput, DriverUncheckedCreateWithoutPackagesInput>
+    where?: DriverWhereInput
+  }
+
+  export type DriverUpdateToOneWithWhereWithoutPackagesInput = {
+    where?: DriverWhereInput
+    data: XOR<DriverUpdateWithoutPackagesInput, DriverUncheckedUpdateWithoutPackagesInput>
+  }
+
+  export type DriverUpdateWithoutPackagesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    user?: UserUpdateOneWithoutDriverNestedInput
+    zones?: ZoneUpdateManyWithoutDriversNestedInput
+  }
+
+  export type DriverUncheckedUpdateWithoutPackagesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    user?: UserUncheckedUpdateOneWithoutDriverNestedInput
+    zones?: ZoneUncheckedUpdateManyWithoutDriversNestedInput
+  }
+
+  export type PackageCreateManyDriverInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    zoneId: string
+  }
+
+  export type ZoneUpdateWithoutDriversInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    packages?: PackageUpdateManyWithoutZoneNestedInput
+  }
+
+  export type ZoneUncheckedUpdateWithoutDriversInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    packages?: PackageUncheckedUpdateManyWithoutZoneNestedInput
+  }
+
+  export type ZoneUncheckedUpdateManyWithoutDriversInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PackageUpdateWithoutDriverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    zone?: ZoneUpdateOneRequiredWithoutPackagesNestedInput
+  }
+
+  export type PackageUncheckedUpdateWithoutDriverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    zoneId?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PackageUncheckedUpdateManyWithoutDriverInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    zoneId?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PackageCreateManyZoneInput = {
+    id?: string
+    trackingCode: string
+    status: $Enums.PackageStatus
+    driverId?: string | null
+  }
+
+  export type DriverUpdateWithoutZonesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    user?: UserUpdateOneWithoutDriverNestedInput
+    packages?: PackageUpdateManyWithoutDriverNestedInput
+  }
+
+  export type DriverUncheckedUpdateWithoutZonesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    user?: UserUncheckedUpdateOneWithoutDriverNestedInput
+    packages?: PackageUncheckedUpdateManyWithoutDriverNestedInput
+  }
+
+  export type DriverUncheckedUpdateManyWithoutZonesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PackageUpdateWithoutZoneInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    driver?: DriverUpdateOneWithoutPackagesNestedInput
+  }
+
+  export type PackageUncheckedUpdateWithoutZoneInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    driverId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type PackageUncheckedUpdateManyWithoutZoneInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    trackingCode?: StringFieldUpdateOperationsInput | string
+    status?: EnumPackageStatusFieldUpdateOperationsInput | $Enums.PackageStatus
+    driverId?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+
+
+  /**
+   * Batch Payload for updateMany & deleteMany & createMany
+   */
+
+  export type BatchPayload = {
+    count: number
+  }
+
+  /**
+   * DMMF
+   */
+  export const dmmf: runtime.BaseDMMF
+}

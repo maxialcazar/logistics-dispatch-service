@@ -4,6 +4,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  engineType      = "client"
 }
 
 model User {
@@ -11,22 +12,26 @@ model User {
   username   String   @unique
   password   String
   role       Role
-  driverId   String?
+
+  driverId   String?  @unique
   driver     Driver?  @relation(fields: [driverId], references: [id])
 }
 
 model Driver {
   id       String   @id @default(uuid())
   name     String
-  users    User[]   // uno a muchos
-  zones    Zone[]   @relation("DriverZones")
-  packages Package[]
+
+  user    User?
+  zones    Zone[]
 }
 
 model Zone {
   id      String     @id @default(uuid())
   name    String
-  drivers Driver[]   @relation("DriverZones")
+
+  driver   Driver?  @relation(fields: [driverId], references: [id])
+  driverId String?
+
   packages Package[]
 }
 
@@ -36,8 +41,6 @@ model Package {
   status       PackageStatus
   zone         Zone     @relation(fields: [zoneId], references: [id])
   zoneId       String
-  driver       Driver?  @relation(fields: [driverId], references: [id])
-  driverId     String?
 }
 
 enum Role {
