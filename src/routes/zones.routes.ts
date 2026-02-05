@@ -6,9 +6,8 @@ import { requireRole } from "../middlewares/role.middleware";
 const router = Router();
 
 router.use(auth);
-router.use(requireRole("dispatcher"));
 
-router.get("/", getZones);
-router.post("/", createZone);
+router.get("/", requireRole("dispatcher"), getZones);
+router.post("/", requireRole("dispatcher"), createZone);
 
 export default router;

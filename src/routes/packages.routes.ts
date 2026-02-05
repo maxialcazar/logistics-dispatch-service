@@ -2,45 +2,21 @@ import { Router } from "express";
 import {
   getPackages,
   createPackage,
-  assignPackageToDriver,
-  updatePackageStatus,
   getPackagesByDriver,
-  getMyPackages,
+  updatePackageStatus,
+  assignPackageToDriver,
 } from "../controllers/packages.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 
-const packagesRouter = Router();
+const router = Router();
 
-// Dispatcher
+router.use(auth);
 
-packagesRouter.get("/", auth, requireRole("dispatcher"), getPackages);
+router.get("/", requireRole("dispatcher"), getPackages);
+router.post("/", requireRole("dispatcher"), createPackage);
+router.get("/driver/:driverId", requireRole("dispatcher"), getPackagesByDriver);
+router.patch("/:packageId/status", requireRole("dispatcher"), updatePackageStatus);
+router.post("/:packageId/assign", requireRole("dispatcher"), assignPackageToDriver);
 
-packagesRouter.post("/", auth, requireRole("dispatcher"), createPackage);
-
-packagesRouter.post(
-  "/:packageId/assign",
-  auth,
-  requireRole("dispatcher"),
-  assignPackageToDriver
-);
-
-packagesRouter.get(
-  "/driver/:driverId",
-  auth,
-  requireRole("dispatcher"),
-  getPackagesByDriver
-);
-
-// Driver
-
-packagesRouter.get("/me", auth, requireRole("driver"), getMyPackages);
-
-packagesRouter.patch(
-  "/:packageId/status",
-  auth,
-  requireRole("driver"),
-  updatePackageStatus
-);
-
-export default packagesRouter;
+export default router;

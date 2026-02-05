@@ -1,19 +1,18 @@
 import { Router } from "express";
-import { auth } from "../middlewares/auth.middleware";
-import { requireRole } from "../middlewares/role.middleware";
 import {
   getDrivers,
   createDriver,
   assignZonesToDriver,
 } from "../controllers/drivers.controller";
+import { auth } from "../middlewares/auth.middleware";
+import { requireRole } from "../middlewares/role.middleware";
 
-const driversRouter = Router();
+const router = Router();
 
-driversRouter.use(auth);
-driversRouter.use(requireRole("dispatcher"));
+router.use(auth);
 
-driversRouter.get("/", getDrivers);
-driversRouter.post("/", createDriver);
-driversRouter.post("/:driverId/zones", assignZonesToDriver);
+router.get("/", requireRole("dispatcher"), getDrivers);
+router.post("/", requireRole("dispatcher"), createDriver);
+router.post("/:id/zones", requireRole("dispatcher"), assignZonesToDriver);
 
-export default driversRouter;
+export default router;
