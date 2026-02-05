@@ -15,6 +15,8 @@ model User {
 
   driverId   String?  @unique
   driver     Driver?  @relation(fields: [driverId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
 }
 
 model Driver {
@@ -23,6 +25,8 @@ model Driver {
 
   user    User?
   zones    Zone[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Zone {
@@ -33,6 +37,8 @@ model Zone {
   driverId String?
 
   packages Package[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Package {
@@ -41,6 +47,8 @@ model Package {
   status       PackageStatus
   zone         Zone     @relation(fields: [zoneId], references: [id])
   zoneId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 }
 
 enum Role {

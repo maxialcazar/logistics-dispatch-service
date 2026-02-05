@@ -9,6 +9,8 @@ import {
 } from "../controllers/packages.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
+import { validate } from "../middlewares/validate.middleware";
+import { createPackageSchema, updatePackageStatusSchema, assignPackageSchema } from "../schemas/package.schema";
 
 const router = Router();
 
@@ -53,7 +55,7 @@ router.get("/", requireRole("dispatcher"), getPackages);
  *       201:
  *         description: Created
  */
-router.post("/", requireRole("dispatcher"), createPackage);
+router.post("/", requireRole("dispatcher"), validate(createPackageSchema), createPackage);
 
 /**
  * @openapi
@@ -89,7 +91,7 @@ router.get("/driver/:driverId", requireRole("dispatcher"), getPackagesByDriver);
  *       200:
  *         description: Success
  */
-router.patch("/:packageId/status", requireRole("dispatcher", "driver"), updatePackageStatus);
+router.patch("/:packageId/status", requireRole("dispatcher", "driver"), validate(updatePackageStatusSchema), updatePackageStatus);
 
 /**
  * @openapi
@@ -107,7 +109,7 @@ router.patch("/:packageId/status", requireRole("dispatcher", "driver"), updatePa
  *       200:
  *         description: Success
  */
-router.post("/:packageId/assign", requireRole("dispatcher"), assignPackageToDriver);
+router.post("/:packageId/assign", requireRole("dispatcher"), validate(assignPackageSchema), assignPackageToDriver);
 
 /**
  * @openapi

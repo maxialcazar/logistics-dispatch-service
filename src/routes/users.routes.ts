@@ -2,6 +2,8 @@ import { Router } from "express";
 import { createUser } from "../controllers/users.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
+import { validate } from "../middlewares/validate.middleware";
+import { createUserSchema } from "../schemas/user.schema";
 
 const router = Router();
 
@@ -23,6 +25,6 @@ const router = Router();
  *       201:
  *         description: Created
  */
-router.post("/", auth, requireRole("dispatcher"), createUser);
+router.post("/", auth, requireRole("dispatcher"), validate(createUserSchema), createUser);
 
 export default router;

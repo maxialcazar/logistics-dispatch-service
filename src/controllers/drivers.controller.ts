@@ -1,80 +1,35 @@
 import { Request, Response } from "express";
-import { prisma } from "../prisma";
-import bcrypt from "bcrypt";
+import { DriverService } from "../services/driver.service";
 import { AuthRequest } from "../middlewares/auth.middleware";
 
-// Listar drivers
 export async function getDrivers(req: Request, res: Response) {
-  const drivers = await prisma.driver.findMany({
-    include: { zones: true },
+  const { name, page, limit } = req.query;
+  const drivers = await DriverService.getAllDrivers({
+    name: name as string,
+    page: page ? parseInt(page as string) : undefined,
+    limit: limit ? parseInt(limit as string) : undefined,
   });
   res.json(drivers);
 }
 
-// Crear driver
 export async function createDriver(req: Request, res: Response) {
-  const { name, username, password } = req.body;
-
-  if (!name || !username || !password) {
-    return res.status(400).json({
-      error: "name, username and password are required",
-    });
+  try {
+    const driver = await DriverService.createDriver(req.body);
+    res.status(201).json(driver);
+  } catch (error: any) {
+    if (error.message === "username_exists") {
+      return res.status(400).json({ error: "username already exists" });
+    }
+    res.status(500).json({ error: "Internal Server Error" });
   }
-
-  const existingUser = await prisma.user.findUnique({
-    where: { username },
-  });
-
-  if (existingUser) {
-    return res.status(400).json({ error: "username already exists" });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const driver = await prisma.driver.create({
-    data: {
-      name,
-      user: {
-        create: {
-          username,
-          password: hashedPassword,
-          role: "driver",
-        },
-      },
-    },
-    include: {
-      user: true,
-    },
-  });
-
-  res.status(201).json(driver);
 }
 
 export async function assignZonesToDriver(req: Request, res: Response) {
   const { driverId } = req.params;
   const { zoneIds } = req.body;
 
-  if (!Array.isArray(zoneIds)) {
-    return res.status(400).json({ error: "zoneIds must be an array" });
-  }
-
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Liberar zonas previas de este driver
-      await tx.zone.updateMany({
-        where: { driverId: driverId as string },
-        data: { driverId: null },
-      });
-
-      // 2. Asignar nuevas zonas
-      await tx.zone.updateMany({
-        where: { id: { in: zoneIds } },
-        data: { driverId: driverId as string },
-      });
-
-      return { ok: true };
-    });
-
+    const result = await DriverService.assignZones(driverId as string, zoneIds);
     res.json(result);
   } catch (error) {
     console.error("Error in assignZonesToDriver:", error);
@@ -84,11 +39,7 @@ export async function assignZonesToDriver(req: Request, res: Response) {
 
 export async function getDriverZones(req: Request, res: Response) {
   const { driverId } = req.params;
-
-  const zones = await prisma.zone.findMany({
-    where: { driverId: driverId as string },
-  });
-
+  const zones = await DriverService.getDriverZones(driverId as string);
   res.json(zones);
 }
 
@@ -97,9 +48,6 @@ export async function getMyZones(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "Not a driver" });
   }
 
-  const zones = await prisma.zone.findMany({
-    where: { driverId: req.user.driverId },
-  });
-
+  const zones = await DriverService.getDriverZones(req.user.driverId);
   res.json(zones);
 }

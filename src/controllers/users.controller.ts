@@ -1,29 +1,14 @@
-import bcrypt from "bcrypt";
-import { prisma } from "../prisma";
 import { Request, Response } from "express";
+import { UserService } from "../services/user.service";
 
 export async function createUser(req: Request, res: Response) {
-  const { username, password, role } = req.body;
-
-  if (!username || !password || !role) {
-    return res.status(400).json({ error: "username, password and role are required" });
+  try {
+    const user = await UserService.createUser(req.body);
+    res.json(user);
+  } catch (error: any) {
+    if (error.message === "username_exists") {
+      return res.status(400).json({ error: "username already exists" });
+    }
+    res.status(500).json({ error: "Internal Server Error" });
   }
-
-  const existingUser = await prisma.user.findUnique({ where: { username } });
-  if (existingUser) {
-    return res.status(400).json({ error: "username already exists" });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      username,
-      password: hashedPassword,
-      role,
-    },
-  });
-
-  const { password: _, ...userWithoutPassword } = user;
-  res.json(userWithoutPassword);
 }
