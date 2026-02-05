@@ -25,7 +25,7 @@ export class PackageService {
         include: { 
           zone: {
             include: { driver: true }
-          }
+          } 
         },
         skip,
         take: limit,
@@ -45,19 +45,33 @@ export class PackageService {
     };
   }
 
-  static async createPackage(trackingCode: string, zoneId: string) {
+  static async createPackage(trackingCode: string, zoneId: string, userId: string) {
     const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
     if (!zone) {
       throw new Error("zone_not_found");
     }
 
-    return prisma.package.create({
-      data: { trackingCode, zoneId, status: "pending" },
-      include: { 
-        zone: {
-          include: { driver: true }
-        }
-      },
+    return prisma.$transaction(async (tx) => {
+      const pkg = await tx.package.create({
+        data: { 
+          trackingCode, 
+          zoneId, 
+          status: "pending",
+          history: {
+            create: {
+              status: "pending",
+              userId,
+              notes: "Package created"
+            }
+          }
+        },
+        include: { 
+          zone: {
+            include: { driver: true }
+          }
+        },
+      });
+      return pkg;
     });
   }
 
@@ -75,7 +89,7 @@ export class PackageService {
     });
   }
 
-  static async updateStatus(packageId: string, status: PackageStatus, userRole: string, userDriverId: string | null) {
+  static async updateStatus(packageId: string, status: PackageStatus, userId: string, userRole: string, userDriverId: string | null) {
     const pkg = await prisma.package.findUnique({ 
       where: { id: packageId },
       include: { zone: true }
@@ -101,13 +115,26 @@ export class PackageService {
       throw new Error(`invalid_transition:${pkg.status}:${status}`);
     }
 
-    return prisma.package.update({
-      where: { id: packageId },
-      data: { status },
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.package.update({
+        where: { id: packageId },
+        data: { status },
+      });
+
+      await tx.packageHistory.create({
+        data: {
+          packageId,
+          status,
+          userId,
+          notes: `Status updated to ${status}`
+        }
+      });
+
+      return updated;
     });
   }
 
-  static async assignToDriver(packageId: string, driverId: string) {
+  static async assignToDriver(packageId: string, driverId: string, userId: string) {
     const pkg = await prisma.package.findUnique({ 
       where: { id: packageId },
       include: { zone: true } 
@@ -124,14 +151,27 @@ export class PackageService {
       throw new Error("driver_not_in_zone");
     }
 
-    return prisma.package.update({
-      where: { id: packageId },
-      data: { status: "assigned" },
-      include: { 
-        zone: {
-          include: { driver: true }
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.package.update({
+        where: { id: packageId },
+        data: { status: "assigned" },
+        include: { 
+          zone: {
+            include: { driver: true }
+          }
+        },
+      });
+
+      await tx.packageHistory.create({
+        data: {
+          packageId,
+          status: "assigned",
+          userId,
+          notes: `Assigned to driver ${driver.name}`
         }
-      },
+      });
+
+      return updated;
     });
   }
 
@@ -143,6 +183,18 @@ export class PackageService {
         }
       },
       include: { zone: true },
+    });
+  }
+
+  static async getPackageHistory(packageId: string) {
+    return prisma.packageHistory.findMany({
+      where: { packageId },
+      include: { 
+        user: {
+          select: { username: true, role: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 }

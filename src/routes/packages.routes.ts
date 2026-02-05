@@ -5,7 +5,8 @@ import {
   getPackagesByDriver,
   updatePackageStatus,
   assignPackageToDriver,
-  getMyPackages
+  getMyPackages,
+  getPackageHistory
 } from "../controllers/packages.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
@@ -27,13 +28,62 @@ router.use(auth);
  * @openapi
  * /api/packages:
  *   get:
- *     summary: List all packages
+ *     summary: List all packages with filtering and pagination
  *     tags: [Packages]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, assigned, in_transit, delivered, cancelled]
+ *         description: Filter by package status
+ *       - in: query
+ *         name: zoneId
+ *         schema:
+ *           type: string
+ *         description: Filter by zone ID
+ *       - in: query
+ *         name: trackingCode
+ *         schema:
+ *           type: string
+ *         description: Search by tracking code (partial match)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of items per page
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
  */
 router.get("/", requireRole("dispatcher"), getPackages);
 
@@ -124,5 +174,23 @@ router.post("/:packageId/assign", requireRole("dispatcher"), validate(assignPack
  *         description: Success
  */
 router.get("/me", auth, requireRole("driver"), getMyPackages);
+
+/**
+ * @openapi
+ * /api/packages/{packageId}/history:
+ *   get:
+ *     summary: Get history of a package
+ *     tags: [Packages]
+ *     parameters:
+ *       - in: path
+ *         name: packageId
+ *         required: true
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+router.get("/:packageId/history", auth, requireRole("dispatcher", "driver"), getPackageHistory);
 
 export default router;

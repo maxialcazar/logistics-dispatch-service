@@ -23,7 +23,7 @@ export async function getPackages(req: AuthRequest, res: Response) {
 export async function createPackage(req: AuthRequest, res: Response) {
   const { trackingCode, zoneId } = req.body;
   try {
-    const pkg = await PackageService.createPackage(trackingCode, zoneId);
+    const pkg = await PackageService.createPackage(trackingCode, zoneId, req.user!.id);
     res.status(201).json(pkg);
   } catch (error: any) {
     if (error.message === "zone_not_found") {
@@ -54,6 +54,7 @@ export async function updatePackageStatus(req: AuthRequest, res: Response) {
     const updated = await PackageService.updateStatus(
       packageId,
       status,
+      req.user!.id,
       req.user!.role,
       req.user!.driverId
     );
@@ -82,7 +83,7 @@ export async function assignPackageToDriver(req: AuthRequest, res: Response) {
   const packageId = req.params.packageId as string;
 
   try {
-    const updated = await PackageService.assignToDriver(packageId, driverId);
+    const updated = await PackageService.assignToDriver(packageId, driverId, req.user!.id);
     res.json(updated);
   } catch (error: any) {
     if (error.message === "package_not_found") {
@@ -105,4 +106,14 @@ export async function getMyPackages(req: AuthRequest, res: Response) {
 
   const packages = await PackageService.getMyPackages(req.user.driverId);
   res.json(packages);
+}
+
+export async function getPackageHistory(req: AuthRequest, res: Response) {
+  const packageId = req.params.packageId as string;
+  try {
+    const history = await PackageService.getPackageHistory(packageId);
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 }

@@ -14,16 +14,22 @@
 
 ### 👨‍💼 Panel de Despachadores (Dispatcher)
 
-- **Gestión de Usuarios**: Crear y administrar cuentas de administradores y repartidores.
-- **Control de Zonas**: Definir áreas geográficas de operación.
-- **Administración de Drivers**: Asignar repartidores a zonas específicas.
-- **Logística de Paquetes**: Crear paquetes, asignarlos a zonas y monitorear su estado global.
+- **Gestión Integral**: Usuarios, Zonas, Conductores y Paquetes.
+- **Validación de Datos**: Esquemas estrictos con **Zod** para prevenir datos corruptos.
+- **Paginación y Búsqueda**: Navegación eficiente por grandes volúmenes de datos.
+- **Documentación Viva**: API documentada con **Swagger** en `/api-docs`.
 
 ### 🚲 Perfil de Repartidores (Driver)
 
-- **Vista Personalizada**: Acceso exclusivo a zonas y paquetes asignados.
-- **Gestión de Entregas**: Actualización de estados de paquetes en tiempo real (`in_transit` → `delivered`).
-- **Seguridad Garantizada**: Los repartidores solo tienen acceso a la información que les compete.
+- **Vista Especializada**: Acceso exclusivo a los paquetes de su zona asignada.
+- **Flujo de Entrega**: Reglas de negocio para cambios de estado (ej: no se puede "entregar" un paquete "cancelado").
+- **Alta Disponibilidad**: Capa de caché con **Redis** para consultas ultrarrápidas de zonas y perfiles.
+
+### 🛡️ Core Arquitectónico
+
+- **Capa de Servicios**: Lógica de negocio desacoplada para máxima escalabilidad.
+- **Seguridad Avanzada**: Protección con **Helmet**, **Rate Limiting** y **Bcrypt**.
+- **Logging Estructurado**: Registro de eventos y errores con **Winston**.
 
 ---
 
@@ -32,74 +38,12 @@
 - **Runtime**: Node.js (v18+)
 - **Lenguaje**: TypeScript
 - **Framework**: Express.js
-- **Base de Datos**: PostgreSQL
+- **Base de Datos**: PostgreSQL + **Redis** (Caché)
 - **ORM**: Prisma (v7+)
-- **Autenticación**: JSON Web Tokens (JWT)
-- **Seguridad**: Bcrypt para hashing de contraseñas
-
----
-
-## 📊 Modelo de Datos
-
-```mermaid
-erDiagram
-    USER ||--o| DRIVER : "is a"
-    DRIVER ||--o{ ZONE : "manages"
-    ZONE ||--o{ PACKAGE : "contains"
-    USER {
-        string id PK
-        string username
-        string password
-        enum role
-    }
-    DRIVER {
-        string id PK
-        string name
-    }
-    ZONE {
-        string id PK
-        string name
-    }
-    PACKAGE {
-        string id PK
-        string trackingCode
-        string status
-    }
-```
-
----
-
-## 🚀 Instalación y Configuración
-
-### 1. Clonar y preparar dependencias
-
-```bash
-git clone <repo-url>
-cd logistics-dispatch-service
-npm install
-```
-
-### 2. Variables de Entorno
-
-Crea un archivo `.env` en la raíz con la siguiente configuración:
-
-```env
-PORT=3001
-DATABASE_URL="postgresql://USUARIO:PASSWORD@localhost:5432/TU_DB"
-JWT_SECRET="tu_secreto_super_seguro"
-JWT_EXPIRES_IN="24h"
-```
-
-### 3. Base de Datos y Cliente Prisma
-
-```bash
-# Sincronizar esquema y generar cliente
-npx prisma generate
-npx prisma migrate dev --name init
-
-# Opcional: Poblar base de datos con admin inicial (admin/1234)
-npx prisma db seed
-```
+- **Validación**: Zod
+- **Autenticación**: JWT
+- **Pruebas**: Jest + Supertest
+- **Logging**: Winston + Morgan
 
 ---
 
@@ -107,27 +51,27 @@ npx prisma db seed
 
 ```text
 src/
-├── controllers/    # Lógica de negocio por entidad
-├── middlewares/    # Auth (JWT) y validación de Roles
-├── routes/         # Definición de rutas Express
-├── prisma.ts       # Configuración del cliente Prisma
-└── index.ts        # Punto de entrada del servidor
+├── controllers/    # Controladores de entrada (req/res)
+├── services/       # Lógica de negocio pura (Servicios)
+├── middlewares/    # Auth, Roles, Validación, Error Handler
+├── routes/         # Definición de endpoints
+├── schemas/        # Esquemas de validación Zod
+├── utils/          # Helpers (Logger, etc.)
+├── redis.ts        # Cliente de caché
+├── prisma.ts       # Cliente de base de datos
+└── app.ts          # Configuración de Express
 ```
 
 ---
 
-## 📡 API Reference
+## 📡 API Reference & Swagger
 
-Para una guía detallada de cómo probar cada endpoint, consulta nuestra [**Guía de Pruebas API**](./Testing%20Guide).
+El servidor cuenta con documentación interactiva:
 
-| Método  | Endpoint                   | Acceso     | Descripción                  |
-| :------ | :------------------------- | :--------- | :--------------------------- |
-| `POST`  | `/api/auth/login`          | Público    | Obtener JWT Token            |
-| `POST`  | `/api/users`               | Dispatcher | Crear nuevos usuarios        |
-| `GET`   | `/api/zones`               | Dispatcher | Listar zonas operativas      |
-| `GET`   | `/api/drivers`             | Dispatcher | Ver lista de conductores     |
-| `PATCH` | `/api/packages/:id/status` | Mix        | Actualizar estado de entrega |
-| `GET`   | `/api/packages/me`         | Driver     | Ver paquetes del repartidor  |
+- **Swagger UI**: [http://localhost:3001/api-docs](http://localhost:3001/api-docs)
+- **Health Check**: `/api/health`
+
+Para una guía detallada de cómo probar cada endpoint y correr los tests automatizados, consulta nuestra [**Guía de Pruebas (TESTING_GUIDE.md)**](./TESTING_GUIDE.md).
 
 ---
 

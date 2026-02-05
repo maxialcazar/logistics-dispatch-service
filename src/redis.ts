@@ -44,5 +44,11 @@ export const redis = {
     if (keys.length > 0) {
       await client.del(keys);
     }
+  },
+  async disconnect() {
+    if (client.isOpen) {
+      await client.quit();
+      console.log('🛑 Redis disconnected');
+    }
   }
 };

@@ -15,6 +15,7 @@ model User {
 
   driverId   String?  @unique
   driver     Driver?  @relation(fields: [driverId], references: [id])
+  history    PackageHistory[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
 }
@@ -47,8 +48,26 @@ model Package {
   status       PackageStatus
   zone         Zone     @relation(fields: [zoneId], references: [id])
   zoneId       String
+  history      PackageHistory[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([status])
+  @@index([zoneId])
+}
+
+model PackageHistory {
+  id        String        @id @default(uuid())
+  packageId String
+  package   Package       @relation(fields: [packageId], references: [id])
+  status    PackageStatus
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  notes     String?
+  createdAt DateTime      @default(now())
+
+  @@index([packageId])
+  @@index([userId])
 }
 
 enum Role {

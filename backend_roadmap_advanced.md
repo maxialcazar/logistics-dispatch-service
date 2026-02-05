@@ -4,30 +4,30 @@ Este documento analiza el código actual y propone una serie de mejoras técnica
 
 ---
 
-## 🛠️ 1. Optimizaciones Técnicas (Performance & Escalabilidad)
+## Ô£à 1. Optimizaciones T├®cnicas (Performance & Escalabilidad)
 
-### A. Capa de Servicios (Business Logic Decoupling)
+### A. Capa de Servicios (Business Logic Decoupling) Ô£à
 
 Actualmente, la lógica de negocio reside directamente en los controladores.
 
 - **Mejora**: Mover la lógica a archivos `src/services/`.
 - **Beneficio**: Facilita las pruebas unitarias puras y permite reutilizar lógica en diferentes partes de la app (ej. un cron job y un endpoint usando el mismo servicio).
 
-### B. Paginación y Filtrado Avanzado
+### B. Paginación y Filtrado Avanzado Ô£à
 
 Endpoints como `GET /api/packages` devuelven todos los registros.
 
-- **Mejora**: Implementar paginación (limit/offset o cursor-based) y filtrado (por fecha, estado, zona) directamente en las consultas de Prisma.
+- **Mejora**: Implementar paginaci├│n (limit/offset o cursor-based) y filtrado (por fecha, estado, zona) directamente en las consultas de Prisma.
 - **Beneficio**: Evita el consumo excesivo de memoria y ancho de banda cuando la base de datos crezca a miles de registros.
 
-### C. Caché con Redis
+### C. Caché con Redis Ô£à
 
 Datos que cambian poco pero se consultan mucho (como la lista de zonas o perfiles de conductores).
 
-- **Mejora**: Implementar una capa de caché con Redis.
+- **Mejora**: Implementar una capa de cach├® con Redis.
 - **Beneficio**: Reduce la carga en PostgreSQL y baja la latencia de respuesta de milisegundos a microsegundos.
 
-### D. Logging de Grado de Producción
+### D. Logging de Grado de Producción Ô£à
 
 - **Mejora**: Reemplazar `console.log` por **Winston** o **Pino**.
 - **Beneficio**: Permite estructurar logs en JSON para servicios como Datadog o ELK Stack, y separar logs por niveles (info, warn, error).
@@ -36,14 +36,14 @@ Datos que cambian poco pero se consultan mucho (como la lista de zonas o perfile
 
 ## 🛡️ 2. Seguridad y Resiliencia
 
-### A. Rate Limiting
+### A. Rate Limiting Ô£à
 
 - **Mejora**: Usar `express-rate-limit`.
-- **Beneficio**: Protege la API contra ataques de fuerza bruta y denegación de servicio (DoS).
+- **Beneficio**: Protege la API contra ataques de fuerza bruta y denegaci├│n de servicio (DoS).
 
-### B. Helmet.js
+### B. Helmet.js Ô£à
 
-- **Mejora**: Implementar `helmet` para configurar headers de seguridad HTTP automáticamente.
+- **Mejora**: Implementar `helmet` para configurar headers de seguridad HTTP autom├íticamente.
 - **Beneficio**: Previene ataques comunes como XSS y Clickjacking.
 
 ### C. Graceful Shutdown
