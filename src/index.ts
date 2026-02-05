@@ -10,6 +10,10 @@ import zonesRouter from "./routes/zones.routes";
 import authRouter from "./routes/auth.routes";
 import usersRouter from "./routes/users.routes";
 
+// Swagger
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./swagger";
+
 dotenv.config();
 
 const app = express();
@@ -19,6 +23,15 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+
+// Swagger UI
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Swagger JSON
+app.get("/swagger.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
 
 // Rutas
 app.use("/api/packages", packagesRouter);
