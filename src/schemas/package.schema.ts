@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createPackageSchema = z.object({
   body: z.object({
     trackingCode: z.string().min(5),
+    address: z.string().min(5),
     zoneId: z.string().uuid(),
   }),
 });

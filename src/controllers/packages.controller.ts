@@ -21,9 +21,9 @@ export async function getPackages(req: AuthRequest, res: Response) {
 }
 
 export async function createPackage(req: AuthRequest, res: Response) {
-  const { trackingCode, zoneId } = req.body;
+  const { trackingCode, address, zoneId } = req.body;
   try {
-    const pkg = await PackageService.createPackage(trackingCode, zoneId, req.user!.id);
+    const pkg = await PackageService.createPackage(trackingCode, address, zoneId, req.user!.id);
     res.status(201).json(pkg);
   } catch (error: any) {
     if (error.message === "zone_not_found") {

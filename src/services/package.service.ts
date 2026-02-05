@@ -46,7 +46,7 @@ export class PackageService {
     };
   }
 
-  static async createPackage(trackingCode: string, zoneId: string, userId: string) {
+  static async createPackage(trackingCode: string, address: string, zoneId: string, userId: string) {
     const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
     if (!zone) {
       throw new Error("zone_not_found");
@@ -56,13 +56,14 @@ export class PackageService {
       const pkg = await tx.package.create({
         data: { 
           trackingCode, 
+          address,
           zoneId, 
           status: "pending",
           history: {
             create: {
               status: "pending",
               userId,
-              notes: "Package created"
+              notes: `Package created for delivery at ${address}`
             }
           }
         },

@@ -45,6 +45,7 @@ model Zone {
 model Package {
   id           String   @id @default(uuid())
   trackingCode String   @unique
+  address      String
   status       PackageStatus
   zone         Zone     @relation(fields: [zoneId], references: [id])
   zoneId       String
