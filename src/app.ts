@@ -29,8 +29,8 @@ const app = express();
 // Security Middleware
 app.use(helmet());
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window`
+  windowMs: 15 * 60 * 1000, 
+  max: 5000, // Increased for Load Testing (was 100)
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },

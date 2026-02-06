@@ -106,14 +106,23 @@ router.get("/track/:trackingCode/stream", trackingLimiter, async (req, res) => {
 
     // 2. Define listener to filter events
     const listener = (data: any) => {
-       if (data.driverId === driverId) {
-          // Construct client-safe payload (exclude internal driver ID)
-          const clientPayload = {
-             lat: data.lat,
-             lng: data.lng,
-             timestamp: data.timestamp
-          };
-          res.write(`data: ${JSON.stringify(clientPayload)}\n\n`);
+       try {
+         if (data.driverId === driverId) {
+            // Construct client-safe payload (exclude internal driver ID)
+            const clientPayload = {
+               lat: data.lat,
+               lng: data.lng,
+               timestamp: data.timestamp
+            };
+            
+            // Defensive writing check
+            if (res.writable) {
+                res.write(`data: ${JSON.stringify(clientPayload)}\n\n`);
+            }
+         }
+       } catch (err) {
+         console.error("SSE Write Error:", err);
+         // Don't crash the process, just log
        }
     };
 
