@@ -1,117 +1,91 @@
-# 🧪 Guía de Pruebas (Testing Guide)
+# 🧪 Guía de Pruebas y QA - Logistics Dispatch Service
 
-Esta guía explica cómo verificar el correcto funcionamiento del backend del **Logistics Dispatch Service**, tanto mediante pruebas automatizadas como manuales.
+Esta guía detalla cómo validar la funcionalidad, rendimiento y robustez del sistema LDE.
 
 ---
 
-## 🤖 1. Pruebas Automatizadas (Jest + Supertest)
+## 1. Pruebas Unitarias e Integración (Jest)
 
-Hemos implementado un conjunto de pruebas que verifican la salud de la API y las reglas de validación.
+El proyecto incluye una suite de tests automatizados que verifica la lógica de negocio crítica, la seguridad de las rutas y la coherencia de los datos.
 
-### Ejecutar todos los tests
+### Ejecución
 
 ```bash
+# Ejecutar toda la suite
 npm test
+
+# Ejecutar un archivo específico
+npx jest tests/public_tracking.test.ts
 ```
 
-### Ejecutar un test específico
+> **Nota:** Los tests requieren una instancia de Redis corriendo (o Docker). Si el test falla por `ECONNREFUSED`, asegúrate de que Redis esté activo en el puerto 6379 o configura `.env`.
 
-```bash
-# Ejemplo: Probar solo validación de login
-npx jest tests/auth_validation.test.ts
+---
+
+## 2. Pruebas de Carga (Stress Testing)
+
+Para validar la arquitectura, incluimos un script de "Tormenta de Tráfico" que simula una flota de 50-500 conductores bombardeando el sistema simultáneamente.
+
+### Ubicación
+
+Los scripts de carga se han movido a: `LDE-INFO/stress-tests/`
+
+### ¿Qué hace la prueba?
+
+1. Crea 50 conductores y paquetes en la base de datos.
+2. Abre 50 conexiones SSE (clientes públicos) escuchando eventos.
+3. Lanza 1,000 actualizaciones de ubicación (`PATCH /location`) en ráfaga (concurrencia masiva).
+4. Mide latencia, tasa de entrega y estabilidad del servidor.
+
+### Cómo Ejecutar (PowerShell)
+
+```powershell
+# Asegúrate de que el servidor (o Docker) esté corriendo en el puerto 3001
+# O usa el orquestador automático que levanta su propio servidor:
+
+cd LDE-INFO/stress-tests
+powershell -ExecutionPolicy Bypass -File run_stress.ps1
 ```
 
-### Qué cubren los tests actuales:
+---
 
-- **Salud del Sistema**: Verifica que el endpoint `/api/health` responda correctamente.
-- **Validación de Datos (Zod)**: Asegura que el servidor bloquee peticiones con datos faltantes o incorrectos.
-- **Tracking Público y Privacidad**: Verifica que el portal público (`/api/public/track`) devuelva datos, aplique el enmascaramiento de direcciones y respete los límites de velocidad (Rate Limiting).
-- **Geocodificación**: Valida que los paquetes acepten coordenadas GPS lat/lng y que los conductores puedan actualizar su ubicación en tiempo real.
-- **SSE Streams**: Verifica que la conexión al stream `/api/public/track/{trackingCode}/stream` se mantenga abierta y reciba "heartbeats".
+## 3. Verificación de Observabilidad
+
+El sistema expone métricas en tiempo real. Esto es útil para monitorear la salud del servicio durante las pruebas de carga.
+
+**Endpoint:** `GET /api/admin/metrics`
+**Headers:** `Authorization: Bearer <TOKEN_DE_DISPATCHER>`
+
+**Ejemplo de Respuesta:**
+
+```json
+{
+  "status": "online",
+  "uptime": "345s",
+  "resources": {
+    "memory_rss_mb": 120,
+    "memory_heap_mb": 85
+  },
+  "components": {
+    "database": { "status": "ok", "latency_ms": 2 },
+    "redis": { "status": "ok", "latency_ms": 1 },
+    "websockets": { "connected_clients": 50 }
+  }
+}
+```
+
+### Escenario de Prueba Manual de Métricas
+
+1. Inicia el servidor (`docker-compose up`).
+2. Conecta 5 pestañas de navegador al panel de dispatcher (simulado).
+3. Consulta el endpoint de métricas.
+4. Verifica que `websockets.connected_clients` sea 5.
 
 ---
 
-## 🛰️ 2. Pruebas de Tiempo Real (Híbrido)
+## 4. Escenarios de Caos (Chaos Engineering)
 
-### WebSockets (Backoffice)
+Para validar la resiliencia (ya implementada en código), puedes intentar:
 
-1. Conecta un cliente Socket.IO a `ws://localhost:3001`.
-2. Envía un `PATCH /api/drivers/location` con coordenadas.
-3. Verifica que el socket reciba el evento `driver-location-updated`.
-
-### Server-Sent Events (Público)
-
-1. Abre en tu navegador (o usa `curl`): `http://localhost:3001/api/public/track/{TRACKING_CODE}/stream`.
-2. Deberías ver una conexión permanente que recibe datos periódicamente (heartbeats `: heartbeat` o updates `data: {...}`).
-
----
-
-## 🧪 3. Pruebas de Resiliencia (Chaos Testing)
-
-### Simulación de Fallo de Redis
-
-1. Detén Redis (`docker stop redis` o similar).
-2. Intenta enviar una ubicación de conductor (`PATCH`).
-3. **Resultado Esperado**: El endpoint debe responder `200 OK` (modo "Fire and Forget"), aunque el evento no se emita. El sistema no debe colgarse.
-
-### Simulación de Inestabilidad de Red (SSE)
-
-1. Conéctate al stream SSE.
-2. Desconecta tu internet brevemente.
-3. **Resultado Esperado**: El navegador intentará reconectar automáticamente (gracias a `retry: 10000`).
-
----
-
-## 🔒 4. Pruebas de Seguridad y Privacidad
-
-### Verificación de Enmascaramiento de Dirección
-
-1. Crea un paquete con una dirección específica.
-2. Accede al endpoint público: `GET /api/public/track/{trackingCode}`.
-3. Confirma que la dirección mostrada termine en `***` y no exponga el número exacto de la calle.
-
-### Verificación de Rate Limiting
-
-1. Intenta acceder al endpoint de tracking masivamente (más de 20 veces por hora).
-2. El sistema deberá retornar un error `429 Too Many Requests`.
-
-La forma más sencilla de probar los endpoints es a través de la documentación interactiva.
-
-1. Inicia el servidor: `npm run dev`
-2. Abre en tu navegador: [http://localhost:3001/api-docs](http://localhost:3001/api-docs)
-3. **Flujo de prueba sugerido**:
-   - Ve a `POST /api/auth/login`.
-   - Haz clic en "Try it out" y usa las credenciales de un usuario existente.
-   - Copia el `token` de la respuesta.
-   - Haz clic en el botón **Authorize** (arriba a la derecha) y pega el token.
-   - ¡Ahora puedes probar los endpoints protegidos (Drivers, Zones, Packages)!
-
----
-
-## ⚡ 3. Pruebas de Rendimiento (Redis)
-
-Si tienes Redis habilitado (`REDIS_ENABLED=true` en `.env`), puedes verificar la caché de la siguiente manera:
-
-1. Realiza una petición `GET /api/zones`.
-2. Revisa los logs en la terminal. Deberías ver una consulta a PostgreSQL.
-3. Realiza la misma petición de nuevo.
-4. La respuesta debería ser casi instantánea y no verás una nueva consulta a la base de datos en los logs (los datos vienen de Redis).
-
----
-
-## 🔍 4. Monitoreo de Logs
-
-Para ver qué está pasando "bajo el capó" o depurar errores internos:
-
-- **Logs en vivo**: Revisa la terminal donde corre `npm run dev`.
-- **Archivos de Log**:
-  - `logs/error.log`: Solo contiene errores críticos y sus stack traces.
-  - `logs/combined.log`: Registro completo de todas las peticiones HTTP y eventos de la aplicación.
-
----
-
-## 🛠️ 5. Herramientas Recomendadas
-
-- **Postman / Insomnia**: Para pruebas manuales más complejas.
-- **TablePlus / DBeaver**: Para inspeccionar los datos directamente en PostgreSQL.
-- **Redis Insight**: Para visualizar las claves guardadas en la caché.
+1. **Matar Redis:** Detén el contenedor de Redis (`docker stop logistics-redis`). El API no debe caerse, solo debe dejar de transmitir eventos en vivo.
+2. **Reinicio de API:** Reinicia el contenedor de Node.js. Los clientes SSE deberían reconectarse automáticamente gracias al mecanismo de `retry`.

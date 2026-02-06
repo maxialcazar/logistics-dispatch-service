@@ -63,6 +63,16 @@ _Datos validados mediante pruebas de estrés (Load Testing) en entorno controlad
 
 ---
 
+## ☁️ Despliegue Universal (Docker Ready)
+
+LDE se entrega completamente "Dockerizado", lo que significa que es agnóstico a la infraestructura:
+
+- **Cloud:** Compatible con AWS ECS, Google Cloud Run, Azure o DigitalOcean.
+- **On-Premise:** Puede correr en servidores propios con un simple `docker-compose up`.
+- **Portabilidad:** Garantía de "escríbelo una vez, ejecútalo en cualquier lugar", eliminando conflictos de versiones o dependencias.
+
+---
+
 ## 🎯 ¿Por qué elegir LDE?
 
 Si su negocio necesita escalar de 10 a 1,000 entregas diarias, no puede depender de hojas de cálculo o sistemas que se actualizan cada 5 minutos. **LDE** ofrece la infraestructura de los gigantes logísticos, lista para conectar con cualquier Frontend (React, Vue, Mobile App) y empezar a operar hoy mismo.
