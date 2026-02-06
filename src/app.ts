@@ -30,11 +30,11 @@ const app = express();
 // Security Middleware
 app.use(helmet());
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 5000, // Limit each IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many requests, please try again later." },
+	windowMs: 15 * 60 * 1000, 
+	max: 5000, // Limit each IP
+	standardHeaders: true,
+	legacyHeaders: false,
+	message: { error: "Too many requests, please try again later." },
 });
 app.use("/api/", limiter);
 
@@ -44,7 +44,7 @@ app.use(express.json());
 
 // Logging: Use morgan for HTTP request logs, and winston for application logs
 app.use(morgan("combined", {
-  stream: { write: (message) => logger.info(message.trim()) }
+	stream: { write: (message) => logger.info(message.trim()) }
 }));
 
 // Swagger UI
@@ -52,8 +52,8 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Swagger JSON
 app.get("/swagger.json", (req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  res.send(swaggerSpec);
+	res.setHeader("Content-Type", "application/json");
+	res.send(swaggerSpec);
 });
 
 // Rutas

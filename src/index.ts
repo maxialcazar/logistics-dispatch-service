@@ -19,24 +19,24 @@ import { eventBus } from "./services/event.service";
 eventBus.init();
 
 const server = httpServer.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+	console.log(`Server running on http://localhost:${PORT}`);
 });
 
 async function gracefulShutdown(signal: string) {
-  console.log(`\n${signal} signal received: closing HTTP server`);
-  server.close(async () => {
-    console.log('HTTP server closed');
-    try {
-      await prisma.$disconnect();
-      console.log('📦 Prisma disconnected');
-      await redis.disconnect();
-      await eventBus.close();
-      process.exit(0);
-    } catch (err) {
-      console.error('Error during graceful shutdown', err);
-      process.exit(1);
-    }
-  });
+	console.log(`\n${signal} signal received: closing HTTP server`);
+	server.close(async () => {
+		console.log('HTTP server closed');
+		try {
+			await prisma.$disconnect();
+			console.log('📦 Prisma disconnected');
+			await redis.disconnect();
+			await eventBus.close();
+			process.exit(0);
+		} catch (err) {
+			console.error('Error during graceful shutdown', err);
+			process.exit(1);
+		}
+	});
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
