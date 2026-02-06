@@ -10,6 +10,7 @@ import zonesRouter from "./routes/zones.routes";
 import authRouter from "./routes/auth.routes";
 import usersRouter from "./routes/users.routes";
 import publicRouter from "./routes/public.routes";
+import adminRouter from "./routes/admin.routes";
 
 // Middlewares
 import { errorHandler } from "./middlewares/error.middleware";
@@ -30,7 +31,7 @@ const app = express();
 app.use(helmet());
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 5000, // Increased for Load Testing (was 100)
+  max: 5000, // Limit each IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
@@ -62,6 +63,7 @@ app.use("/api/zones", zonesRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/public", publicRouter);
+app.use("/api/admin", adminRouter);
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));

@@ -53,3 +53,7 @@ export function emitToRoom(room: string, event: string, data: any) {
     io.to(room).emit(event, data);
   }
 }
+
+export function getConnectedClientCount() {
+  return io ? io.engine.clientsCount : 0;
+}

@@ -4,7 +4,9 @@ import { prisma } from "./prisma";
 import { redis } from "./redis";
 import { initSocket } from "./websocket";
 
-const PORT = process.env.PORT || 3001;
+import { env } from "./config/env";
+
+const PORT = env.PORT;
 
 const httpServer = createServer(app);
 const io = initSocket(httpServer);

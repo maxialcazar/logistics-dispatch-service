@@ -87,9 +87,11 @@ El servidor emite los siguientes eventos globales:
 
 ---
 
-## 🧪 Pruebas y Monitoreo
+## 📚 Documentación y Recursos
 
-Para detalles sobre cómo ejecutar tests automatizados con **Jest** o cómo inspeccionar los logs estructurados, consulta la [**Guía de Pruebas (TESTING_GUIDE.md)**](./TESTING_GUIDE.md).
+- **Resumen del Producto**: Para una visión comercial y técnica detallada, ver [PRODUCT_OVERVIEW.md](./LDE-INFO/PRODUCT_OVERVIEW.md).
+- **Guía de Pruebas**: Para ejecutar tests unitarios y de estrés, consulta la [TESTING_GUIDE.md](./LDE-INFO/TESTING_GUIDE.md).
+- **Scripts de Carga**: Disponibles en `LDE-INFO/stress-tests` para validar la escalabilidad.
 
 ---
 
