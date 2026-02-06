@@ -46,7 +46,16 @@ export class PackageService {
     };
   }
 
-  static async createPackage(trackingCode: string, address: string, zoneId: string, userId: string) {
+  static async createPackage(data: {
+    trackingCode: string;
+    address: string;
+    zoneId: string;
+    userId: string;
+    lat?: number;
+    lng?: number;
+    estimatedDeliveryAt?: Date;
+  }) {
+    const { trackingCode, address, zoneId, userId, lat, lng, estimatedDeliveryAt } = data;
     const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
     if (!zone) {
       throw new Error("zone_not_found");
@@ -57,6 +66,9 @@ export class PackageService {
         data: { 
           trackingCode, 
           address,
+          lat,
+          lng,
+          estimatedDeliveryAt,
           zoneId, 
           status: "pending",
           history: {
@@ -93,7 +105,18 @@ export class PackageService {
     });
   }
 
-  static async updateStatus(packageId: string, status: PackageStatus, userId: string, userRole: string, userDriverId: string | null) {
+  static async updateStatus(params: {
+    packageId: string;
+    status: PackageStatus;
+    userId: string;
+    userRole: string;
+    userDriverId: string | null;
+    lat?: number;
+    lng?: number;
+    estimatedDeliveryAt?: Date;
+  }) {
+    const { packageId, status, userId, userRole, userDriverId, lat, lng, estimatedDeliveryAt } = params;
+    
     const pkg = await prisma.package.findUnique({ 
       where: { id: packageId },
       include: { zone: true }
@@ -122,7 +145,12 @@ export class PackageService {
     return prisma.$transaction(async (tx) => {
       const updated = await tx.package.update({
         where: { id: packageId },
-        data: { status },
+        data: { 
+          status,
+          lat,
+          lng,
+          estimatedDeliveryAt
+        }
       });
 
       await tx.packageHistory.create({
@@ -134,7 +162,13 @@ export class PackageService {
         }
       });
 
-      emitToAll("package-status-updated", { packageId, status });
+      emitToAll("package-status-updated", { 
+        packageId, 
+        status, 
+        lat, 
+        lng, 
+        estimatedDeliveryAt 
+      });
       return updated;
     });
   }
@@ -202,5 +236,42 @@ export class PackageService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+  static async getPublicTracking(trackingCode: string) {
+    const pkg = await prisma.package.findUnique({
+      where: { trackingCode },
+      select: {
+        trackingCode: true,
+        status: true,
+        address: true,
+        lat: true,
+        lng: true,
+        estimatedDeliveryAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!pkg) return null;
+
+    // Mask the address for privacy (e.g., "Av. Principal 123" -> "Av. Principal ***")
+    const parts = pkg.address.split(" ");
+    if (parts.length > 2) {
+      pkg.address = `${parts.slice(0, -1).join(" ")} ***`;
+    }
+
+    return pkg;
+  }
+
+  static async getAssignedDriverId(trackingCode: string) {
+    const pkg = await prisma.package.findUnique({
+      where: { trackingCode },
+      include: {
+        zone: true 
+      }
+    });
+
+    if (!pkg) return null;
+    return pkg.zone.driverId; // This is the currently assigned driver for the zone
   }
 }

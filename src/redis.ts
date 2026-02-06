@@ -50,5 +50,17 @@ export const redis = {
       await client.quit();
       console.log('🛑 Redis disconnected');
     }
+  },
+  
+  // Pub/Sub capabilities
+  async publish(channel: string, message: string) {
+    if (!redisEnabled || !client.isOpen) return;
+    await client.publish(channel, message);
   }
 };
+
+// Export a robust way to get a new client for subscriptions (Redis requires dedicated connection for sub)
+export const createRedisClient = () => {
+    return createClient({ url: redisUrl });
+};
+

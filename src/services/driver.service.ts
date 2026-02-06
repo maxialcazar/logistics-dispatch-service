@@ -110,4 +110,25 @@ export class DriverService {
       where: { driverId },
     });
   }
+
+  static async updateLocation(driverId: string, lat: number, lng: number) {
+    const updated = await prisma.driver.update({
+      where: { id: driverId },
+      data: { lat, lng },
+    });
+
+    // Send to Redis (Pub/Sub) instead of direct socket emit
+    // This allows dedicated socket nodes to pick it up and broadcast
+    const payload = JSON.stringify({ 
+      driverId, 
+      lat, 
+      lng,
+      timestamp: Date.now() 
+    });
+    
+    // Fire and forget (low latency)
+    await redis.publish("driver.location.updated", payload);
+
+    return updated;
+  }
 }

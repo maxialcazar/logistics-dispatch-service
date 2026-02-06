@@ -16,3 +16,9 @@ export const assignZonesSchema = z.object({
     zoneIds: z.array(z.string().uuid()),
   }),
 });
+export const updateLocationSchema = z.object({
+  body: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+});

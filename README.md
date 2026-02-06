@@ -17,21 +17,26 @@
 ### 👨‍💼 Panel de Despachadores (Dispatcher)
 
 - **Gestión Integral**: Control total sobre Usuarios, Zonas, Conductores y Paquetes.
-- **Auditoría Total (History)**: Cada acción sobre un paquete queda registrada en un historial inmutable, permitiendo saber quién hizo qué y cuándo.
-- **Paginación y Filtrado**: Endpoints optimizados para manejar miles de registros sin degradación de performance.
+- **Auditoría Total (History)**: Cada acción sobre un paquete queda registrada en un historial inmutable.
+- **Vistas de Mapa y Geocodificación**: Seguimiento de paquetes mediante coordenadas GPS y visualización de ETAs.
 
 ### 🚲 Perfil de Repartidores (Driver)
 
-- **Inteligencia de Zonas**: Los conductores solo ven y gestionan paquetes asignados a sus zonas dinámicas.
-- **Seguridad de Estado**: Máquina de estados estricta que previene transiciones de entrega inválidas.
-- **Notificaciones Real-time**: Recibe actualizaciones instantáneas de asignación a través de WebSockets.
+- **Seguimiento GPS Real-time**: Ingesta de alta frecuencia y baja latencia (Stateless).
+- **Inteligencia de Zonas**: Gestión de paquetes basada en zonas dinámicas.
+
+### 🏠 Portal del Cliente Final (Public)
+
+- **Tracking Premium (SSE)**: Streaming en tiempo real (`/api/public/track/:code/stream`) sin polling.
+- **Privacidad Blindada (Masking)**: Enmascaramiento automático de direcciones.
+- **Seguridad Anti-Scraping**: Rate limits estrictos.
 
 ### 🚀 Capacidades Avanzadas (Production Ready)
 
-- **Arquitectura Reactiva**: Integración con **Socket.io** para emitir eventos en tiempo real (`package-status-updated`, `package-assigned`, etc.).
-- **Capa de Caché Inteligente**: Uso proactivo de **Redis** para acelerar lecturas, con invalidación automática basada en eventos.
-- **Resiliencia y Cierre Limpio**: Implementación de **Graceful Shutdown** para proteger conexiones a base de datos y caché durante despliegues.
-- **Performance**: Base de datos indexada en campos críticos (status, IDs) para búsquedas instantáneas.
+- **Arquitectura Event-Driven**: Redis Pub/Sub como backbone de eventos para desacoplar ingesta y consumo.
+- **SSE & Websockets Híbridos**: Lo mejor de ambos mundos para cada tipo de cliente.
+- **Capa de Caché Inteligente**: Uso de **Redis** con invalidación automática.
+- **Resiliencia**: Graceful Shutdown y manejo de errores centralizado.
 
 ---
 

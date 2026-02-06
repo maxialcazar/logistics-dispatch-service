@@ -21,9 +21,17 @@ export async function getPackages(req: AuthRequest, res: Response) {
 }
 
 export async function createPackage(req: AuthRequest, res: Response) {
-  const { trackingCode, address, zoneId } = req.body;
+  const { trackingCode, address, zoneId, lat, lng, estimatedDeliveryAt } = req.body;
   try {
-    const pkg = await PackageService.createPackage(trackingCode, address, zoneId, req.user!.id);
+    const pkg = await PackageService.createPackage({
+      trackingCode,
+      address,
+      zoneId,
+      userId: req.user!.id,
+      lat,
+      lng,
+      estimatedDeliveryAt: estimatedDeliveryAt ? new Date(estimatedDeliveryAt) : undefined,
+    });
     res.status(201).json(pkg);
   } catch (error: any) {
     if (error.message === "zone_not_found") {
@@ -47,17 +55,20 @@ export async function getPackagesByDriver(req: AuthRequest, res: Response) {
 }
 
 export async function updatePackageStatus(req: AuthRequest, res: Response) {
-  const packageId = req.params.packageId as string;
-  const { status } = req.body as { status: PackageStatus };
+  const { packageId } = req.params;
+  const { status, lat, lng, estimatedDeliveryAt } = req.body;
 
   try {
-    const updated = await PackageService.updateStatus(
-      packageId,
+    const updated = await PackageService.updateStatus({
+      packageId: packageId as string,
       status,
-      req.user!.id,
-      req.user!.role,
-      req.user!.driverId
-    );
+      userId: req.user!.id,
+      userRole: req.user!.role,
+      userDriverId: req.user!.driverId || null,
+      lat,
+      lng,
+      estimatedDeliveryAt: estimatedDeliveryAt ? new Date(estimatedDeliveryAt) : undefined,
+    });
     res.json(updated);
   } catch (error: any) {
     if (error.message === "package_not_found") {

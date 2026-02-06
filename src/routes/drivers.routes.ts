@@ -5,11 +5,12 @@ import {
   assignZonesToDriver,
   getDriverZones,
   getMyZones,
+  updateLocation,
 } from "../controllers/drivers.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createDriverSchema, assignZonesSchema } from "../schemas/driver.schema";
+import { createDriverSchema, assignZonesSchema, updateLocationSchema } from "../schemas/driver.schema";
 
 const router = Router();
 
@@ -115,5 +116,30 @@ router.get("/me/zones", requireRole("driver"), getMyZones);
  *         description: Success
  */
 router.get("/:driverId/zones", requireRole("dispatcher"), getDriverZones);
+
+/**
+ * @openapi
+ * /api/drivers/location:
+ *   patch:
+ *     summary: Update driver's current location (real-time tracking)
+ *     tags: [Drivers]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               lat:
+ *                 type: number
+ *               lng:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Location updated
+ */
+router.patch("/location", requireRole("driver"), validate(updateLocationSchema), updateLocation);
 
 export default router;

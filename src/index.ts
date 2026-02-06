@@ -9,6 +9,13 @@ const PORT = process.env.PORT || 3001;
 const httpServer = createServer(app);
 const io = initSocket(httpServer);
 
+import { eventBus } from "./services/event.service";
+
+// ...
+
+// Init Event Bus
+eventBus.init();
+
 const server = httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
@@ -21,6 +28,7 @@ async function gracefulShutdown(signal: string) {
       await prisma.$disconnect();
       console.log('📦 Prisma disconnected');
       await redis.disconnect();
+      await eventBus.close();
       process.exit(0);
     } catch (err) {
       console.error('Error during graceful shutdown', err);

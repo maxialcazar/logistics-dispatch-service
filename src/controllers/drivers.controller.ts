@@ -51,3 +51,18 @@ export async function getMyZones(req: AuthRequest, res: Response) {
   const zones = await DriverService.getDriverZones(req.user.driverId);
   res.json(zones);
 }
+
+export async function updateLocation(req: AuthRequest, res: Response) {
+  if (!req.user?.driverId) {
+    return res.status(403).json({ error: "Only drivers can update location" });
+  }
+
+  const { lat, lng } = req.body;
+  try {
+    const updated = await DriverService.updateLocation(req.user.driverId, lat, lng);
+    res.json(updated);
+  } catch (error) {
+    console.error("Error in updateLocation:", error);
+    res.status(500).json({ error: "Failed to update location" });
+  }
+}
