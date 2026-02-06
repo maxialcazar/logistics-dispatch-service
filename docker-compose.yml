@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  app:
+    container_name: logistics-api
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/logistics?schema=public
+      - REDIS_ENABLED=true
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=super_secret_docker_key
+    depends_on:
+      - db
+      - redis
+    networks:
+      - logistics-net
+    restart: always
+
+  db:
+    container_name: logistics-db
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: logistics
+    ports:
+      - "5433:5432" # Mapped to 5433 host to avoid conflict with local postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - logistics-net
+
+  redis:
+    container_name: logistics-redis
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6380:6379" # Mapped to 6380 to avoid conflict with local redis
+    networks:
+      - logistics-net
+
+networks:
+  logistics-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
