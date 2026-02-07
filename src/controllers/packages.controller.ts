@@ -7,7 +7,7 @@ export async function getPackages(req: AuthRequest, res: Response) {
   const { status, zoneId, trackingCode, page, limit } = req.query;
 
   try {
-    const result = await PackageService.getAllPackages({
+    const result = await PackageService.getAllPackages(req.user!.companyId, {
       status: status as PackageStatus,
       zoneId: zoneId as string,
       trackingCode: trackingCode as string,
@@ -23,7 +23,7 @@ export async function getPackages(req: AuthRequest, res: Response) {
 export async function createPackage(req: AuthRequest, res: Response) {
   const { trackingCode, address, zoneId, lat, lng, estimatedDeliveryAt } = req.body;
   try {
-    const pkg = await PackageService.createPackage({
+    const pkg = await PackageService.createPackage(req.user!.companyId, {
       trackingCode,
       address,
       zoneId,
@@ -44,7 +44,7 @@ export async function createPackage(req: AuthRequest, res: Response) {
 export async function getPackagesByDriver(req: AuthRequest, res: Response) {
   const driverId = req.params.driverId as string;
   try {
-    const packages = await PackageService.getPackagesByDriver(driverId);
+    const packages = await PackageService.getPackagesByDriver(req.user!.companyId, driverId);
     res.json(packages);
   } catch (error: any) {
     if (error.message === "driver_not_found") {
@@ -59,7 +59,7 @@ export async function updatePackageStatus(req: AuthRequest, res: Response) {
   const { status, lat, lng, estimatedDeliveryAt } = req.body;
 
   try {
-    const updated = await PackageService.updateStatus({
+    const updated = await PackageService.updateStatus(req.user!.companyId, {
       packageId: packageId as string,
       status,
       userId: req.user!.id,
@@ -94,7 +94,7 @@ export async function assignPackageToDriver(req: AuthRequest, res: Response) {
   const packageId = req.params.packageId as string;
 
   try {
-    const updated = await PackageService.assignToDriver(packageId, driverId, req.user!.id);
+    const updated = await PackageService.assignToDriver(req.user!.companyId, packageId, driverId, req.user!.id);
     res.json(updated);
   } catch (error: any) {
     if (error.message === "package_not_found") {
@@ -115,14 +115,14 @@ export async function getMyPackages(req: AuthRequest, res: Response) {
     return res.status(403).json({ error: "not a driver" });
   }
 
-  const packages = await PackageService.getMyPackages(req.user.driverId);
+  const packages = await PackageService.getMyPackages(req.user.companyId, req.user.driverId);
   res.json(packages);
 }
 
 export async function getPackageHistory(req: AuthRequest, res: Response) {
   const packageId = req.params.packageId as string;
   try {
-    const history = await PackageService.getPackageHistory(packageId);
+    const history = await PackageService.getPackageHistory(req.user!.companyId, packageId);
     res.json(history);
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });

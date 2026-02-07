@@ -6,6 +6,7 @@ export interface AuthRequest extends Request {
     id: string;
     role: string;
     driverId: string | null;
+    companyId: string;
   };
 }
 
@@ -23,13 +24,11 @@ export function auth(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
     
-    // Debug point
-    // console.log("Extracted JWT payload:", payload);
-
     req.user = {
-      id: payload.userId, // Fixed: was sub
+      id: payload.userId,
       role: payload.role,
       driverId: payload.driverId,
+      companyId: payload.companyId,
     };
 
     next();

@@ -1,0 +1,1425 @@
+{
+  "info": {
+    "_postman_id": "71356634-abc4-4adf-80c1-567061ff8324",
+    "name": "Logistics Dispatch Service API",
+    "description": "API collection for the Logistics Dispatch Service. This collection includes endpoints for authentication, user management, driver management, package tracking, zone management, and administrative functions.\n\n## Authentication\nMost endpoints require JWT Bearer token authentication. Use the Auth endpoints to obtain a token.\n\n## Base URL\nSet the `{{baseUrl}}` variable to your API server address (e.g., `http://localhost:3000/api`).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "id": "6fb02984-01c2-4496-bee5-9e81d3f8791c",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"securePassword123\",\n  \"name\": \"John Doe\",\n  \"phone\": \"+1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "id": "3eb14a7f-531f-4a40-9704-431c3372338b",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"securePassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "id": "e2fc7c2a-c41b-4081-9438-6df679b07cc2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "id": "342da1fd-acdb-4183-9fab-8a9b9799aeb0",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "id": "621499e4-b89e-4a26-b2af-ab4982dfa40d",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "646d350d-bc10-4259-9856-47eddeeb5c04",
+      "description": "Authentication endpoints for login, registration, and token management"
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "id": "7e19d958-87e1-43e2-a04a-0babbcb9dccb",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users?page=1&limit=10&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by name or email"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by ID",
+          "id": "fc718aa1-abc9-4996-aec5-87048b49255b",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "userId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create User",
+          "id": "ef0991d8-f079-4a9b-9284-b09f256d50b2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"securePassword123\",\n  \"name\": \"Jane Doe\",\n  \"phone\": \"+1234567890\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "id": "843abf07-35c8-4f65-bbf7-eb326629a715",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"+0987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "userId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "id": "3f17360d-822a-4422-80fb-ed958191dcbb",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "userId"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "2c69551f-2d42-4d04-9f09-95348a1aeb9f",
+      "description": "User management endpoints"
+    },
+    {
+      "name": "Drivers",
+      "item": [
+        {
+          "name": "Get All Drivers",
+          "id": "ed523432-4d7e-447c-aab0-5c9c80fa67e0",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/drivers?page=1&limit=10&status=&zoneId=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by status (available, busy, offline)"
+                },
+                {
+                  "key": "zoneId",
+                  "value": "",
+                  "description": "Filter by zone ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Driver by ID",
+          "id": "8b804113-ef17-4193-a255-2df44b05b270",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/drivers/:driverId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers",
+                ":driverId"
+              ],
+              "variable": [
+                {
+                  "key": "driverId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Driver",
+          "id": "643548cd-0b1f-4f02-b966-f390c8af1581",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid\",\n  \"vehicleType\": \"van\",\n  \"vehiclePlate\": \"ABC-1234\",\n  \"licenseNumber\": \"DL123456789\",\n  \"zoneId\": \"zone-uuid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/drivers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Driver",
+          "id": "98ebc875-fe2e-47f5-89b0-3db41544825b",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleType\": \"truck\",\n  \"vehiclePlate\": \"XYZ-5678\",\n  \"zoneId\": \"new-zone-uuid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/drivers/:driverId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers",
+                ":driverId"
+              ],
+              "variable": [
+                {
+                  "key": "driverId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Driver",
+          "id": "5fdc012a-de48-4f30-a092-7ad3bf8cc716",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/drivers/:driverId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers",
+                ":driverId"
+              ],
+              "variable": [
+                {
+                  "key": "driverId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Driver Status",
+          "id": "0189df14-5bfb-437c-b272-0c02d6177c39",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"available\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/drivers/:driverId/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers",
+                ":driverId",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "driverId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Driver Location",
+          "id": "f7b42a28-2dcf-4d7a-92da-b0390d2aa738",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 40.7128,\n  \"longitude\": -74.0060\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/drivers/:driverId/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers",
+                ":driverId",
+                "location"
+              ],
+              "variable": [
+                {
+                  "key": "driverId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Driver Packages",
+          "id": "6cdbfb13-79e4-469b-a6f7-b6b5ee72ea99",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/drivers/:driverId/packages?status=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "drivers",
+                ":driverId",
+                "packages"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by package status"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "driverId"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "8c24d75d-3316-4531-b673-ee609f021267",
+      "description": "Driver management and tracking endpoints"
+    },
+    {
+      "name": "Packages",
+      "item": [
+        {
+          "name": "Get All Packages",
+          "id": "fdb52a09-01d0-4054-9f4a-cdf346b52311",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/packages?page=1&limit=10&status=&driverId=&zoneId=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by status (pending, assigned, in_transit, delivered, failed)"
+                },
+                {
+                  "key": "driverId",
+                  "value": "",
+                  "description": "Filter by assigned driver"
+                },
+                {
+                  "key": "zoneId",
+                  "value": "",
+                  "description": "Filter by delivery zone"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Package by ID",
+          "id": "692e935d-3f7c-42d5-a66c-0a6153607171",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/packages/:packageId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":packageId"
+              ],
+              "variable": [
+                {
+                  "key": "packageId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Package",
+          "id": "a56dceef-9243-4bb6-8251-8863d0cb96bb",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trackingNumber\": \"PKG-2024-001234\",\n  \"senderName\": \"Sender Company\",\n  \"senderAddress\": \"123 Sender St, City, State 12345\",\n  \"senderPhone\": \"+1234567890\",\n  \"recipientName\": \"John Recipient\",\n  \"recipientAddress\": \"456 Recipient Ave, City, State 67890\",\n  \"recipientPhone\": \"+0987654321\",\n  \"weight\": 2.5,\n  \"dimensions\": {\n    \"length\": 30,\n    \"width\": 20,\n    \"height\": 15\n  },\n  \"description\": \"Electronics - Handle with care\",\n  \"zoneId\": \"zone-uuid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/packages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Package",
+          "id": "00bbef79-3cc1-4afb-8c1a-21d6c2ce5615",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientName\": \"Updated Recipient\",\n  \"recipientAddress\": \"789 New Address, City, State 11111\",\n  \"recipientPhone\": \"+1111111111\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/packages/:packageId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":packageId"
+              ],
+              "variable": [
+                {
+                  "key": "packageId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Package",
+          "id": "1c06d496-19c6-49bb-870f-34eb97e46973",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/packages/:packageId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":packageId"
+              ],
+              "variable": [
+                {
+                  "key": "packageId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Package to Driver",
+          "id": "8ee35927-837d-4eb7-acfc-2fede469c3aa",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"driver-uuid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/packages/:packageId/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":packageId",
+                "assign"
+              ],
+              "variable": [
+                {
+                  "key": "packageId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Package Status",
+          "id": "479b8919-4907-4695-8d26-da6802c5814a",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_transit\",\n  \"notes\": \"Package picked up from warehouse\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/packages/:packageId/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":packageId",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "packageId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Package History",
+          "id": "55a05870-cb65-4a3d-b301-52cac7cb6901",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/packages/:packageId/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "packages",
+                ":packageId",
+                "history"
+              ],
+              "variable": [
+                {
+                  "key": "packageId"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "14904338-f428-49fb-bd32-41190c4ed347",
+      "description": "Package/shipment management and tracking endpoints"
+    },
+    {
+      "name": "Zones",
+      "item": [
+        {
+          "name": "Get All Zones",
+          "id": "94d4c34b-b380-4139-a097-653f439b3fb8",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/zones?page=1&limit=10&active=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "zones"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "active",
+                  "value": "",
+                  "description": "Filter by active status (true/false)"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Zone by ID",
+          "id": "721e8de9-f606-4313-8ebf-2e730598df03",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/zones/:zoneId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "zones",
+                ":zoneId"
+              ],
+              "variable": [
+                {
+                  "key": "zoneId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Zone",
+          "id": "18474b0f-f148-493f-b4fa-1aa3943b9527",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Downtown District\",\n  \"description\": \"Central business district delivery zone\",\n  \"boundaries\": {\n    \"type\": \"Polygon\",\n    \"coordinates\": [[\n      [-74.006, 40.712],\n      [-74.006, 40.718],\n      [-73.996, 40.718],\n      [-73.996, 40.712],\n      [-74.006, 40.712]\n    ]]\n  },\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/zones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "zones"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Zone",
+          "id": "862aaaad-3ae8-4169-ae8a-9f8787cf93cf",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Zone Name\",\n  \"description\": \"Updated description\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/zones/:zoneId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "zones",
+                ":zoneId"
+              ],
+              "variable": [
+                {
+                  "key": "zoneId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Zone",
+          "id": "e1b38c68-58c8-49cc-9243-5697d37e4a42",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/zones/:zoneId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "zones",
+                ":zoneId"
+              ],
+              "variable": [
+                {
+                  "key": "zoneId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Zone Drivers",
+          "id": "1c526893-f24b-459b-8130-124cd4812779",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/zones/:zoneId/drivers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "zones",
+                ":zoneId",
+                "drivers"
+              ],
+              "variable": [
+                {
+                  "key": "zoneId"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Zone Packages",
+          "id": "67243888-0393-410b-9fbf-9ce0b77d3424",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/zones/:zoneId/packages?status=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "zones",
+                ":zoneId",
+                "packages"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filter by package status"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "zoneId"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "4c5308b8-8f60-40aa-b925-a3f996eee8bb",
+      "description": "Delivery zone management endpoints"
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "id": "76534361-c5ec-4ef6-aab5-2b4931423cc7",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "dashboard"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get System Health",
+          "id": "d1c3401d-8aa5-4b62-b7af-a4dee3b7bd86",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Audit Logs",
+          "id": "36cdee52-a81c-4fbd-9a6d-61c4a8ad7182",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/logs?page=1&limit=50&action=&userId=&startDate=&endDate=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "action",
+                  "value": "",
+                  "description": "Filter by action type"
+                },
+                {
+                  "key": "userId",
+                  "value": "",
+                  "description": "Filter by user ID"
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "description": "Start date (ISO format)"
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "description": "End date (ISO format)"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Reports",
+          "id": "562e1c41-0d55-4d0a-9ada-a6cd7897b8d3",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/reports?type=deliveries&startDate=&endDate=&zoneId=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "reports"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "deliveries",
+                  "description": "Report type (deliveries, drivers, zones)"
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "description": "Start date (ISO format)"
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "description": "End date (ISO format)"
+                },
+                {
+                  "key": "zoneId",
+                  "value": "",
+                  "description": "Filter by zone ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Assign Packages",
+          "id": "eea0b568-aeda-4823-820b-a771ab7fa747",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignments\": [\n    {\n      \"packageId\": \"package-uuid-1\",\n      \"driverId\": \"driver-uuid-1\"\n    },\n    {\n      \"packageId\": \"package-uuid-2\",\n      \"driverId\": \"driver-uuid-1\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/bulk-assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "bulk-assign"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "b5c64c99-add7-4500-a1bf-9dfb59306a6e",
+      "description": "Administrative endpoints for system management"
+    },
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "Track Package",
+          "id": "7faf3329-89e5-41ae-98eb-1d16a8ec708f",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/public/track/:trackingNumber",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "public",
+                "track",
+                ":trackingNumber"
+              ],
+              "variable": [
+                {
+                  "key": "trackingNumber"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get API Status",
+          "id": "c13d843d-2b4a-4408-9f36-49cb18c630ea",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/public/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "public",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Service Areas",
+          "id": "4361b2d3-fc69-4d49-9fe6-c7a475b72a7a",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/public/service-areas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "public",
+                "service-areas"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "id": "c081788a-0497-4932-ac6c-b2ebdeb8e4f9",
+      "description": "Public endpoints that don't require authentication"
+    }
+  ],
+  "variable": [
+    {
+      "id": "0e0a4084-2ea1-4f62-9113-ef34586e586c",
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "id": "dec47e8b-dee4-4bf0-95eb-374578216ce8",
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "id": "d799d31c-9aaa-401e-b503-d023a0a43346",
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

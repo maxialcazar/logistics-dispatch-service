@@ -4,8 +4,8 @@ import { redis } from "../redis";
 import { emitToAll } from "../websocket";
 
 export class DriverService {
-  static async getAllDrivers(filters: { name?: string; page?: number; limit?: number } = {}) {
-    const cacheKey = `drivers:${JSON.stringify(filters)}`;
+  static async getAllDrivers(companyId: string, filters: { name?: string; page?: number; limit?: number } = {}) {
+    const cacheKey = `drivers:${companyId}:${JSON.stringify(filters)}`;
     const cached = await redis.get(cacheKey);
 
     if (cached) {
@@ -15,7 +15,7 @@ export class DriverService {
     const { name, page = 1, limit = 10 } = filters;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { companyId };
     if (name) {
       where.name = { contains: name, mode: 'insensitive' };
     }
@@ -44,7 +44,7 @@ export class DriverService {
     return result;
   }
 
-  static async createDriver(data: any) {
+  static async createDriver(companyId: string, data: any) {
     const { name, username, password } = data;
 
     const existingUser = await prisma.user.findUnique({
@@ -60,11 +60,13 @@ export class DriverService {
     const driver = await prisma.driver.create({
       data: {
         name,
+        companyId,
         user: {
           create: {
             username,
             password: hashedPassword,
             role: "driver",
+            companyId,
           },
         },
       },
@@ -73,31 +75,46 @@ export class DriverService {
       },
     });
 
-    await redis.delPrefix('drivers:'); // Invalidate drivers cache
+    await redis.delPrefix(`drivers:${companyId}:`); 
     return driver;
   }
 
-  static async assignZones(driverId: string, zoneIds: string[]) {
+  static async assignZones(companyId: string, driverId: string, zoneIds: string[]) {
+    // Verify driver belongs to company
+    const driver = await prisma.driver.findFirst({ where: { id: driverId, companyId } });
+    if (!driver) throw new Error("driver_not_found");
+
+    // Verify all zones belong to company
+    const count = await prisma.zone.count({ 
+      where: { 
+        id: { in: zoneIds },
+        companyId 
+      } 
+    });
+    if (count !== zoneIds.length) {
+      throw new Error("zones_not_founded_or_access_denied");
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Liberar zonas previas de este driver
       await tx.zone.updateMany({
-        where: { driverId },
+        where: { driverId, companyId },
         data: { driverId: null },
       });
 
       // 2. Asignar nuevas zonas
       await tx.zone.updateMany({
-        where: { id: { in: zoneIds } },
+        where: { id: { in: zoneIds }, companyId },
         data: { driverId },
       });
 
       return { ok: true };
     });
 
-    // Invalidate caches for both drivers and zones as their relationship changed
+    // Invalidate caches
     await Promise.all([
-      redis.delPrefix('drivers:'),
-      redis.delPrefix('zones:'),
+      redis.delPrefix(`drivers:${companyId}:`),
+      redis.delPrefix(`zones:${companyId}:`),
     ]);
 
     emitToAll("zones-reassigned", { driverId, zoneIds });

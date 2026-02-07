@@ -3,7 +3,7 @@ import { PackageStatus } from "@prisma/client";
 import { emitToAll } from "../websocket";
 
 export class PackageService {
-  static async getAllPackages(filters: {
+  static async getAllPackages(companyId: string, filters: {
     status?: PackageStatus;
     zoneId?: string;
     trackingCode?: string;
@@ -13,7 +13,7 @@ export class PackageService {
     const { status, zoneId, trackingCode, page = 1, limit = 10 } = filters;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { companyId }; // FORCE COMPANY ID
     if (status) where.status = status;
     if (zoneId) where.zoneId = zoneId;
     if (trackingCode) {
@@ -46,7 +46,7 @@ export class PackageService {
     };
   }
 
-  static async createPackage(data: {
+  static async createPackage(companyId: string, data: {
     trackingCode: string;
     address: string;
     zoneId: string;
@@ -56,7 +56,9 @@ export class PackageService {
     estimatedDeliveryAt?: Date;
   }) {
     const { trackingCode, address, zoneId, userId, lat, lng, estimatedDeliveryAt } = data;
-    const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
+    
+    // Validate Zone belongs to Company
+    const zone = await prisma.zone.findFirst({ where: { id: zoneId, companyId } });
     if (!zone) {
       throw new Error("zone_not_found");
     }
@@ -69,7 +71,8 @@ export class PackageService {
           lat,
           lng,
           estimatedDeliveryAt,
-          zoneId, 
+          zoneId,
+          companyId, // Assign to Company
           status: "pending",
           history: {
             create: {
@@ -86,26 +89,29 @@ export class PackageService {
         },
       });
       
+      // We might want to namespace events by companyId in the future
       emitToAll("package-created", pkg);
       return pkg;
     });
   }
 
-  static async getPackagesByDriver(driverId: string) {
-    const driver = await prisma.driver.findUnique({
-      where: { id: driverId },
+  static async getPackagesByDriver(companyId: string, driverId: string) {
+    // Ensure driver belongs to company
+    const driver = await prisma.driver.findFirst({
+      where: { id: driverId, companyId },
     });
     if (!driver) throw new Error("driver_not_found");
 
     return prisma.package.findMany({
       where: { 
+        companyId,
         zone: { driverId }
       },
       include: { zone: true },
     });
   }
 
-  static async updateStatus(params: {
+  static async updateStatus(companyId: string, params: {
     packageId: string;
     status: PackageStatus;
     userId: string;
@@ -117,8 +123,9 @@ export class PackageService {
   }) {
     const { packageId, status, userId, userRole, userDriverId, lat, lng, estimatedDeliveryAt } = params;
     
-    const pkg = await prisma.package.findUnique({ 
-      where: { id: packageId },
+    // Scoped find
+    const pkg = await prisma.package.findFirst({ 
+      where: { id: packageId, companyId },
       include: { zone: true }
     });
     
@@ -173,15 +180,15 @@ export class PackageService {
     });
   }
 
-  static async assignToDriver(packageId: string, driverId: string, userId: string) {
-    const pkg = await prisma.package.findUnique({ 
-      where: { id: packageId },
+  static async assignToDriver(companyId: string, packageId: string, driverId: string, userId: string) {
+    const pkg = await prisma.package.findFirst({ 
+      where: { id: packageId, companyId },
       include: { zone: true } 
     });
     if (!pkg) throw new Error("package_not_found");
 
-    const driver = await prisma.driver.findUnique({
-      where: { id: driverId },
+    const driver = await prisma.driver.findFirst({
+      where: { id: driverId, companyId },
       include: { zones: true },
     });
     if (!driver) throw new Error("driver_not_found");
@@ -215,9 +222,10 @@ export class PackageService {
     });
   }
 
-  static async getMyPackages(driverId: string) {
+  static async getMyPackages(companyId: string, driverId: string) {
     return prisma.package.findMany({
       where: { 
+        companyId,
         zone: {
           driverId: driverId
         }
@@ -226,7 +234,11 @@ export class PackageService {
     });
   }
 
-  static async getPackageHistory(packageId: string) {
+  static async getPackageHistory(companyId: string, packageId: string) {
+    // Verify ownership first
+    const pkg = await prisma.package.findFirst({ where: { id: packageId, companyId } });
+    if (!pkg) throw new Error("package_not_found");
+
     return prisma.packageHistory.findMany({
       where: { packageId },
       include: { 
@@ -237,8 +249,12 @@ export class PackageService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  // Public Tracking 
+  // Note: Since trackingCode is scoped by company, this might return the first match found.
+  // Ideally, public tracking should include company slug in URL.
   static async getPublicTracking(trackingCode: string) {
-    const pkg = await prisma.package.findUnique({
+    const pkg = await prisma.package.findFirst({
       where: { trackingCode },
       select: {
         trackingCode: true,
@@ -254,7 +270,6 @@ export class PackageService {
 
     if (!pkg) return null;
 
-    // Mask the address for privacy (e.g., "Av. Principal 123" -> "Av. Principal ***")
     const parts = pkg.address.split(" ");
     if (parts.length > 2) {
       pkg.address = `${parts.slice(0, -1).join(" ")} ***`;
@@ -264,7 +279,7 @@ export class PackageService {
   }
 
   static async getAssignedDriverId(trackingCode: string) {
-    const pkg = await prisma.package.findUnique({
+    const pkg = await prisma.package.findFirst({
       where: { trackingCode },
       include: {
         zone: true 
@@ -272,6 +287,6 @@ export class PackageService {
     });
 
     if (!pkg) return null;
-    return pkg.zone.driverId; // This is the currently assigned driver for the zone
+    return pkg.zone.driverId; 
   }
 }

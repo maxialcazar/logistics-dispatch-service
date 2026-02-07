@@ -23,6 +23,11 @@ class EventBus extends EventEmitter {
 
   async init() {
     if (this.isConnected) return;
+    
+    if (process.env.REDIS_ENABLED !== 'true') {
+        logger.info("📡 EventBus disabled (REDIS_ENABLED!=true)");
+        return;
+    }
 
     this.subscriber = createRedisClient();
     

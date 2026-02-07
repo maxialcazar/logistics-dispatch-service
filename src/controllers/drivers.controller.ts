@@ -1,10 +1,10 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { DriverService } from "../services/driver.service";
 import { AuthRequest } from "../middlewares/auth.middleware";
 
-export async function getDrivers(req: Request, res: Response) {
+export async function getDrivers(req: AuthRequest, res: Response) {
   const { name, page, limit } = req.query;
-  const drivers = await DriverService.getAllDrivers({
+  const drivers = await DriverService.getAllDrivers(req.user!.companyId, {
     name: name as string,
     page: page ? parseInt(page as string) : undefined,
     limit: limit ? parseInt(limit as string) : undefined,
@@ -12,9 +12,9 @@ export async function getDrivers(req: Request, res: Response) {
   res.json(drivers);
 }
 
-export async function createDriver(req: Request, res: Response) {
+export async function createDriver(req: AuthRequest, res: Response) {
   try {
-    const driver = await DriverService.createDriver(req.body);
+    const driver = await DriverService.createDriver(req.user!.companyId, req.body);
     res.status(201).json(driver);
   } catch (error: any) {
     if (error.message === "username_exists") {
@@ -24,12 +24,12 @@ export async function createDriver(req: Request, res: Response) {
   }
 }
 
-export async function assignZonesToDriver(req: Request, res: Response) {
+export async function assignZonesToDriver(req: AuthRequest, res: Response) {
   const { driverId } = req.params;
   const { zoneIds } = req.body;
 
   try {
-    const result = await DriverService.assignZones(driverId as string, zoneIds);
+    const result = await DriverService.assignZones(req.user!.companyId, driverId as string, zoneIds);
     res.json(result);
   } catch (error) {
     console.error("Error in assignZonesToDriver:", error);
@@ -37,8 +37,9 @@ export async function assignZonesToDriver(req: Request, res: Response) {
   }
 }
 
-export async function getDriverZones(req: Request, res: Response) {
+export async function getDriverZones(req: AuthRequest, res: Response) {
   const { driverId } = req.params;
+  // TODO: Update service to support companyId check
   const zones = await DriverService.getDriverZones(driverId as string);
   res.json(zones);
 }

@@ -2,8 +2,8 @@ import { prisma } from "../prisma";
 import { redis } from "../redis";
 
 export class ZoneService {
-  static async getAllZones(filters: { name?: string; page?: number; limit?: number } = {}) {
-    const cacheKey = `zones:${JSON.stringify(filters)}`;
+  static async getAllZones(companyId: string, filters: { name?: string; page?: number; limit?: number } = {}) {
+    const cacheKey = `zones:${companyId}:${JSON.stringify(filters)}`;
     const cached = await redis.get(cacheKey);
     
     if (cached) {
@@ -13,7 +13,7 @@ export class ZoneService {
     const { name, page = 1, limit = 10 } = filters;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { companyId };
     if (name) {
       where.name = { contains: name, mode: 'insensitive' };
     }
@@ -43,9 +43,15 @@ export class ZoneService {
     return result;
   }
 
-  static async createZone(name: string) {
-    const zone = await prisma.zone.create({ data: { name } });
-    await redis.delPrefix('zones:'); // Invalidate cache
+  static async createZone(companyId: string, name: string) {
+    const zone = await prisma.zone.create({ 
+      data: { name, companyId } 
+    });
+    
+    // Invalidate cache for this company only
+    // Note: delPrefix helper might need wildcard support if not already present, 
+    // assuming it works like 'KEYS prefix*' -> DEL
+    await redis.delPrefix(`zones:${companyId}:`); 
     return zone;
   }
 }

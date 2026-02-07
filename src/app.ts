@@ -31,7 +31,7 @@ const app = express();
 app.use(helmet());
 const limiter = rateLimit({
 	windowMs: 15 * 60 * 1000, 
-	max: 5000, // Limit each IP
+	max: 50000, // Limit each IP
 	standardHeaders: true,
 	legacyHeaders: false,
 	message: { error: "Too many requests, please try again later." },

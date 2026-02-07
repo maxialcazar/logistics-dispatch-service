@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { Role } from "@prisma/client";
 
 export class UserService {
-  static async createUser(data: any) {
+  static async createUser(companyId: string, data: any) {
     const { username, password, role } = data;
 
     const existingUser = await prisma.user.findUnique({ where: { username } });
@@ -18,6 +18,7 @@ export class UserService {
         username,
         password: hashedPassword,
         role: role as Role,
+        companyId,
       },
     });
 
