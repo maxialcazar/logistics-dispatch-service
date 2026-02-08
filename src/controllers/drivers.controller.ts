@@ -60,7 +60,7 @@ export async function updateLocation(req: AuthRequest, res: Response) {
 
   const { lat, lng } = req.body;
   try {
-    const updated = await DriverService.updateLocation(req.user.driverId, lat, lng);
+    const updated = await DriverService.updateLocation(req.user.driverId, req.user.companyId, lat, lng);
     res.json(updated);
   } catch (error) {
     console.error("Error in updateLocation:", error);

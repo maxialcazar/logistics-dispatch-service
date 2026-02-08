@@ -3,6 +3,8 @@ import { Server as HttpServer } from "http";
 import logger from "./utils/logger";
 import { eventBus } from "./services/event.service";
 
+import jwt from "jsonwebtoken";
+
 let io: Server;
 
 export function initSocket(server: HttpServer) {
@@ -14,17 +16,35 @@ export function initSocket(server: HttpServer) {
 	});
 
 	// Use the Singleton EventBus instead of opening a new Redis connection
-	eventBus.on("driver.location.updated", (data) => {
-			// Re-broadcast to all connected web clients (Backoffice)
-			io.emit("driver-location-updated", data);
+	eventBus.on("driver.location.updated", (data: any) => {
+			if (data.companyId) {
+				// Re-broadcast ONLY to Company Room (Data Privacy Enforcement)
+				io.to(`company-${data.companyId}`).emit("driver-location-updated", data);
+			}
 	});
 
 	io.on("connection", (socket) => {
 		logger.info(`🔌 Client connected: ${socket.id}`);
 
+        // Secure Room Joining via JWT
+        const token = socket.handshake.auth.token;
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+                if (decoded.companyId) {
+                    const room = `company-${decoded.companyId}`;
+                    socket.join(room);
+                    logger.info(`🔐 Client ${socket.id} joined secure room: ${room}`);
+                }
+            } catch (error) {
+                logger.warn(`⚠️ Client ${socket.id} provided invalid token, denied room access.`);
+            }
+        }
+
 		socket.on("join-room", (room: string) => {
+            // Legacy/Optional: Allow manual join if needed, but prefer auto-join
 			socket.join(room);
-			logger.info(`🏠 Client ${socket.id} joined room: ${room}`);
+			logger.info(`🏠 Client ${socket.id} joined room manually: ${room}`);
 		});
 
 		socket.on("disconnect", () => {

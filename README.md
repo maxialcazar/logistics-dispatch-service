@@ -33,21 +33,30 @@ Diseñado con una **arquitectura híbrida de ingesta asíncrona (Write-Back Cach
 
 Incluimos un script de ingeniería de performance capaz de simular **1,600 transacciones/segundo**.
 
-### Ejecución del Test de Estrés (Con Validación WebSockets)
+### Ejecución del Test de Estrés (Con Validación Visual)
 
-```bash
-# Paso 1: Limpiar Base de Datos
-npx prisma db push --force-reset
+1. **Iniciar Servidor:**
 
-# Paso 2: Ejecutar Simulador Masivo
-npx ts-node scripts/load-test.ts
-```
+   ```bash
+   npm run dev
+   ```
 
-**Resultados Esperados:**
+2. **Abrir Monitor en Tiempo Real:**
+   - Navegar a: `http://localhost:3010/monitor.html`
+   - Clic en **"Connect (Auto-Retry)"**. (Esperará a que el test inicie).
 
-- **RPS (Throughput):** > 1,500 req/seg.
-- **Latencia Real (Socket):** ~24ms (Instantáneo).
+3. **Lanzar la Carga:**
+   ```bash
+   npx prisma db push --force-reset
+   npx ts-node scripts/load-test.ts
+   ```
+
+**Resultados Esperados (v2.0):**
+
+- **RPS (Throughput):** ~4,500 eventos/seg.
+- **Latencia Real (Socket):** ~73ms (Mediana).
 - **Estabilidad:** 0.0% Error Rate.
+- **Visualización:** 125 conductores moviéndose en tiempo real en el dashboard.
 
 ---
 

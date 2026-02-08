@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import morgan from "morgan";
+import path from "path";
 
 // Routers
 import packagesRouter from "./routes/packages.routes";
@@ -28,7 +29,10 @@ dotenv.config();
 const app = express();
 
 // Security Middleware
-app.use(helmet());
+app.use(helmet({
+	contentSecurityPolicy: false, // Disable CSP for simple monitoring usage
+}));
+
 const limiter = rateLimit({
 	windowMs: 15 * 60 * 1000, 
 	max: 50000, // Limit each IP
@@ -41,6 +45,9 @@ app.use("/api/", limiter);
 // Middleware global
 app.use(cors());
 app.use(express.json());
+
+// Serve public folder relative to the project root (src/../public)
+app.use(express.static(path.join(__dirname, "../public")));
 
 // Logging: Use morgan for HTTP request logs, and winston for application logs
 app.use(morgan("combined", {

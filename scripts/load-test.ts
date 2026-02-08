@@ -295,18 +295,18 @@ async function simulateCompany(c: any, adminToken: string) {
             // 1. Get Packages
             await get(`/packages/me`, drvToken); 
 
-            // 2. Loop update location for 10 seconds
+            // 2. Loop update location for 60 seconds (Visual Demo)
             const startTime = Date.now();
-            while (Date.now() - startTime < 10000) {
+            while (Date.now() - startTime < 60000) {
                await patch('/drivers/location', {
                    lat: -34.0 + (Math.random() * 0.1),
                    lng: -58.0 + (Math.random() * 0.1)
                }, drvToken);
+               
                await new Promise(r => setTimeout(r, 2000));
             }
        } catch (e: any) {
-           // console.error(`Driver ${drv.name} sim failed: ${e.message}`);
-           // Silent fail to avoid log spam, allow logic to continue
+           // Silent fail
        }
     });
 

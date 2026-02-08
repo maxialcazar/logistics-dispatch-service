@@ -128,23 +128,25 @@ export class DriverService {
     });
   }
 
-  static async updateLocation(driverId: string, lat: number, lng: number) {
-    const ts = Date.now();
-    
-    // 1. Buffer in Redis (Write-Back)
-    await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({ lat, lng, ts }));
+  static async updateLocation(driverId: string, companyId: string, lat: number, lng: number) {
+      const ts = Date.now();
+      
+      // 1. Buffer in Redis (Write-Back)
+      // Note: Buffer key is global or per-company? Global is simpler for worker.
+      await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({ lat, lng, ts }));
 
-    // 2. Publish Real-Time
-    const payload = JSON.stringify({ 
-      driverId, 
-      lat, 
-      lng,
-      timestamp: ts 
-    });
-    
-    await redis.publish("driver.location.updated", payload);
+      // 2. Publish Real-Time
+      const payload = JSON.stringify({ 
+        driverId, 
+        companyId,
+        lat, 
+        lng,
+        timestamp: ts 
+      });
+      
+      await redis.publish("driver.location.updated", payload);
 
-    return { id: driverId, lat, lng, updatedAt: new Date() };
+      return { id: driverId, lat, lng, updatedAt: new Date() };
   }
 
   // Background Worker to flush Redis buffer to Postgres

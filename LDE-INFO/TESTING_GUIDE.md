@@ -40,33 +40,43 @@ Este no es un simple script de "ping"; es un simulador de tráfico realista que 
 3.  **Simulación Paralela:** Lanza simulaciones simultáneas tipo "tormena" donde miles de conductores envían actualizaciones GPS (`PATCH /location`) y consultan sus rutas (`GET /packages/me`).
 4.  **Telemetría:** Recolecta tiempos de respuesta (latencia) y genera un reporte estadístico.
 
-### Cómo Ejecutar la Prueba de Estrés
+### Cómo Ejecutar la Prueba de Estrés (Con Monitor Visual)
 
-Para obtener resultados limpios y evitar conflictos de duplicados en la BD:
+Para validar tanto la capacidad bruta como la latencia "percibida" en tiempo real:
 
-```bash
-# 1. Resetear la Base de Datos (¡Cuidado! Borra datos)
-npx prisma db push --force-reset
+1.  **Iniciar Servidor Backend:**
 
-# 2. Ejecutar el Simulador
-npx ts-node scripts/load-test.ts
-```
+    ```bash
+    npm run dev
+    ```
 
-### Interpretación del Reporte
+2.  **Abrir Dashboard de Monitoreo:**
+    - Navega a `http://localhost:3010/monitor.html`.
+    - Haz clic en **"Connect (Auto-Retry)"**.
+    - _Nota: Verás errores de conexión hasta que el script cree la empresa._
 
-Al finalizar, verás una tabla como esta:
+3.  **Lanzar Simulador de Carga:**
+    En otra terminal:
+    ```bash
+    npx prisma db push --force-reset
+    npx ts-node scripts/load-test.ts
+    ```
+
+### Interpretación del Reporte (2026 Benchmark)
+
+Al finalizar (aprox. 90 segundos), verás una tabla como esta:
 
 ```text
-┌─────────┬───────────────────────────────┬──────┬───────┬────────┬─────────┬─────────┬─────────┐
-│ (index) │ Label                         │ Reqs │ RPS   │ Err%   │ Med(ms) │ p95(ms) │ p99(ms) │
-├─────────┼───────────────────────────────┼──────┼───────┼────────┼─────────┼─────────┼─────────┤
-│ 1       │ 'PATCH /drivers/location'     │ 4500 │ '50.0'│ '0.0%' │ '15'    │ '70'    │ '120'   │
-└─────────┴───────────────────────────────┴──────┴───────┴────────┴─────────┴─────────┴─────────┘
+┌─────────┬───────────────────────────────┬───────┬──────────┬────────┬─────────┬─────────┬─────────┐
+│ (index) │ Label                         │ Reqs  │ RPS      │ Err%   │ Med(ms) │ p95(ms) │ p99(ms) │
+├─────────┼───────────────────────────────┼───────┼──────────┼────────┼─────────┼─────────┼─────────┤
+│ 1       │ 'PATCH /drivers/location'     │ 18000 │ '185.0'  │ '0.0%' │ '90'    │ '350'   │ '500'   │
+│ 9       │ 'WS Broadcast Lag'            │ 430000│ '4500.0' │ '0.0%' │ '73'    │ '260'   │ '400'   │
+└─────────┴───────────────────────────────┴───────┴──────────┴────────┴─────────┴─────────┴─────────┘
 ```
 
-- **p95 (Percentil 95):** El 95% de las peticiones fueron más rápidas que este valor. Es la métrica más importante para UX.
-- **RPS (Requests Per Second):** Capacidad de procesamiento (Throughput).
-- **Err%:** Tasa de fallo. En producción debe ser < 0.1%.
+- **WS Broadcast Lag:** Es la métrica crítica. Mide el tiempo desde que el conductor envía su posición hasta que el monitor la recibe. **Objetivo: < 100ms (Mediana).**
+- **RPS (Throughput):** Volumen total de eventos procesados. **Objetivo: > 4,000 ops/seg.**
 
 ---
 

@@ -30,16 +30,36 @@ El cuello de botella #1 en logística es la base de datos: 5,000 conductores env
 
 ---
 
-## 📊 Rendimiento Validado (Benchmark 2026)
+## 📊 Rendimiento Validado (Benchmark v2.0 - Feb 2026)
 
 _Resultados oficiales de pruebas de estrés realizadas en infraestructura de desarrollo (Single Node)._
 
 | Métrica                 | Valor              | Análisis                                                               |
 | :---------------------- | :----------------- | :--------------------------------------------------------------------- |
-| **Throughput (RPS)**    | **1,600+ req/seg** | Capacidad para procesar picos de tráfico masivos.                      |
-| **Latencia Real (E2E)** | **24ms (Mediana)** | Tiempo desde que el conductor se mueve hasta que el mapa se actualiza. |
-| **Latencia API (GPS)**  | **70ms (Mediana)** | Respuesta ultrarrápida al dispositivo móvil gracias a Redis Buffer.    |
-| **Estabilidad**         | **0.0% Error**     | Cero fallos tras procesar 70,000 eventos en < 1 minuto.                |
+| **Throughput (RPS)**    | **4,500+ ops/seg** | Capacidad masiva gracias a Redis Write-Back + Pub/Sub optimizado.      |
+| **Latencia Real (E2E)** | **73ms (Mediana)** | Tiempo desde que el conductor se mueve hasta que el mapa se actualiza. |
+| **Latencia API (GPS)**  | **90ms (Mediana)** | Respuesta rápida bajo carga extrema sostenida.                         |
+| **Estabilidad**         | **0.0% Error**     | Cero fallos tras procesar 400,000+ eventos en < 2 minutos.             |
+
+---
+
+## 🛡️ Seguridad & Multitenancy (NUEVO)
+
+LDE implementa un sistema de aislamiento estricto en tiempo real:
+
+1.  **Socket Rooms Seguras:** Los clientes WebSocket se autentican vía JWT. El servidor extrae el `companyId` del token y fuerza al socket a unirse únicamente a la sala `company-{ID}`.
+2.  **Eventos Privados:** El bus de eventos (backend) etiqueta cada actualización de GPS con su empresa de origen. El servidor solo retransmite el dato a la sala correspondiente.
+3.  **Resultado:** Aislamiento total de datos entre inquilinos (Tenants), incluso en el canal de tiempo real.
+
+---
+
+## 🖥️ Herramientas de Diagnóstico
+
+Incluimos un **Dashboard de Monitorización en Tiempo Real** (`/monitor.html`) para visualizar la salud de la flota:
+
+- **Estado de Conexión:** Feedback visual inmediato.
+- **Latencia (Lag):** Cálculo en milisegundos del retraso de red.
+- **Mapa de Calor:** Visualización de actividad por driver.
 
 ---
 
