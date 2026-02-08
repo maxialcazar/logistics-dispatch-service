@@ -129,23 +129,49 @@ export class DriverService {
   }
 
   static async updateLocation(driverId: string, lat: number, lng: number) {
-    const updated = await prisma.driver.update({
-      where: { id: driverId },
-      data: { lat, lng },
-    });
+    const ts = Date.now();
+    
+    // 1. Buffer in Redis (Write-Back)
+    await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({ lat, lng, ts }));
 
-    // Send to Redis (Pub/Sub) instead of direct socket emit
-    // This allows dedicated socket nodes to pick it up and broadcast
+    // 2. Publish Real-Time
     const payload = JSON.stringify({ 
       driverId, 
       lat, 
       lng,
-      timestamp: Date.now() 
+      timestamp: ts 
     });
     
-    // Fire and forget (low latency)
     await redis.publish("driver.location.updated", payload);
 
-    return updated;
+    return { id: driverId, lat, lng, updatedAt: new Date() };
+  }
+
+  // Background Worker to flush Redis buffer to Postgres
+  static async syncLocationBuffer() {
+      const bufferKey = "drivers:locations:buffer";
+      const all = await redis.hGetAll(bufferKey);
+      
+      if (!all || Object.keys(all).length === 0) return;
+
+      const driverIds = Object.keys(all);
+      // console.log(`[Sync] Persisting ${driverIds.length} locations to DB...`);
+
+      const ops = driverIds.map(id => {
+          try {
+            const data = JSON.parse(all[id]);
+            return prisma.driver.update({
+                where: { id },
+                data: { lat: data.lat, lng: data.lng }
+            });
+          } catch (e) { return null; } // Skip malformed
+      }).filter(op => op !== null) as any[];
+
+      if (ops.length > 0) {
+          await prisma.$transaction(ops);
+      }
+
+      // Clear processed keys
+      await redis.hDel(bufferKey, ...driverIds);
   }
 }

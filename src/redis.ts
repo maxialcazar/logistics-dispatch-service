@@ -56,7 +56,21 @@ export const redis = {
 	async publish(channel: string, message: string) {
 		if (!redisEnabled || !client.isOpen) return;
 		await client.publish(channel, message);
-	}
+	},
+    
+    // Hash Operations for Buffering
+    async hSet(key: string, field: string, value: string) {
+        if (!redisEnabled || !client.isOpen) return;
+        await client.hSet(key, field, value);
+    },
+    async hGetAll(key: string) {
+        if (!redisEnabled || !client.isOpen) return {};
+        return client.hGetAll(key);
+    },
+    async hDel(key: string, ...fields: string[]) {
+        if (!redisEnabled || !client.isOpen) return;
+        await client.hDel(key, fields);
+    }
 };
 
 // Export a robust way to get a new client for subscriptions (Redis requires dedicated connection for sub)
