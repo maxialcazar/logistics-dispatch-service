@@ -14,38 +14,59 @@ El proyecto incluye una suite de tests automatizados que verifica la lógica de 
 # Ejecutar toda la suite
 npm test
 
-# Ejecutar un archivo específico
-npx jest tests/public_tracking.test.ts
+# Ejecutar tests en modo watch
+npm test -- --watch
 ```
 
 > **Nota:** Los tests requieren una instancia de Redis corriendo (o Docker). Si el test falla por `ECONNREFUSED`, asegúrate de que Redis esté activo en el puerto 6379 o configura `.env`.
 
 ---
 
-## 2. Pruebas de Carga (Stress Testing)
+## 2. Pruebas de Carga (Stress Testing & Performance)
 
-Para validar la arquitectura, incluimos un script de "Tormenta de Tráfico" que simula una flota de 50-500 conductores bombardeando el sistema simultáneamente.
+Para validar la arquitectura Multi-Tenant y la capacidad de concurrencia, utilizamos un script de ingeniería de performance desarrollado en TypeScript.
 
-### Ubicación
+Este no es un simple script de "ping"; es un simulador de tráfico realista que emula el comportamiento de miles de usuarios.
 
-Los scripts de carga se han movido a: `LDE-INFO/stress-tests/`
+### Ubicación del Script
+
+- **Script:** `scripts/load-test.ts`
+- **Configuración:** Variables `DISPATCHERS_COUNT` y `OBJECTS_PER_DISPATCHER` dentro del archivo.
 
 ### ¿Qué hace la prueba?
 
-1. Crea 50 conductores y paquetes en la base de datos.
-2. Abre 50 conexiones SSE (clientes públicos) escuchando eventos.
-3. Lanza 1,000 actualizaciones de ubicación (`PATCH /location`) en ráfaga (concurrencia masiva).
-4. Mide latencia, tasa de entrega y estabilidad del servidor.
+1.  **Multi-Tenancy:** Crea 5 empresas aisladas (Empresa A - E).
+2.  **Generación Masiva:** En cada empresa, crea Dispatchers, Zonas, Conductores y Paquetes (volumen configurable).
+3.  **Simulación Paralela:** Lanza simulaciones simultáneas tipo "tormena" donde miles de conductores envían actualizaciones GPS (`PATCH /location`) y consultan sus rutas (`GET /packages/me`).
+4.  **Telemetría:** Recolecta tiempos de respuesta (latencia) y genera un reporte estadístico.
 
-### Cómo Ejecutar (PowerShell)
+### Cómo Ejecutar la Prueba de Estrés
 
-```powershell
-# Asegúrate de que el servidor (o Docker) esté corriendo en el puerto 3001
-# O usa el orquestador automático que levanta su propio servidor:
+Para obtener resultados limpios y evitar conflictos de duplicados en la BD:
 
-cd LDE-INFO/stress-tests
-powershell -ExecutionPolicy Bypass -File run_stress.ps1
+```bash
+# 1. Resetear la Base de Datos (¡Cuidado! Borra datos)
+npx prisma db push --force-reset
+
+# 2. Ejecutar el Simulador
+npx ts-node scripts/load-test.ts
 ```
+
+### Interpretación del Reporte
+
+Al finalizar, verás una tabla como esta:
+
+```text
+┌─────────┬───────────────────────────────┬──────┬───────┬────────┬─────────┬─────────┬─────────┐
+│ (index) │ Label                         │ Reqs │ RPS   │ Err%   │ Med(ms) │ p95(ms) │ p99(ms) │
+├─────────┼───────────────────────────────┼──────┼───────┼────────┼─────────┼─────────┼─────────┤
+│ 1       │ 'PATCH /drivers/location'     │ 4500 │ '50.0'│ '0.0%' │ '15'    │ '70'    │ '120'   │
+└─────────┴───────────────────────────────┴──────┴───────┴────────┴─────────┴─────────┴─────────┘
+```
+
+- **p95 (Percentil 95):** El 95% de las peticiones fueron más rápidas que este valor. Es la métrica más importante para UX.
+- **RPS (Requests Per Second):** Capacidad de procesamiento (Throughput).
+- **Err%:** Tasa de fallo. En producción debe ser < 0.1%.
 
 ---
 
@@ -54,18 +75,14 @@ powershell -ExecutionPolicy Bypass -File run_stress.ps1
 El sistema expone métricas en tiempo real. Esto es útil para monitorear la salud del servicio durante las pruebas de carga.
 
 **Endpoint:** `GET /api/admin/metrics`
-**Headers:** `Authorization: Bearer <TOKEN_DE_DISPATCHER>`
 
-**Ejemplo de Respuesta:**
+**Respuesta:**
 
 ```json
 {
   "status": "online",
-  "uptime": "345s",
-  "resources": {
-    "memory_rss_mb": 120,
-    "memory_heap_mb": 85
-  },
+  "uptime": 345,
+  "resources": { "memory_rss_mb": 120, "memory_heap_mb": 85 },
   "components": {
     "database": { "status": "ok", "latency_ms": 2 },
     "redis": { "status": "ok", "latency_ms": 1 },
@@ -74,18 +91,11 @@ El sistema expone métricas en tiempo real. Esto es útil para monitorear la sal
 }
 ```
 
-### Escenario de Prueba Manual de Métricas
-
-1. Inicia el servidor (`docker-compose up`).
-2. Conecta 5 pestañas de navegador al panel de dispatcher (simulado).
-3. Consulta el endpoint de métricas.
-4. Verifica que `websockets.connected_clients` sea 5.
-
 ---
 
 ## 4. Escenarios de Caos (Chaos Engineering)
 
-Para validar la resiliencia (ya implementada en código), puedes intentar:
+Para validar la resiliencia:
 
-1. **Matar Redis:** Detén el contenedor de Redis (`docker stop logistics-redis`). El API no debe caerse, solo debe dejar de transmitir eventos en vivo.
-2. **Reinicio de API:** Reinicia el contenedor de Node.js. Los clientes SSE deberían reconectarse automáticamente gracias al mecanismo de `retry`.
+1.  **Matar Redis:** `docker stop logistics-redis`. El API dejará de transmitir eventos en vivo pero **NO** debe caerse (las peticiones HTTP seguirán funcionando).
+2.  **Saturación:** Ejecuta el `load-test.ts` con `DISPATCHERS_COUNT = 50`. Verás cómo el `p95` aumenta, pero el `Err%` debe mantenerse bajo gracias al Rate Limiting.

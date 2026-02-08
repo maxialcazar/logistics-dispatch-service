@@ -95,9 +95,9 @@ model Package {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @default(now()) @updatedAt
 
-  @@index([status])
-  @@index([zoneId])
-  @@index([companyId])
+  @@index([companyId, status])        // Optimized for dashboard filtering
+  @@index([companyId, zoneId])        // Optimized for zone-based lookups
+  @@index([companyId, updatedAt])     // Optimized for incremental syncs
   @@unique([trackingCode, companyId]) // Composite unique constraint
 }
 
@@ -111,7 +111,8 @@ model PackageHistory {
   notes     String?
   createdAt DateTime      @default(now())
 
-  @@index([packageId])
+  // Optimized for chronological history view
+  @@index([packageId, createdAt(sort: Desc)])
   @@index([userId])
 }
 

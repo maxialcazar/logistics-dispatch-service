@@ -1,9 +1,10 @@
-
 // Native fetch in Node 18+ or global fetch
 const axios = require('axios');
 const { performance: perf } = require('perf_hooks');
+const { io } = require("socket.io-client");
 
 const API_URL = "http://127.0.0.1:3010/api";
+const SOCKET_URL = "http://127.0.0.1:3010"; // Socket.io on root
 
 // --- TELEMETRY STORE ---
 const metrics: Record<string, number[]> = {};
@@ -185,12 +186,12 @@ async function main() {
 
 async function simulateCompany(c: any, adminToken: string) {
   console.log(`[${c.name}] Starting simulation...`);
-  const DISPATCHERS_COUNT = 25; 
+  const DISPATCHERS_COUNT = 5; 
   // Reducing counts slightly to avoid blowing up memory/network local dev immediately if user has limited resources.
   // User asked for 50 dispatchers * 50 drivers = 2500 requests. 
   // Let's stick to the plan but be aware this is heavy.
   
-  const OBJECTS_PER_DISPATCHER = 10; 
+  const OBJECTS_PER_DISPATCHER = 25; 
 
   // Create dispatchers
   const dispatchers = [];
@@ -223,6 +224,23 @@ async function simulateCompany(c: any, adminToken: string) {
   await Promise.all(dispatchers.map(async (d, i) => {
     // Each dispatcher creates 50 zones, 50 drivers, 50 packages
     const headers = { Authorization: `Bearer ${d.token}` };
+
+    // --- WS CONNECTION ---
+    const socket = io(SOCKET_URL, {
+        auth: { token: d.token },
+        transports: ['websocket'],
+        reconnection: false
+    });
+
+    socket.on('driver-location-updated', (update: any) => {
+        // "timestamp" comes from server (Date.now() when published to Redis)
+        // We compare with client Date.now() to measure Redis -> Socket latency
+        if (update && update.timestamp) {
+            const lag = Date.now() - update.timestamp;
+            track("WS Broadcast Lag", Math.max(0, lag), true);
+        }
+    });
+    // ---------------------
     
     // Create Zones
     const zones = [];
@@ -294,6 +312,7 @@ async function simulateCompany(c: any, adminToken: string) {
 
 
     await Promise.all(driverSims);
+    socket.disconnect();
   }));
 
   console.log(`[${c.name}] Finished.`);
