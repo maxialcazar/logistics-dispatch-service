@@ -48,37 +48,68 @@ export class PackageService {
 
   static async createPackage(companyId: string, data: {
     trackingCode: string;
-    address: string;
-    zoneId: string;
+    recipientName: string;
+    recipientAddress: string;
+    recipientPhone: string;
+    recipientEmail?: string;
+    addressStreet?: string;
+    addressNumber?: string;
+    addressReferences?: string;
+    senderName?: string;
+    senderAddress?: string;
+    senderPhone?: string;
+    weight?: number;
+    volume?: number;
+    zoneId?: string; // Optional now? No, kept required for logic
     userId: string;
     lat?: number;
     lng?: number;
     estimatedDeliveryAt?: Date;
   }) {
-    const { trackingCode, address, zoneId, userId, lat, lng, estimatedDeliveryAt } = data;
+    const { 
+      trackingCode, 
+      recipientName, recipientAddress, recipientPhone, recipientEmail,
+      addressStreet, addressNumber, addressReferences,
+      senderName, senderAddress, senderPhone,
+      weight, volume,
+      zoneId, userId, lat, lng, estimatedDeliveryAt 
+    } = data;
     
-    // Validate Zone belongs to Company
-    const zone = await prisma.zone.findFirst({ where: { id: zoneId, companyId } });
-    if (!zone) {
-      throw new Error("zone_not_found");
+    // Validate Zone belongs to Company (if provided)
+    if (zoneId) {
+        const zone = await prisma.zone.findFirst({ where: { id: zoneId, companyId } });
+        if (!zone) {
+            throw new Error("zone_not_found");
+        }
     }
 
     return prisma.$transaction(async (tx) => {
       const pkg = await tx.package.create({
         data: { 
           trackingCode, 
-          address,
+          recipientName,
+          recipientAddress,
+          recipientPhone,
+          recipientEmail,
+          addressStreet,
+          addressNumber,
+          addressReferences,
+          senderName,
+          senderAddress,
+          senderPhone,
+          weight,
+          volume,
           lat,
           lng,
           estimatedDeliveryAt,
           zoneId,
-          companyId, // Assign to Company
+          companyId,
           status: "pending",
           history: {
             create: {
               status: "pending",
               userId,
-              notes: `Package created for delivery at ${address}`
+              notes: `Package created for ${recipientName} at ${recipientAddress}`
             }
           }
         },
@@ -89,7 +120,6 @@ export class PackageService {
         },
       });
       
-      // We might want to namespace events by companyId in the future
       emitToAll("package-created", pkg);
       return pkg;
     });

@@ -21,11 +21,30 @@ export async function getPackages(req: AuthRequest, res: Response) {
 }
 
 export async function createPackage(req: AuthRequest, res: Response) {
-  const { trackingCode, address, zoneId, lat, lng, estimatedDeliveryAt } = req.body;
+  const { 
+    trackingCode, 
+    recipientName, recipientAddress, recipientPhone, recipientEmail,
+    addressStreet, addressNumber, addressReferences,
+    senderName, senderAddress, senderPhone,
+    weight, volume,
+    zoneId, lat, lng, estimatedDeliveryAt 
+  } = req.body;
+
   try {
     const pkg = await PackageService.createPackage(req.user!.companyId, {
       trackingCode,
-      address,
+      recipientName,
+      recipientAddress,
+      recipientPhone,
+      recipientEmail,
+      addressStreet,
+      addressNumber,
+      addressReferences,
+      senderName,
+      senderAddress,
+      senderPhone,
+      weight,
+      volume,
       zoneId,
       userId: req.user!.id,
       lat,
@@ -34,10 +53,11 @@ export async function createPackage(req: AuthRequest, res: Response) {
     });
     res.status(201).json(pkg);
   } catch (error: any) {
+    console.error(error);
     if (error.message === "zone_not_found") {
       return res.status(400).json({ error: "zone not found" });
     }
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 }
 

@@ -267,14 +267,24 @@ async function simulateCompany(c: any, adminToken: string) {
             const driver = drivers[j];
             
             // Create Package
-            const pkg = await post('/packages', {
-                trackingCode: `PKG_${c.slug}_${i}_${j}`,
-                address: `Calle Falsa ${j}`,
-                zoneId: zone.id,
-                lat: -34.0 + (Math.random() * 0.1),
-                lng: -58.0 + (Math.random() * 0.1)
-            }, d.token);
-            packages.push(pkg);
+            // Create Package (Updated for New Schema)
+            const trackingCode = `PKG_${c.slug}_${i}_${j.toString().padStart(3, '0')}`;
+            const pkgData = {
+                trackingCode,
+                recipientName: `Cliente ${c.slug} #${j}`,
+                recipientAddress: `Av. Siempre Viva ${j + 100}`,
+                recipientPhone: `+54911${Math.floor(Math.random() * 10000000)}`,
+                addressStreet: "Av. Siempre Viva",
+                addressNumber: `${j + 100}`,
+                zoneId: zones[j].id, // Use the correct zone from array
+                lat: -34.6037 + (Math.random() * 0.05 - 0.025), // Around Buenos Aires
+                lng: -58.3816 + (Math.random() * 0.05 - 0.025),
+                weight: Math.floor(Math.random() * 10) + 1,
+                volume: parseFloat((Math.random() * 0.5).toFixed(2))
+            };
+
+            await post('/packages', pkgData, d.token);
+            packages.push({ id: trackingCode }); // Store just ID or full ojbect
 
             // Assign Driver to Zone
             await post(`/drivers/${driver.id}/zones`, { zoneIds: [zone.id] }, d.token);
