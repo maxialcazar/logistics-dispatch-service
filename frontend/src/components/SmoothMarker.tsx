@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { Marker, MarkerProps } from 'react-leaflet';
+import { Marker } from 'react-leaflet';
+import type { MarkerProps } from 'react-leaflet';
 import L from 'leaflet';
 
 /**
