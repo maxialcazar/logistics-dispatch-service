@@ -39,10 +39,14 @@ export const redis = {
 		await client.del(key);
 	},
 	async delPrefix(prefix: string) {
-		if (!redisEnabled || !client.isOpen) return;
-		const keys = await client.keys(`${prefix}*`);
-		if (keys.length > 0) {
-			await client.del(keys);
+		try {
+			if (!redisEnabled || !client.isOpen) return;
+			const keys = await client.keys(`${prefix}*`);
+			if (keys.length > 0) {
+				await client.del(keys);
+			}
+		} catch (error) {
+			console.error(`Error deleting prefix ${prefix} in Redis:`, error);
 		}
 	},
 	async disconnect() {

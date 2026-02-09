@@ -1,6 +1,7 @@
 import { PackageCheck, Truck, Clock, AlertTriangle, Radio } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useMemo } from 'react';
+import { LiveMap } from '../components/LiveMap';
 
 const stats = [
   { label: 'Conductores Activos', value: '12', trend: '+2', trendColor: 'text-green-400', icon: Truck },
@@ -69,36 +70,9 @@ export function Dashboard() {
               <button className="text-xs font-medium text-blue-400 hover:underline">Pantalla Completa</button>
             </div>
           </div>
-          <div className="aspect-video w-full rounded-xl border border-slate-800 bg-slate-900 shadow-inner flex items-center justify-center relative overflow-hidden group">
-            {/* Real data rendering layer */}
-            {activeDrivers.length > 0 ? (
-                 <div className="absolute inset-0 p-4 grid grid-cols-4 gap-2 auto-rows-max overflow-y-auto">
-                    {/* Just a visual representation list instead of a real map for now */}
-                    {activeDrivers.map(driver => (
-                        <div key={driver.driverId} className="bg-slate-800 p-2 rounded border border-slate-700 text-xs shadow-lg animate-in fade-in zoom-in duration-300">
-                            <div className="font-bold text-blue-300 mb-1">{driver.driverId.split('-')[0]}...</div>
-                            <div className="text-slate-400 font-mono">
-                                {driver.lat.toFixed(4)}, {driver.lng.toFixed(4)}
-                            </div>
-                            <div className="text-[10px] text-slate-500 mt-1">
-                                {new Date(driver.timestamp).toLocaleTimeString()}
-                            </div>
-                        </div>
-                    ))}
-                 </div>
-            ) : (
-                <>
-                    <div className="absolute inset-0 bg-[url('https://api.mapbox.com/styles/v1/mapbox/dark-v10/static/-74.006,40.7128,12,0/800x600?access_token=pk.eyJ1IjoiZGFtbWl0IiwiYSI6ImNrdnIxZ3J3NzJzMnQydXA2ZzRzZnJ5cCJ9.7sR7s7s7s7s7')] bg-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-500"></div>
-                     <div className="z-10 text-center space-y-2">
-                        <div className="mx-auto h-12 w-12 rounded-full bg-slate-800/80 flex items-center justify-center">
-                            <Truck className="h-6 w-6 text-slate-500" />
-                        </div>
-                        <p className="text-sm text-slate-400 font-mono">No hay conductores activos</p>
-                        <p className="text-xs text-slate-600">Esperando datos...</p>
-                    </div>
-                </>
-            )}
-           
+          <div className="h-[400px] w-full rounded-xl border border-slate-800 bg-slate-900 shadow-inner flex items-center justify-center relative overflow-hidden group">
+            {/* Real React-Leaflet Map */}
+            <LiveMap />
           </div>
         </div>
 

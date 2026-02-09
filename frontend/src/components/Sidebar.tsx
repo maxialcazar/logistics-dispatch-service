@@ -1,4 +1,4 @@
-import { BarChart3, Map, Truck, Package, Users, PieChart, Settings, HelpCircle, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart3, Map, Truck, Package, Users, PieChart, MapPin, Settings, HelpCircle, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import { useState } from 'react';
@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   { icon: BarChart3, label: 'Tablero Principal', path: '/' },
+  { icon: MapPin, label: 'Zonas', path: '/zones' },
   { icon: Map, label: 'Mapa en Vivo', path: '/monitor' },
   { icon: Truck, label: 'Centro de Despacho', path: '/dispatch' },
   { icon: Package, label: 'Paquetes', path: '/packages' },

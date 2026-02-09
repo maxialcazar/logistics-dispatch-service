@@ -85,7 +85,7 @@ router.use(auth);
  *                     totalPages:
  *                       type: integer
  */
-router.get("/", requireRole("dispatcher"), getPackages);
+router.get("/", requireRole("dispatcher", "admin"), getPackages);
 
 /**
  * @openapi
@@ -105,7 +105,7 @@ router.get("/", requireRole("dispatcher"), getPackages);
  *       201:
  *         description: Created
  */
-router.post("/", requireRole("dispatcher"), validate(createPackageSchema), createPackage);
+router.post("/", requireRole("dispatcher", "admin"), validate(createPackageSchema), createPackage);
 
 /**
  * @openapi
@@ -123,7 +123,7 @@ router.post("/", requireRole("dispatcher"), validate(createPackageSchema), creat
  *       200:
  *         description: Success
  */
-router.get("/driver/:driverId", requireRole("dispatcher"), getPackagesByDriver);
+router.get("/driver/:driverId", requireRole("dispatcher", "admin"), getPackagesByDriver);
 
 /**
  * @openapi
@@ -141,7 +141,7 @@ router.get("/driver/:driverId", requireRole("dispatcher"), getPackagesByDriver);
  *       200:
  *         description: Success
  */
-router.patch("/:packageId/status", requireRole("dispatcher", "driver"), validate(updatePackageStatusSchema), updatePackageStatus);
+router.patch("/:packageId/status", requireRole("dispatcher", "driver", "admin"), validate(updatePackageStatusSchema), updatePackageStatus);
 
 /**
  * @openapi
@@ -159,7 +159,7 @@ router.patch("/:packageId/status", requireRole("dispatcher", "driver"), validate
  *       200:
  *         description: Success
  */
-router.post("/:packageId/assign", requireRole("dispatcher"), validate(assignPackageSchema), assignPackageToDriver);
+router.post("/:packageId/assign", requireRole("dispatcher", "admin"), validate(assignPackageSchema), assignPackageToDriver);
 
 /**
  * @openapi
@@ -191,6 +191,6 @@ router.get("/me", auth, requireRole("driver"), getMyPackages);
  *       200:
  *         description: Success
  */
-router.get("/:packageId/history", auth, requireRole("dispatcher", "driver"), getPackageHistory);
+router.get("/:packageId/history", auth, requireRole("dispatcher", "driver", "admin"), getPackageHistory);
 
 export default router;

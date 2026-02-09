@@ -30,10 +30,24 @@ interface PaginatedResponse<T> {
 
 export const packageService = {
   async getZones(token: string): Promise<Zone[]> {
-    const res = await fetch('/api/zones', {
+    const res = await fetch('/api/zones?limit=100', { // Fetch all zones (up to limit)
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) throw new Error('Failed to fetch zones');
+    const data = await res.json();
+    return data.items || [];
+  },
+
+  async createZone(token: string, name: string): Promise<Zone> {
+    const res = await fetch('/api/zones', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) throw new Error('Failed to create zone');
     return res.json();
   },
 

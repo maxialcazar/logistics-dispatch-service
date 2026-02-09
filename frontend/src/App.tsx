@@ -4,6 +4,8 @@ import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 import { CreatePackagePage } from "./pages/CreatePackagePage";
 import { PackagesPage } from "./pages/PackagesPage";
+import { ZonesPage } from "./pages/ZonesPage";
+import { DriversPage } from "./pages/DriversPage";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContext.tsx"
 
@@ -27,6 +29,13 @@ function AppRoutes() {
         {/* Packages Module */}
         <Route path="/packages" element={<PackagesPage />} />
         <Route path="/packages/new" element={<CreatePackagePage />} />
+        
+        {/* Zones Module */}
+        <Route path="/zones" element={<ZonesPage />} />
+        
+        {/* Drivers Module */}
+        <Route path="/drivers" element={<DriversPage />} />
+
         <Route path="/monitor" element={<div className="p-8 text-center text-slate-500">Enhanced Real-Time Monitor (Coming Soon)</div>} />
       </Route>
     </Routes>

@@ -1,1 +1,2 @@
 npx prisma db push --force-reset
+npx ts-node scripts/load-test.ts

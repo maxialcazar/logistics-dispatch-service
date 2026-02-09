@@ -59,7 +59,8 @@ router.use(auth);
  *                     totalPages:
  *                       type: integer
  */
-router.get("/", requireRole("dispatcher"), getZones);
+// allow admin to create zones too
+router.get("/", requireRole("dispatcher", "admin"), getZones);
 
 /**
  * @openapi
@@ -73,6 +74,6 @@ router.get("/", requireRole("dispatcher"), getZones);
  *       201:
  *         description: Created
  */
-router.post("/", requireRole("dispatcher"), validate(createZoneSchema), createZone);
+router.post("/", requireRole("dispatcher", "admin"), validate(createZoneSchema), createZone);
 
 export default router;

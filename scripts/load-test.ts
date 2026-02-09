@@ -128,11 +128,11 @@ async function get(endpoint: string, token?: string) {
 }
 
 const companies = [
-  { name: "Empresa A", slug: "empresa-a", user: "adminA", pass: "123456" },
-  { name: "Empresa B", slug: "empresa-b", user: "adminB", pass: "123456" },
-  { name: "Empresa C", slug: "empresa-c", user: "adminC", pass: "123456" },
-  { name: "Empresa D", slug: "empresa-d", user: "adminD", pass: "123456" },
-  { name: "Empresa E", slug: "empresa-e", user: "adminE", pass: "123456" },
+  { name: "Empresa A", slug: "empresa-a", user: "adminA", pass: "123456" }
+  //{ name: "Empresa B", slug: "empresa-b", user: "adminB", pass: "123456" },
+  //{ name: "Empresa C", slug: "empresa-c", user: "adminC", pass: "123456" },
+  //{ name: "Empresa D", slug: "empresa-d", user: "adminD", pass: "123456" },
+  //{ name: "Empresa E", slug: "empresa-e", user: "adminE", pass: "123456" },
 ];
 
 async function main() {
@@ -186,7 +186,7 @@ async function main() {
 
 async function simulateCompany(c: any, adminToken: string) {
   console.log(`[${c.name}] Starting simulation...`);
-  const DISPATCHERS_COUNT = 5; 
+  const DISPATCHERS_COUNT = 1; 
   // Reducing counts slightly to avoid blowing up memory/network local dev immediately if user has limited resources.
   // User asked for 50 dispatchers * 50 drivers = 2500 requests. 
   // Let's stick to the plan but be aware this is heavy.
@@ -296,7 +296,7 @@ async function simulateCompany(c: any, adminToken: string) {
     // Simulation Phase: Drivers updating location
     console.log(`[${c.name}] Dispatcher ${d.name} setup complete. Launching drivers...`);
     
-    const driverSims = drivers.map(async (drv) => {
+    const driverSims = drivers.map(async (drv, driverIndex) => { // Added driverIndex
        try {
             // Login as driver
             const drvLogin = await post('/auth/login', { username: `usr_${drv.name}`, password: '123456' });
@@ -305,16 +305,48 @@ async function simulateCompany(c: any, adminToken: string) {
             // 1. Get Packages
             await get(`/packages/me`, drvToken); 
 
-            // 2. Loop update location for 60 seconds (Visual Demo)
-            const startTime = Date.now();
-            while (Date.now() - startTime < 60000) {
-               await patch('/drivers/location', {
-                   lat: -34.0 + (Math.random() * 0.1),
-                   lng: -58.0 + (Math.random() * 0.1)
-               }, drvToken);
-               
-               await new Promise(r => setTimeout(r, 2000));
-            }
+            // --- Smooth Linear Movement Logic ---
+            // Distribute drivers in a grid/lanes
+            const driversPerCol = 10;
+            const colIndex = driverIndex % driversPerCol; // Use driverIndex here
+            const rowIndex = Math.floor(driverIndex / driversPerCol); // Use driverIndex here
+            
+            // Start grid in Buenos Aires
+            let lat = -34.6037 + (rowIndex * 0.002); // Rows spaced by ~200m
+            let lng = -58.3816 + (colIndex * 0.002); // Cols spaced by ~200m
+
+            // Constant smooth velocity (e.g., moving North-East)
+            const latStep = 0.00005; // ~5 meters per update
+            const lngStep = 0.00005; 
+
+            const interval = setInterval(async () => {
+              try {
+                // Linear movement
+                lat += latStep;
+                lng += lngStep;
+                
+                // Add tiny random jitter to look organic (not robotic)
+                const jitter = (Math.random() - 0.5) * 0.00001; 
+                
+                const payload = { lat: lat + jitter, lng: lng + jitter };
+                
+                // Assuming USE_WEBSOCKETS is defined elsewhere, or we default to HTTP
+                // For this context, we'll stick to the existing `patch` function.
+                await patch('/drivers/location', payload, drvToken);
+                
+              } catch (e: any) {
+                // Silent fail for location updates
+              }
+            }, 1000); // 1 update per second (SmoothMarker handles animation)
+
+            // Keep the simulation running for 60 seconds (or until main process exits)
+            // We need to clear the interval after some time if we want to stop it.
+            // For now, let's assume the main process will exit, or we'll add a timeout.
+            await new Promise(resolve => setTimeout(() => {
+                clearInterval(interval);
+                resolve(null);
+            }, 60000)); // Run for 60 seconds
+            
        } catch (e: any) {
            // Silent fail
        }

@@ -23,7 +23,10 @@ export class DriverService {
     const [items, total] = await Promise.all([
       prisma.driver.findMany({
         where,
-        include: { zones: true },
+        include: { 
+          zones: true,
+          user: { select: { username: true } } 
+        },
         skip,
         take: limit,
       }),

@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+// Force recompile after prisma generate
 import { PackageStatus } from "@prisma/client";
 import { emitToAll } from "../websocket";
 
@@ -162,8 +163,11 @@ export class PackageService {
     if (!pkg) throw new Error("package_not_found");
 
     // Business Logic: Driver restricted to their zone
-    if (userRole === "driver" && pkg.zone.driverId !== userDriverId) {
-      throw new Error("not_authorized_for_zone");
+    // Business Logic: Driver restricted to their zone
+    if (userRole === "driver") {
+        if (!pkg.zone || pkg.zone.driverId !== userDriverId) {
+             throw new Error("not_authorized_for_zone");
+        }
     }
 
     const allowedTransitions: Record<PackageStatus, PackageStatus[]> = {
@@ -223,7 +227,7 @@ export class PackageService {
     });
     if (!driver) throw new Error("driver_not_found");
 
-    if (pkg.zone.driverId !== driverId) {
+    if (!pkg.zone || pkg.zone.driverId !== driverId) {
       throw new Error("driver_not_in_zone");
     }
 
@@ -289,7 +293,7 @@ export class PackageService {
       select: {
         trackingCode: true,
         status: true,
-        address: true,
+        recipientAddress: true,
         lat: true,
         lng: true,
         estimatedDeliveryAt: true,
@@ -300,12 +304,13 @@ export class PackageService {
 
     if (!pkg) return null;
 
-    const parts = pkg.address.split(" ");
+    let displayAddress = pkg.recipientAddress;
+    const parts = displayAddress.split(" ");
     if (parts.length > 2) {
-      pkg.address = `${parts.slice(0, -1).join(" ")} ***`;
+      displayAddress = `${parts.slice(0, -1).join(" ")} ***`;
     }
 
-    return pkg;
+    return { ...pkg, recipientAddress: displayAddress };
   }
 
   static async getAssignedDriverId(trackingCode: string) {
@@ -316,7 +321,7 @@ export class PackageService {
       }
     });
 
-    if (!pkg) return null;
+    if (!pkg || !pkg.zone) return null;
     return pkg.zone.driverId; 
   }
 }

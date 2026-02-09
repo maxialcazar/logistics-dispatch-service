@@ -3,10 +3,31 @@ import { z } from "zod";
 export const createPackageSchema = z.object({
   body: z.object({
     trackingCode: z.string().min(5),
-    address: z.string().min(5),
-    zoneId: z.string().uuid(),
-    lat: z.number().optional(),
-    lng: z.number().optional(),
+    
+    // Recipient Info
+    recipientName: z.string().min(2),
+    recipientAddress: z.string().min(5),
+    recipientPhone: z.string().min(5),
+    recipientEmail: z.string().email().optional(),
+    
+    // Delivery Details
+    addressReferences: z.string().optional(),
+    addressStreet: z.string().optional(),
+    addressNumber: z.string().optional(),
+
+    // Sender Info (Optional)
+    senderName: z.string().optional().or(z.literal("")),
+    senderAddress: z.string().optional().or(z.literal("")),
+    senderPhone: z.string().optional().or(z.literal("")),
+
+    // Logistics
+    weight: z.number().optional().nullable(),
+    volume: z.number().optional().nullable(),
+    zoneId: z.string().uuid().optional(), // Make optional if auto-zone logic exists? No, keep required for now as per controller logic.
+    
+    // Coordinates
+    lat: z.number().nullable().optional(),
+    lng: z.number().nullable().optional(),
     estimatedDeliveryAt: z.string().datetime().optional(),
   }),
 });

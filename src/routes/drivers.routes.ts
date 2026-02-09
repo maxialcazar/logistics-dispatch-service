@@ -52,7 +52,8 @@ router.use(auth);
  *         description: Success
  */
 
-router.get("/", requireRole("dispatcher"), getDrivers);
+// allow admin to manage drivers
+router.get("/", requireRole("dispatcher", "admin"), getDrivers);
 /**
  * @openapi
  * /api/drivers:
@@ -65,7 +66,7 @@ router.get("/", requireRole("dispatcher"), getDrivers);
  *       201:
  *         description: Created
  */
-router.post("/", requireRole("dispatcher"), validate(createDriverSchema), createDriver);
+router.post("/", requireRole("dispatcher", "admin"), validate(createDriverSchema), createDriver);
 
 /**
  * @openapi
@@ -83,7 +84,7 @@ router.post("/", requireRole("dispatcher"), validate(createDriverSchema), create
  *       200:
  *         description: Success
  */
-router.post("/:driverId/zones", requireRole("dispatcher"), validate(assignZonesSchema), assignZonesToDriver);
+router.post("/:driverId/zones", requireRole("dispatcher", "admin"), validate(assignZonesSchema), assignZonesToDriver);
 
 /**
  * @openapi
@@ -115,7 +116,7 @@ router.get("/me/zones", requireRole("driver"), getMyZones);
  *       200:
  *         description: Success
  */
-router.get("/:driverId/zones", requireRole("dispatcher"), getDriverZones);
+router.get("/:driverId/zones", requireRole("dispatcher", "admin"), getDriverZones);
 
 /**
  * @openapi
