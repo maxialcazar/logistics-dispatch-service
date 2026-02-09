@@ -8,6 +8,8 @@ import clsx from 'clsx';
 export function PackagesPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [packages, setPackages] = useState<IPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,21 +18,23 @@ export function PackagesPage() {
 
   useEffect(() => {
     fetchPackages();
-  }, [token, activeFilter]);
+  }, [token, activeFilter, page]);
 
   const fetchPackages = async () => {
     if (!token) return;
     setLoading(true);
     try {
-      // We are fetching only page 1 for now. Pagination can be added later as requested.
-      const res = await packageService.getPackages(token, activeFilter || undefined, 1);
+      const res = await packageService.getPackages(token, activeFilter || undefined, page);
       setPackages(res.items);
+      setTotalPages(res.meta.totalPages);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // ... (getStatusBadge function remains same)
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -43,6 +47,8 @@ export function PackagesPage() {
     }
   };
 
+  // Note: filtering is client-side on the current PAGE only for now.
+  // Ideally, search should trigger server-side query, but sticking to simple client filter for visual consistency with current code.
   const filteredPackages = packages.filter(p => 
     p.trackingCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.recipientName.toLowerCase().includes(searchTerm.toLowerCase())
@@ -50,6 +56,8 @@ export function PackagesPage() {
 
   return (
     <div className="space-y-6">
+      {/* ... (Header and Toolbar remain same) ... */}
+      
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -84,7 +92,7 @@ export function PackagesPage() {
              {['', 'pending', 'assigned', 'in_transit', 'delivered'].map((status) => (
                <button
                  key={status}
-                 onClick={() => setActiveFilter(status)}
+                 onClick={() => { setActiveFilter(status); setPage(1); }} // Reset page on filter change
                  className={clsx(
                    "px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border",
                    activeFilter === status 
@@ -101,13 +109,13 @@ export function PackagesPage() {
       {/* Data Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         {loading ? (
-             <div className="p-12 text-center text-slate-500">Cargando paquetes...</div>
+             <div className="p-12 text-center text-slate-500 animate-pulse">Cargando paquetes...</div>
         ) : error ? (
              <div className="p-12 text-center text-red-400">Error: {error}</div>
         ) : filteredPackages.length === 0 ? (
              <div className="p-12 text-center text-slate-500">
                 <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No se encontraron paquetes.</p>
+                <p>No se encontraron paquetes en esta página.</p>
              </div>
         ) : (
           <div className="overflow-x-auto">
@@ -162,12 +170,24 @@ export function PackagesPage() {
         )}
       </div>
 
-       {/* Pagination (Visual placeholder) */}
-       <div className="flex items-center justify-between text-sm text-slate-400 px-2">
-           <div>Mostrando {filteredPackages.length} resultados</div>
+       {/* Pagination */}
+       <div className="flex items-center justify-between text-sm text-slate-400 px-2 py-4 border-t border-slate-800 bg-slate-900/50 rounded-b-xl">
+           <div>Página {page} de {totalPages}</div>
            <div className="flex gap-2">
-               <button className="px-3 py-1 bg-slate-900 border border-slate-800 rounded hover:bg-slate-800 disabled:opacity-50" disabled>Anterior</button>
-               <button className="px-3 py-1 bg-slate-900 border border-slate-800 rounded hover:bg-slate-800 disabled:opacity-50" disabled>Siguiente</button>
+               <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
+               >
+                 Anterior
+               </button>
+               <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
+               >
+                 Siguiente
+               </button>
            </div>
        </div>
     </div>

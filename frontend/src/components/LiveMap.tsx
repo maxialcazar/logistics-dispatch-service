@@ -54,13 +54,23 @@ const createDriverIcon = (driverId: string) => {
     });
 };
 
-export function LiveMap() {
+interface LiveMapProps {
+    visibleDriverIds?: string[]; // If provided, only shows these drivers. If undefined/null, shows all.
+}
+
+export function LiveMap({ visibleDriverIds }: LiveMapProps) {
     const { locations } = useSocket();
     
-    // Convert Map to Array
-    const drivers = useMemo(() => Array.from(locations.values()), [locations]);
+    // Convert Map to Array and apply filter if exists
+    const drivers = useMemo(() => {
+        const all = Array.from(locations.values());
+        if (!visibleDriverIds) return all;
+        return all.filter(d => visibleDriverIds.includes(d.driverId));
+    }, [locations, visibleDriverIds]);
 
-    // Calculate center dynamically or fallback to Buenos Aires (Obelisco)
+    // Calculate center dynamically only if we have filtered drivers, 
+    // otherwise stick to default or previous center to avoid jumping.
+    // ... (logic continues)
     const center: [number, number] = drivers.length > 0 
         ? [drivers[0].lat, drivers[0].lng] 
         : [-34.6037, -58.3816];

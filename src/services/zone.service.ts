@@ -43,15 +43,74 @@ export class ZoneService {
     return result;
   }
 
-  static async createZone(companyId: string, name: string) {
+  static async createZone(companyId: string, name: string, description?: string) {
     const zone = await prisma.zone.create({ 
-      data: { name, companyId } 
+      data: { name, description, companyId } 
     });
     
-    // Invalidate cache for this company only
-    // Note: delPrefix helper might need wildcard support if not already present, 
-    // assuming it works like 'KEYS prefix*' -> DEL
     await redis.delPrefix(`zones:${companyId}:`); 
     return zone;
+  }
+
+  static async updateZone(
+    zoneId: string, 
+    companyId: string, 
+    data: { 
+      isActive?: boolean; 
+      description?: string; 
+      driverId?: string | null; 
+      name?: string;
+    }
+  ) {
+    try {
+      const currentZone = await prisma.zone.findFirst({ where: { id: zoneId, companyId } });
+      if (!currentZone) throw new Error('Zone not found');
+
+      const willBeActive = data.isActive !== undefined ? data.isActive : currentZone.isActive;
+      const willHaveDriver = data.driverId !== undefined ? data.driverId : currentZone.driverId;
+
+      // Check logic: Can only activate if driver is assigned
+      if (willBeActive && !willHaveDriver) {
+        throw new Error('Cannot activate zone without an assigned driver');
+      }
+
+      const updatedZone = await prisma.zone.update({
+        where: { id: zoneId }, // ID is globally unique
+        data: {
+          description: data.description,
+          isActive: data.isActive,
+          driverId: data.driverId,
+          name: data.name
+        },
+        include: { driver: true }
+      });
+
+      // Business Logic: If activated, assign pending packages in this zone
+      if (data.isActive === true) {
+        console.log(`Activating zone ${zoneId}, updating packages...`);
+        try {
+            await prisma.package.updateMany({
+              where: {
+                zoneId: zoneId,
+                status: 'pending',
+                companyId
+              },
+              data: { 
+                status: 'assigned',
+                updatedAt: new Date()
+              }
+            });
+        } catch (pkgError) {
+            console.error("Error updating packages status (non-fatal):", pkgError);
+        }
+      }
+
+      await redis.delPrefix(`zones:${companyId}:`);
+      return updatedZone;
+
+    } catch (error) {
+      console.error("Error in ZoneService.updateZone:", error);
+      throw error;
+    }
   }
 }

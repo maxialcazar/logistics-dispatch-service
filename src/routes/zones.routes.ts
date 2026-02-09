@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getZones, createZone } from "../controllers/zones.controller";
+import { getZones, createZone, updateZone } from "../controllers/zones.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
@@ -75,5 +75,7 @@ router.get("/", requireRole("dispatcher", "admin"), getZones);
  *         description: Created
  */
 router.post("/", requireRole("dispatcher", "admin"), validate(createZoneSchema), createZone);
+
+router.patch("/:id", requireRole("dispatcher", "admin"), updateZone);
 
 export default router;

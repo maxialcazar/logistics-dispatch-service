@@ -61,6 +61,8 @@ model Driver {
 model Zone {
   id      String     @id @default(uuid())
   name    String
+  description String?
+  isActive Boolean @default(false)
 
   // Multi-Tenancy
   companyId String
