@@ -29,6 +29,11 @@ export function CreatePackagePage() {
     recipientPhone: '',
     addressReferences: '',
     
+    // Detailed Address (UI only)
+    addressStreet: '',
+    addressNumber: '',
+    addressCity: '', // Used for neighborhood
+
     zoneId: '',
   });
 
@@ -75,7 +80,6 @@ export function CreatePackagePage() {
         ...formData,
         lat: coords.lat,
         lng: coords.lng,
-        // Send defaults or nulls for weight/volume as they are removed from UI
         weight: null,
         volume: null
       };
@@ -90,9 +94,9 @@ export function CreatePackagePage() {
       setFormData(prev => ({ 
         ...prev, 
         trackingCode: '', 
-        // Keep sender info optional clearing logic
         senderName: '', senderAddress: '', senderPhone: '',
-        recipientName: '', recipientAddress: '', recipientPhone: '', addressReferences: ''
+        recipientName: '', recipientAddress: '', recipientPhone: '', addressReferences: '',
+        addressStreet: '', addressNumber: '', addressCity: ''
       }));
     } catch (err: any) {
       setError(err.message);
@@ -255,22 +259,122 @@ export function CreatePackagePage() {
                 </div>
             </div>
 
-             <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Dirección de Entrega</label>
-                <div className="relative">
-                    <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+             <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-slate-300">Dirección de Entrega</label>
+                    <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">Geocodificación Automática</span>
+                </div>
+                
+                {/* Structured Address Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Country & Province (Defaults) */}
+                    <div className="space-y-2">
+                         <label className="text-xs text-slate-500">País</label>
+                         <input 
+                            type="text" 
+                            value="Argentina" 
+                            disabled 
+                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-400 cursor-not-allowed"
+                         />
+                    </div>
+                    <div className="space-y-2">
+                         <label className="text-xs text-slate-500">Provincia</label>
+                         <input 
+                            type="text" 
+                            value="Córdoba" 
+                            disabled 
+                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-400 cursor-not-allowed"
+                         />
+                    </div>
+
+                    {/* Neighborhood (Autocomplete) */}
+                    <div className="space-y-2 md:col-span-1">
+                         <label className="text-xs text-slate-300">Barrio (Córdoba Capital)</label>
+                         <input
+                            list="barrios-cordoba"
+                            type="text"
+                            placeholder="Seleccione o escriba..."
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                            value={formData.addressCity || ''} // Reusing addressCity for Neighborhood temporarily
+                            onChange={e => {
+                                const val = e.target.value;
+                                setFormData(prev => ({ 
+                                    ...prev, 
+                                    addressCity: val,
+                                    recipientAddress: `${prev.addressStreet || ''} ${prev.addressNumber || ''}, ${val}, Córdoba, Argentina`.trim()
+                                }));
+                            }}
+                         />
+                         <datalist id="barrios-cordoba">
+                            {[
+                                // Zona Centro y Nueva Córdoba
+                                "Centro", "Nueva Córdoba", "Güemes", "Observatorio", "Alberdi", "Alto Alberdi", "Bajo Supremo",
+                                // Norte
+                                "Alta Córdoba", "Cofico", "General Bustos", "General Paz", "Juniors", "San Martín", 
+                                "Villa Cabrera", "San Rafael", "Los Paraísos", "Barrio Poeta Lugones", "Cerro de las Rosas", 
+                                "Urca", "Villa Belgrano", "Argüello", "Villa Warcalde", "Los Boulevares", "Parque Liceo",
+                                // Sur
+                                "Jardín", "Rogelio Martínez", "Crisol", "Maipú", "San Vicente", "Barrio Iponá", "San Fernando",
+                                "Las Flores", "Villa El Libertador", "Santa Isabel", "Congreso", "Comercial",
+                                // Oeste
+                                "Sachi", "Carrara", "Manantiales", "Villa Urquiza", "Las Palmas", "Los Plátanos", "Consorcio Esperanza",
+                                "Quebrada de las Rosas", "San Ignacio", "Villa Unión", "Parque República",
+                                // Este
+                                "Yapeyú", "Pueyrredón", "Talleres", "Patricios", "General Savio",
+                                // Otros Populares
+                                "Ciudad Universitaria", "Parque Sarmiento", "Maldonado", "Acosta", "Altamira", "Empalme",
+                                "Ferreyra", "Ituzaingó", "José Ignacio Díaz", "Coronel Olmedo"
+                            ].sort().map(b => <option key={b} value={b} />)}
+                         </datalist>
+                    </div>
+
+                    {/* Street & Number */}
+                    <div className="space-y-2 md:col-span-1">
+                         <label className="text-xs text-slate-300">Calle y Altura</label>
+                         <div className="flex gap-2">
+                             <input
+                                type="text"
+                                placeholder="Calle"
+                                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                                value={formData.addressStreet || ''}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setFormData(prev => ({ 
+                                        ...prev, 
+                                        addressStreet: val,
+                                        recipientAddress: `${val} ${prev.addressNumber || ''}, ${prev.addressCity || ''}, Córdoba, Argentina`.trim()
+                                    }));
+                                }}
+                             />
+                             <input
+                                type="text"
+                                placeholder="N°"
+                                className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                                value={formData.addressNumber || ''}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setFormData(prev => ({ 
+                                        ...prev, 
+                                        addressNumber: val,
+                                        recipientAddress: `${prev.addressStreet || ''} ${val}, ${prev.addressCity || ''}, Córdoba, Argentina`.trim()
+                                    }));
+                                }}
+                             />
+                         </div>
+                    </div>
+                </div>
+
+                {/* Full Address Preview (Readonly) */}
+                <div className="relative pt-2">
+                    <MapPin className="absolute left-3 top-5 h-4 w-4 text-slate-500" />
+                    <label className="text-xs text-slate-500 mb-1 block">Dirección Completa (Generada)</label>
                     <input
                         type="text"
-                        placeholder="Calle, Altura, Piso/Depto"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                        disabled
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-slate-300 font-mono text-sm"
                         value={formData.recipientAddress}
-                        onChange={e => setFormData({ ...formData, recipientAddress: e.target.value })}
-                        required
                     />
                 </div>
-                <p className="text-xs text-slate-500 ml-1">
-                   Las coordenadas se calcularán automáticamente al crear el paquete.
-                </p>
             </div>
 
              <div className="space-y-2">
@@ -293,7 +397,8 @@ export function CreatePackagePage() {
                   trackingCode: '', 
                   senderName: '', senderAddress: '', senderPhone: '',
                   recipientName: '', recipientAddress: '', recipientPhone: '', 
-                  addressReferences: '', zoneId: ''
+                  addressReferences: '', zoneId: '',
+                  addressStreet: '', addressNumber: '', addressCity: ''
               })}
             >
               Limpiar

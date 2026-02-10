@@ -4,7 +4,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { PackageStatus } from "@prisma/client";
 
 export async function getPackages(req: AuthRequest, res: Response) {
-  const { status, zoneId, trackingCode, page, limit } = req.query;
+  const { status, zoneId, trackingCode, page, limit, isArchived } = req.query;
 
   try {
     const result = await PackageService.getAllPackages(req.user!.companyId, {
@@ -13,6 +13,7 @@ export async function getPackages(req: AuthRequest, res: Response) {
       trackingCode: trackingCode as string,
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
+      isArchived: isArchived === 'true',
     });
     res.json(result);
   } catch (error) {
@@ -147,4 +148,40 @@ export async function getPackageHistory(req: AuthRequest, res: Response) {
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
   }
+}
+
+export async function getDashboardStats(req: AuthRequest, res: Response) {
+    try {
+        const stats = await PackageService.getDashboardStats(req.user!.companyId);
+        res.json(stats);
+    } catch (error) {
+        console.error("Stats Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}
+
+export async function archivePackages(req: AuthRequest, res: Response) {
+    const { packageIds } = req.body;
+    if (!Array.isArray(packageIds) || packageIds.length === 0) {
+        return res.status(400).json({ error: "Invalid packageIds" });
+    }
+    try {
+        const result = await PackageService.archivePackages(req.user!.companyId, packageIds);
+        res.json({ count: result.count });
+    } catch (error) {
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}
+
+export async function deletePackages(req: AuthRequest, res: Response) {
+    const { packageIds } = req.body;
+    if (!Array.isArray(packageIds) || packageIds.length === 0) {
+        return res.status(400).json({ error: "Invalid packageIds" });
+    }
+    try {
+        const result = await PackageService.deletePackages(req.user!.companyId, packageIds);
+        res.json({ count: result.count });
+    } catch (error) {
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 }

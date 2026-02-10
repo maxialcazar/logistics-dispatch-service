@@ -1,26 +1,66 @@
-import { PackageCheck, Truck, Clock, AlertTriangle, Radio } from 'lucide-react';
+import { PackageCheck, Truck, Clock, AlertTriangle, Radio, Navigation } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
-import { useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { packageService } from '../services/packageService';
+import { useMemo, useState, useEffect } from 'react';
 import { LiveMap } from '../components/LiveMap';
-
-const stats = [
-  { label: 'Conductores Activos', value: '12', trend: '+2', trendColor: 'text-green-400', icon: Truck },
-  { label: 'Paquetes Entregados', value: '184', trend: '+14%', trendColor: 'text-green-400', icon: PackageCheck },
-  { label: 'Tiempo Prom. Entrega', value: '24m', trend: '-2m', trendColor: 'text-green-400', icon: Clock },
-  { label: 'Incidencias Pendientes', value: '3', trend: '+1', trendColor: 'text-red-400', icon: AlertTriangle },
-];
 
 export function Dashboard() {
   const { locations, isConnected } = useSocket();
+  const { token } = useAuth();
+  
+  const [metrics, setMetrics] = useState({ 
+      deliveredToday: 0, 
+      inTransit: 0, 
+      avgDeliveryTimeMinutes: 0 
+  });
+
+  // Fetch Stats Loop (Every 60s)
+  useEffect(() => {
+      if (!token) return;
+      const loadStats = () => {
+          packageService.getDashboardStats(token)
+            .then(data => setMetrics(data))
+            .catch(err => console.error("Stats Error:", err));
+      }
+      loadStats();
+      const interval = setInterval(loadStats, 60000);
+      return () => clearInterval(interval);
+  }, [token]);
 
   // Convert Map to Array for rendering
   const activeDrivers = useMemo(() => Array.from(locations.values()), [locations]);
+
+  // Dynamic Stats Configuration
+  const dynamicStats = [
+      { 
+          label: 'Paquetes Entregados', // Reset at 00:00 implemented in backend query
+          value: metrics.deliveredToday.toString(), 
+          trend: 'Hoy', 
+          trendColor: 'text-slate-400', 
+          icon: PackageCheck 
+      },
+      { 
+          label: 'Tiempo Prom. Entrega', 
+          value: `${metrics.avgDeliveryTimeMinutes}m`, 
+          trend: 'Estimado', 
+          trendColor: 'text-slate-400', 
+          icon: Clock 
+      },
+      { 
+          label: 'En Ruta Ahora', // Replaces "Incidencias"
+          value: metrics.inTransit.toString(), 
+          trend: 'Activos', 
+          trendColor: 'text-blue-400', 
+          icon: Navigation 
+      },
+  ];
 
   return (
     <div className="space-y-8">
       {/* Metrics Row */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Dynamic Card for Active Drivers */}
+        {/* Dynamic Card for Active Drivers (From Socket) */}
          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-6 shadow-sm transition-all hover:bg-slate-800/50 hover:shadow-md">
             <div>
               <p className="text-sm font-medium text-slate-400">Conductores Conectados</p>
@@ -36,18 +76,17 @@ export function Dashboard() {
             </div>
          </div>
 
-         {/* Static cards for now... */}
-        {stats.slice(1).map((stat, i) => (
+         {/* Backend Metrics Cards */}
+        {dynamicStats.map((stat, i) => (
           <div
             key={i}
             className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-6 shadow-sm transition-all hover:bg-slate-800/50 hover:shadow-md"
           >
             <div>
               <p className="text-sm font-medium text-slate-400">{stat.label}</p>
-              <p className="mt-2 text-3xl font-bold">{stat.value}</p>
+              <p className="mt-2 text-3xl font-bold text-white">{stat.value}</p>
               <div className="mt-1 flex items-center gap-1 text-xs">
                 <span className={stat.trendColor}>{stat.trend}</span>
-                <span className="text-slate-500">vs última hora</span>
               </div>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 text-blue-400 ring-1 ring-slate-700">

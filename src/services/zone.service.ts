@@ -105,7 +105,12 @@ export class ZoneService {
         }
       }
 
-      await redis.delPrefix(`zones:${companyId}:`);
+      const keysToInvalidate = [
+          `zones:${companyId}`,
+          `drivers:${companyId}`
+      ];
+      await Promise.all(keysToInvalidate.map(k => redis.delPrefix(`${k}:`)));
+      
       return updatedZone;
 
     } catch (error) {

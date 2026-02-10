@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
-const URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const URL = import.meta.env.VITE_API_URL || undefined; // Use window origin (proxy) by default
 
 class SocketService {
   public socket: Socket | null = null;

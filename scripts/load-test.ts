@@ -260,7 +260,7 @@ async function simulateCompany(c: any, adminToken: string) {
     }
 
     // Create Packages & Assign
-    const packages = [];
+    const packages: any[] = [];
     try {
         for(let j=0; j<OBJECTS_PER_DISPATCHER; j++) {
             const zone = zones[j];
@@ -296,59 +296,87 @@ async function simulateCompany(c: any, adminToken: string) {
     // Simulation Phase: Drivers updating location
     console.log(`[${c.name}] Dispatcher ${d.name} setup complete. Launching drivers...`);
     
-    const driverSims = drivers.map(async (drv, driverIndex) => { // Added driverIndex
+    const driverSims = drivers.map(async (drvData, driverIndex) => { 
        try {
-            // Login as driver
-            const drvLogin = await post('/auth/login', { username: `usr_${drv.name}`, password: '123456' });
-            const drvToken = drvLogin.token;
+            // Login as driver user (created previously)
+            // Note: In create steps we made users 'usr_Driver_...'
+            const login = await post('/auth/login', { 
+                username: `usr_${drvData.name}`, // Fixed username reference
+                password: '123456' 
+            });
+            const drvToken = login.token;
 
-            // 1. Get Packages
-            await get(`/packages/me`, drvToken); 
-
-            // --- Smooth Linear Movement Logic ---
-            // Distribute drivers in a grid/lanes
-            const driversPerCol = 10;
-            const colIndex = driverIndex % driversPerCol; // Use driverIndex here
-            const rowIndex = Math.floor(driverIndex / driversPerCol); // Use driverIndex here
+            // 1. Get Packages Assigned to Me
+            // The setup phase assigned drivers to zones, and packages to zones.
+            // But packages need to be explicitly assigned to drivers or claimed.
+            // Assuming the existing logic assigns them, or we need to claim them.
+            // Let's try to fetch 'my packages'. If empty, we might need to assign one first.
+            let myPackages = await get('/packages/me', drvToken);
             
-            // Start grid in Buenos Aires
-            let lat = -34.6037 + (rowIndex * 0.002); // Rows spaced by ~200m
-            let lng = -58.3816 + (colIndex * 0.002); // Cols spaced by ~200m
+            // If no packages, let's try to assign the one created for this index
+            // We know packages[j] matches drivers[j] in our loop
+            if (myPackages.length === 0 && packages[driverIndex]) {
+                 try {
+                    await post(`/packages/${packages[driverIndex].id}/assign`, { driverId: login.user.driverId }, d.token); // Admin/Dispatcher assigns
+                    myPackages = [{ id: packages[driverIndex].id }];
+                 } catch (e) { /* Ignore assign error */ }
+            }
 
-            // Constant smooth velocity (e.g., moving North-East)
-            const latStep = 0.00005; // ~5 meters per update
-            const lngStep = 0.00005; 
+            const targetPkg = myPackages[0]; // Focus on one package
 
-            const interval = setInterval(async () => {
+            // --- MOVEMENT LOOP ---
+            const driversPerCol = 10;
+            const colIndex = driverIndex % driversPerCol;
+            const rowIndex = Math.floor(driverIndex / driversPerCol);
+            
+            let lat = -34.6037 + (rowIndex * 0.002);
+            let lng = -58.3816 + (colIndex * 0.002);
+            
+            // Randomize speed slightly
+            const latStep = 0.00005 * (0.8 + Math.random() * 0.4); 
+            const lngStep = 0.00005 * (0.8 + Math.random() * 0.4);
+
+            const locationInterval = setInterval(async () => {
               try {
-                // Linear movement
                 lat += latStep;
                 lng += lngStep;
-                
-                // Add tiny random jitter to look organic (not robotic)
                 const jitter = (Math.random() - 0.5) * 0.00001; 
-                
-                const payload = { lat: lat + jitter, lng: lng + jitter };
-                
-                // Assuming USE_WEBSOCKETS is defined elsewhere, or we default to HTTP
-                // For this context, we'll stick to the existing `patch` function.
-                await patch('/drivers/location', payload, drvToken);
-                
-              } catch (e: any) {
-                // Silent fail for location updates
-              }
-            }, 1000); // 1 update per second (SmoothMarker handles animation)
+                await patch('/drivers/location', { lat: lat + jitter, lng: lng + jitter }, drvToken);
+              } catch (e) { /* silent fail */ }
+            }, 1000);
 
-            // Keep the simulation running for 60 seconds (or until main process exits)
-            // We need to clear the interval after some time if we want to stop it.
-            // For now, let's assume the main process will exit, or we'll add a timeout.
+            // --- STATUS UPDATE SIMULATION (Staggered) ---
+            if (targetPkg) {
+                // 1. Wait random time before starting (5s - 20s)
+                const startDelay = Math.floor(Math.random() * 15000) + 5000;
+                
+                setTimeout(async () => {
+                    try {
+                        console.log(`[${drvData.name}] 🚚 Starting delivery for ${targetPkg.id}`);
+                        await patch(`/packages/${targetPkg.id}/status`, { status: 'in_transit' }, drvToken);
+                        
+                        // 2. Drive for random time (10s - 30s)
+                        const driveTime = Math.floor(Math.random() * 20000) + 10000;
+                        
+                        setTimeout(async () => {
+                             try {
+                                console.log(`[${drvData.name}] ✅ Delivered ${targetPkg.id}`);
+                                await patch(`/packages/${targetPkg.id}/status`, { status: 'delivered' }, drvToken);
+                             } catch (e: any) { console.error(`[${drvData.name}] Refused delivery: ${e.message}`); }
+                        }, driveTime);
+
+                    } catch (e: any) { console.error(`[${drvData.name}] Failed start: ${e.message}`); }
+                }, startDelay);
+            }
+
+            // Keep simulation alive
             await new Promise(resolve => setTimeout(() => {
-                clearInterval(interval);
+                clearInterval(locationInterval);
                 resolve(null);
-            }, 60000)); // Run for 60 seconds
+            }, 60000)); 
             
        } catch (e: any) {
-           // Silent fail
+           console.error(`[DriverSim] Error: ${e.message}`);
        }
     });
 

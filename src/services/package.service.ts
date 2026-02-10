@@ -2,20 +2,28 @@ import { prisma } from "../prisma";
 // Force recompile after prisma generate
 import { PackageStatus } from "@prisma/client";
 import { emitToAll } from "../websocket";
+import { geocodeAddress } from "../utils/geocoder";
 
 export class PackageService {
   static async getAllPackages(companyId: string, filters: {
-    status?: PackageStatus;
+    status?: PackageStatus | string;
     zoneId?: string;
     trackingCode?: string;
     page?: number;
     limit?: number;
+    isArchived?: boolean; // New filter
   }) {
-    const { status, zoneId, trackingCode, page = 1, limit = 10 } = filters;
+    const { status, zoneId, trackingCode, page = 1, limit = 10, isArchived = false } = filters;
     const skip = (page - 1) * limit;
 
-    const where: any = { companyId }; // FORCE COMPANY ID
-    if (status) where.status = status;
+    const where: any = { companyId, isArchived }; // Default false unless specified
+    if (status) {
+        if (Object.values(PackageStatus).includes(status as PackageStatus)) {
+             where.status = status;
+        } else if (typeof status === 'string' && status.includes(',')) {
+             where.status = { in: status.split(',') };
+        }
+    }
     if (zoneId) where.zoneId = zoneId;
     if (trackingCode) {
       where.trackingCode = { contains: trackingCode, mode: 'insensitive' };
@@ -47,6 +55,35 @@ export class PackageService {
     };
   }
 
+  static async archivePackages(companyId: string, packageIds: string[]) {
+    return prisma.package.updateMany({
+      where: {
+        companyId,
+        id: { in: packageIds }
+      },
+      data: { isArchived: true }
+    });
+  }
+
+  static async deletePackages(companyId: string, packageIds: string[]) {
+      // Delete history first manually since no cascade in schema
+      await prisma.packageHistory.deleteMany({
+          where: {
+              package: {
+                  companyId,
+                  id: { in: packageIds }
+              }
+          }
+      });
+
+      return prisma.package.deleteMany({
+          where: {
+              companyId,
+              id: { in: packageIds }
+          }
+      });
+  }
+
   static async createPackage(companyId: string, data: {
     trackingCode: string;
     recipientName: string;
@@ -67,6 +104,8 @@ export class PackageService {
     lng?: number;
     estimatedDeliveryAt?: Date;
   }) {
+
+// ... inside createPackage ...
     const { 
       trackingCode, 
       recipientName, recipientAddress, recipientPhone, recipientEmail,
@@ -84,6 +123,33 @@ export class PackageService {
         }
     }
 
+    // --- Geocoding Logic ---
+    let finalLat = lat;
+    let finalLng = lng;
+
+    if ((!finalLat || !finalLng) && recipientAddress) {
+        // Try precise addr (Street + Number) if available, OR append default context to simple address
+        let queryAddr = recipientAddress;
+
+        if (addressStreet && addressNumber) {
+             queryAddr = `${addressStreet} ${addressNumber}, Cordoba, Argentina`;
+        } else if (!recipientAddress.toLowerCase().includes("argentina")) {
+             // Default context bias for local logistics
+             queryAddr = `${recipientAddress}, Cordoba, Argentina`;
+        }
+
+        console.log(`Geocoding package address: ${queryAddr}...`);
+        const geo = await geocodeAddress(queryAddr);
+        if (geo) {
+            console.log(`Geocoded to: ${geo.lat}, ${geo.lng}`);
+            finalLat = geo.lat;
+            finalLng = geo.lng;
+        } else {
+            console.warn("Geocoding failed for address:", queryAddr);
+        }
+    }
+    // -----------------------
+
     return prisma.$transaction(async (tx) => {
       const pkg = await tx.package.create({
         data: { 
@@ -100,8 +166,8 @@ export class PackageService {
           senderPhone,
           weight,
           volume,
-          lat,
-          lng,
+          lat: finalLat,
+          lng: finalLng,
           estimatedDeliveryAt,
           zoneId,
           companyId,
@@ -171,7 +237,7 @@ export class PackageService {
     }
 
     const allowedTransitions: Record<PackageStatus, PackageStatus[]> = {
-      pending: ["assigned", "cancelled"],
+      pending: ["assigned", "in_transit", "cancelled"], // Expanded for flexibility
       assigned: ["in_transit", "cancelled"],
       in_transit: ["delivered"],
       delivered: [],
@@ -323,5 +389,52 @@ export class PackageService {
 
     if (!pkg || !pkg.zone) return null;
     return pkg.zone.driverId; 
+  }
+
+  static async getDashboardStats(companyId: string) {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Local server time 00:00
+
+    // 1. Delivered Today
+    const deliveredTodayCount = await prisma.package.count({
+        where: {
+            companyId,
+            status: 'delivered',
+            updatedAt: { gte: startOfDay }
+        }
+    });
+
+    // 2. In Transit Now
+    const inTransitCount = await prisma.package.count({
+        where: {
+            companyId,
+            status: 'in_transit'
+        }
+    });
+
+    // 3. Average Delivery Time (Simplification: Time from Created to Delivered for packages delivered today)
+    // For more precision, we would check History, but this is a good MVP proxy.
+    const deliveredPackages = await prisma.package.findMany({
+        where: {
+            companyId,
+            status: 'delivered',
+            updatedAt: { gte: startOfDay }
+        },
+        select: { createdAt: true, updatedAt: true }
+    });
+
+    let avgTimeMinutes = 0;
+    if (deliveredPackages.length > 0) {
+        const totalTimeMs = deliveredPackages.reduce((acc, pkg) => {
+            return acc + (pkg.updatedAt.getTime() - pkg.createdAt.getTime());
+        }, 0);
+        avgTimeMinutes = Math.floor((totalTimeMs / deliveredPackages.length) / 1000 / 60);
+    }
+
+    return {
+        deliveredToday: deliveredTodayCount,
+        inTransit: inTransitCount,
+        avgDeliveryTimeMinutes: avgTimeMinutes
+    };
   }
 }

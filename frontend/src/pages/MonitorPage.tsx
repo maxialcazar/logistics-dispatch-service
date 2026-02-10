@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { driverService } from '../services/driverService';
@@ -6,13 +5,20 @@ import { zoneService } from '../services/zoneService';
 import { packageService } from '../services/packageService';
 import { LiveMap } from '../components/LiveMap';
 import { Skeleton } from '../components/Skeleton';
-import { Map, Filter, Search, X, Check, Package, MapPin, Truck } from 'lucide-react';
-import clsx from 'clsx';
+import { Map, MapPin, Truck, Search, X, Check } from 'lucide-react';
 
 // Types
 interface Zone { id: string; name: string; }
-interface Driver { id: string; name: string; zones: { id: string }[]; user?: { username: string } }
-interface ActivePackage { id: string; trackingCode: string; driverId?: string; status: string; }
+interface Driver { id: string; name: string; zones: { id: string; name: string }[]; user?: { username: string } }
+interface ActivePackage { 
+    id: string; 
+    trackingCode: string; 
+    driverId?: string; 
+    status: string;
+    lat?: number;
+    lng?: number;
+    recipientAddress?: string;
+}
 
 export function MonitorPage() {
     const { token } = useAuth();
@@ -35,16 +41,18 @@ export function MonitorPage() {
             try {
                 const [z, d, p] = await Promise.all([
                     zoneService.getZones(token),
-                    driverService.getDrivers(token),
-                    // Fetch only active packages for filtering
-                    packageService.getPackages(token, 'assigned', 1), // Only page 1 for now? ideally all active.
-                    // NOTE: Real-world app needs a dedicated 'search' endpoint. 
-                    // For now we load partial active packages or search dynamically. 
-                    // Let's rely on client-side filter of loaded packages, acknowledging limitation.
+                    driverService.getDrivers(token, 1, 100), // Page 1, Limit 100
+                    // Fetch ALL active packages (limit increased)
+                    packageService.getPackages(token, undefined, 1, 1000), 
                 ]);
                 setZones(z.items || []);
-                setDrivers(d.items || []);
-                setActivePackages(p.items || []); // Only first page of packages. Valid for demo.
+                const mappedDrivers = (d.items || []).map((drv: any) => ({
+                    ...drv,
+                    zones: drv.zones || []
+                }));
+                // console.log("[MonitorPage] Loaded Drivers:", mappedDrivers);
+                setDrivers(mappedDrivers);
+                setActivePackages(p.items || []);
             } catch (e) {
                 console.error(e);
             } finally {
@@ -198,7 +206,18 @@ export function MonitorPage() {
 
             {/* Map Area */}
             <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden relative shadow-2xl">
-                 <LiveMap visibleDriverIds={visibleDriverIds} />
+                 <LiveMap 
+                    visibleDriverIds={visibleDriverIds} 
+                    allDrivers={drivers} 
+                    packages={activePackages.map(p => ({
+                        id: p.id,
+                        trackingCode: p.trackingCode,
+                        lat: p.lat || 0,
+                        lng: p.lng || 0,
+                        status: p.status,
+                        recipientAddress: p.recipientAddress || 'Sin Dirección'
+                    }))}
+                 />
             </div>
         </div>
     );

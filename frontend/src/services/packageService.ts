@@ -67,15 +67,24 @@ export const packageService = {
     return res.json();
   },
 
-  async getPackages(token: string, status?: string, page = 1): Promise<PaginatedResponse<Package>> {
+  async getPackages(token: string, status?: string, page = 1, limit = 10): Promise<PaginatedResponse<Package>> {
     const query = new URLSearchParams();
     if (status) query.append('status', status);
     query.append('page', page.toString());
+    query.append('limit', limit.toString());
     
     const res = await fetch(`/api/packages?${query.toString()}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) throw new Error('Failed to fetch packages');
+    return res.json();
+  },
+
+  async getDashboardStats(token: string) {
+    const res = await fetch('/api/packages/stats', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to fetch stats');
     return res.json();
   }
 };

@@ -1,30 +1,54 @@
+import { prisma } from "../src/prisma";
+import bcrypt from "bcrypt";
 
 async function restoreAdmin() {
     try {
-        console.log("Starting Restore...");
-        const payload = {
-            companyName: 'Logistica Central',
-            companySlug: 'logistica-central', 
-            username: 'adminA',
-            password: '123456'
-        };
+        console.log("Starting Restore Admin (Direct DB)...");
+        
+        const companyName = 'Logistica Central';
+        const companySlug = 'logistica-central';
+        const username = 'adminA';
+        const passwordPlain = '123456';
 
-        const res = await fetch('http://127.0.0.1:3010/api/auth/register-company', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+        // 1. Create Company if not exists
+        let company = await prisma.company.findUnique({ where: { slug: companySlug } });
+        if (!company) {
+            company = await prisma.company.create({
+                data: {
+                    name: companyName,
+                    slug: companySlug
+                }
+            });
+            console.log("✅ Company Created:", companyName);
+        } else {
+            console.log("ℹ️ Company already exists.");
+        }
+
+        // 2. Create Admin User
+        const existingUser = await prisma.user.findFirst({ 
+            where: { username, companyId: company.id } 
         });
 
-        if (res.ok) {
-            console.log("✅ Admin Restaurado: adminA / 123456");
-        } else if (res.status === 409) {
-             console.log("⚠️ El admin ya existe.");
+        if (existingUser) {
+            console.log("⚠️ Admin user already exists.");
         } else {
-             const txt = await res.text();
-             console.log("❌ Error:", res.status, txt);
+            const hashedPassword = await bcrypt.hash(passwordPlain, 10);
+            await prisma.user.create({
+                data: {
+                    username,
+                    password: hashedPassword,
+                    role: 'admin',
+                    companyId: company.id
+                }
+            });
+            console.log("✅ Admin Created: adminA / 123456");
         }
+
     } catch (e) {
-        console.error("Fetch Error:", e);
+        console.error("Restore Error:", e);
+    } finally {
+        await prisma.$disconnect();
     }
 }
+
 restoreAdmin();

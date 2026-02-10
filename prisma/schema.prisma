@@ -118,6 +118,7 @@ model Package {
   zoneId              String?
   
   history             PackageHistory[]
+  isArchived          Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @default(now()) @updatedAt
 

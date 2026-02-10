@@ -22,8 +22,8 @@ interface PaginatedResponse<T> {
 }
 
 export const driverService = {
-  async getDrivers(token: string, page = 1): Promise<PaginatedResponse<Driver>> {
-    const res = await fetch(`/api/drivers?page=${page}&limit=100`, {
+  async getDrivers(token: string, page = 1, limit = 100): Promise<PaginatedResponse<Driver>> {
+    const res = await fetch(`/api/drivers?page=${page}&limit=${limit}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) throw new Error('Failed to fetch drivers');

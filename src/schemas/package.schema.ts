@@ -7,7 +7,7 @@ export const createPackageSchema = z.object({
     // Recipient Info
     recipientName: z.string().min(2),
     recipientAddress: z.string().min(5),
-    recipientPhone: z.string().min(5),
+    recipientPhone: z.string().min(3),
     recipientEmail: z.string().email().optional(),
     
     // Delivery Details

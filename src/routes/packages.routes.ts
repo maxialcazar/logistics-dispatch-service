@@ -6,7 +6,10 @@ import {
   updatePackageStatus,
   assignPackageToDriver,
   getMyPackages,
-  getPackageHistory
+  getPackageHistory,
+  getDashboardStats,
+  archivePackages,
+  deletePackages
 } from "../controllers/packages.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
@@ -106,6 +109,27 @@ router.get("/", requireRole("dispatcher", "admin"), getPackages);
  *         description: Created
  */
 router.post("/", requireRole("dispatcher", "admin"), validate(createPackageSchema), createPackage);
+
+/**
+ * @openapi
+ * /api/packages/stats:
+ *   get:
+ *     summary: Get dashboard statistics (delivered today, in transit, avg time)
+ *     tags: [Packages]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+// Archive Packages
+router.post("/archive", requireRole("dispatcher", "admin"), archivePackages);
+
+// Delete Packages (Permanent)
+router.post("/delete", requireRole("dispatcher", "admin"), deletePackages);
+
+
+router.get("/stats", requireRole("dispatcher", "admin"), getDashboardStats);
 
 /**
  * @openapi
