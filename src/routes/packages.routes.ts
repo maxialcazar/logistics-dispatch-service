@@ -197,7 +197,7 @@ router.post("/:packageId/assign", requireRole("dispatcher", "admin"), validate(a
  *       200:
  *         description: Success
  */
-router.get("/me", auth, requireRole("driver"), getMyPackages);
+router.get("/my-packages", auth, requireRole("driver"), getMyPackages);
 
 /**
  * @openapi

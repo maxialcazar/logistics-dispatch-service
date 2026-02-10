@@ -1,69 +1,105 @@
-# 📦 Logistics Dispatch Service (LDE) - Enterprise Edition
+# 🚚 Logistics Dispatch Service (LDE) - Sistema Integral de Última Milla
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=github)
-![Architecture](https://img.shields.io/badge/Architecture-Event--Driven-orange?style=for-the-badge&logo=redis&logoColor=white)
-![Performance](https://img.shields.io/badge/Latency-24ms-blueviolet?style=for-the-badge&logo=lightning&logoColor=white)
-![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Frontend](https://img.shields.io/badge/Frontend-React_18-blue?style=for-the-badge&logo=react)
+![Backend](https://img.shields.io/badge/Backend-Node.js-green?style=for-the-badge&logo=nodedotjs)
+![Database](https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql)
 
-**Logistics Dispatch Service** es un motor backend de alto rendimiento para logística de última milla.
-Diseñado con una **arquitectura híbrida de ingesta asíncrona (Write-Back Cache)**, capaz de gestionar flotas masivas (5,000+ conductores) en tiempo real con latencia sub-segundo y carga en base de datos mínima.
+**LDE (Logistics Dispatch Enterprise)** es una solución completa para la gestión logística de despacho y seguimiento de flotas en tiempo real. Combina un potente backend de alto rendimiento con una interfaz de administración moderna y una aplicación móvil progresiva para conductores.
 
-> **🚀 Nueva Funcionalidad (Feb 2026):** Implementación de Redis Write-Back Buffer para reducir la latencia de GPS en un **60%** y la carga en DB en un **90%**.
+## 🌟 Características Principales
 
----
+### 1. Panel de Control (Dispatcher & Admin)
 
-## ⚡ Quick Start (Docker)
+- **Centro de Despacho Drag & Drop:** Asignación visual de Zonas a Conductores.
+- **Gestión de Paquetes:** Creación, edición, archivo y cancelación de envíos.
+- **Monitoreo en Vivo:** Mapa interactivo con la ubicación real de toda la flota y estado de entregas.
+- **Gestión de Zonas y Conductores:** CRUD completo con validaciones de seguridad.
 
-1. **Clonar e Iniciar:**
+### 2. App Móvil para Conductores
 
-   ```bash
-   git clone <REPO_URL>
-   cd logistics-dispatch-service
-   docker-compose up --build
-   ```
+- **Dashboard Personalizado:** Lista de entregas asignadas ordenada por prioridad.
+- **Navegación Integrada:** Botones inteligentes para abrir Google Maps/Waze con un toque.
+- **Gestión de Estado:** Actualización de paquetes (En Tránsito -> Entregado / Fallido) con geolocalización automática.
+- **Modo Mapa:** Visualización de ruta y paradas pendientes en el mapa del móvil.
 
-2. **Endpoints:**
-   - **API**: `http://localhost:3010`
-   - **Swagger Docs**: `http://localhost:3010/api-docs`
-   - **Metrics**: `http://localhost:3010/api/admin/metrics`
+### 3. Backend de Alto Rendimiento
 
----
-
-## 🧪 Pruebas de Carga & Validación
-
-Incluimos un script de ingeniería de performance capaz de simular **1,600 transacciones/segundo**.
-
-### Ejecución del Test de Estrés (Con Validación Visual)
-
-1. **Iniciar Servidor:**
-
-   ```bash
-   npm run dev
-   ```
-
-2. **Abrir Monitor en Tiempo Real:**
-   - Navegar a: `http://localhost:3010/monitor.html`
-   - Clic en **"Connect (Auto-Retry)"**. (Esperará a que el test inicie).
-
-3. **Lanzar la Carga:**
-   ```bash
-   npx prisma db push --force-reset
-   npx ts-node scripts/load-test.ts
-   ```
-
-**Resultados Esperados (v2.0):**
-
-- **RPS (Throughput):** ~4,500 eventos/seg.
-- **Latencia Real (Socket):** ~73ms (Mediana).
-- **Estabilidad:** 0.0% Error Rate.
-- **Visualización:** 125 conductores moviéndose en tiempo real en el dashboard.
+- **Arquitectura Híbrida:** Redis Write-Back Buffer para ingesta masiva de GPS.
+- **Event-Driven:** WebSocket (Socket.io) para actualizaciones en <100ms.
+- **Seguridad:** Autenticación JWT y Roles (Admin, Dispatcher, Driver).
 
 ---
 
-## 📚 Documentación Técnica
+## 🚀 Quick Start (Desarrollo Local)
 
-- 📈 **[Visión del Producto & Arquitectura (PRODUCT_OVERVIEW)](./LDE-INFO/PRODUCT_OVERVIEW.md)**: Explicación detallada del patrón Write-Back y ventajas competitivas.
-- 🧪 **[Guía de Pruebas (TESTING_GUIDE)](./LDE-INFO/TESTING_GUIDE.md)**: Cómo validar el sistema bajo presión.
+### Prerrequisitos
+
+- Node.js 18+
+- Docker (opcional, para Base de Datos y Redis)
+- PostgreSQL y Redis corriendo localmente.
+
+### 1. Configuración del Backend
+
+```bash
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno (crear .env basado en .env.example)
+# Asegurar DATABASE_URL y REDIS_URL
+
+# Iniciar Base de Datos (si usa Docker)
+docker-compose up -d
+
+# Migrar Schema
+npx prisma db push
+
+# Iniciar Servidor (Puerto 3010)
+npm run dev
+```
+
+### 2. Configuración del Frontend
+
+```bash
+cd frontend
+
+# Instalar dependencias
+npm install
+
+# Iniciar Cliente React (Puerto 5173)
+npm run dev
+```
+
+Acceder a: `http://localhost:5173`
+
+---
+
+## 📱 Guía de Uso del Sistema
+
+### Flujo de Despacho
+
+1.  **Crear Zonas:** Definir áreas geográficas (ej. Centro, Norte) en `/zones`.
+2.  **Registrar Conductores:** Crear usuarios y credenciales en `/drivers`.
+3.  **Ingresar Paquetes:** Crear nuevos envíos asignados a una Zona en `/packages/new`.
+4.  **Asignar:** En el **Centro de Despacho (`/dispatch`)**, arrastrar la Zona al Conductor disponible.
+
+### Flujo del Conductor
+
+1.  Ingresar a la aplicación con las credenciales creadas por el Admin.
+2.  El sistema detecta el rol y redirige automáticamente a la **Interfaz Móvil**.
+3.  Visualizar paquetes en "Mis Paquetes".
+4.  Pulsar "Iniciar Viaje" -> "Navegar" -> "Entregar".
+5.  El Admin ve el cambio de estado en tiempo real en el Monitor.
+
+---
+
+## 📚 Documentación Técnica Adicional
+
+En la carpeta `LDE-INFO` encontrará detalles profundos:
+
+- 📈 **[Visión del Producto (PRODUCT_OVERVIEW)](./LDE-INFO/PRODUCT_OVERVIEW.md)**: Explicación de arquitectura y módulos.
+- 🧪 **[Guía de Pruebas (TESTING_GUIDE)](./LDE-INFO/TESTING_GUIDE.md)**: Stress testing y validación de sockets.
+- 📱 **[Guía APP Conductor (DRIVER_GUIDE)](./LDE-INFO/DRIVER_APP_GUIDE.md)**: Manual específico para la interfaz móvil.
 
 ---
 
@@ -71,12 +107,9 @@ Incluimos un script de ingeniería de performance capaz de simular **1,600 trans
 
 El sistema cuenta con:
 
-- **Redis Buffer:** Ingesta de GPS en memoria ram.
-- **Background Worker:** Sincronización asíncrona a PostgreSQL cada 5 segundos.
-- **Rate Limiting:** Protección DDoS configurable.
-- **Health Check:** `GET /api/health`
-
----
+- **Redis Buffer:** Ingesta de GPS optimizada.
+- **Background Worker:** Sincronización asíncrona a PostgreSQL.
+- **Soft Delete & Archiving:** Historial preservado para auditoría.
 
 ## 🤝 Licencia
 

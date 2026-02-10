@@ -311,7 +311,7 @@ async function simulateCompany(c: any, adminToken: string) {
             // But packages need to be explicitly assigned to drivers or claimed.
             // Assuming the existing logic assigns them, or we need to claim them.
             // Let's try to fetch 'my packages'. If empty, we might need to assign one first.
-            let myPackages = await get('/packages/me', drvToken);
+            let myPackages = await get('/packages/my-packages', drvToken);
             
             // If no packages, let's try to assign the one created for this index
             // We know packages[j] matches drivers[j] in our loop
