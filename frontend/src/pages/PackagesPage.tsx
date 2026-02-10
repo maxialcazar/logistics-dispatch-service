@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package as IPackage } from '../services/packageService';
 import clsx from 'clsx';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export function PackagesPage() {
   const { token } = useAuth();
@@ -15,26 +16,114 @@ export function PackagesPage() {
   const [error, setError] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>(''); // '' = all
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // New State for Archiving
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Confirmation Modal State
+  const [confirmState, setConfirmState] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      action: () => Promise<void>;
+      variant: 'warning' | 'danger' | 'info';
+      isLoading: boolean;
+      hideCancel?: boolean;
+      confirmText?: string;
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      action: async () => {},
+      variant: 'warning',
+      isLoading: false
+  });
 
   useEffect(() => {
     fetchPackages();
-  }, [token, activeFilter, page]);
+  }, [token, activeFilter, page, showArchived]);
 
   const fetchPackages = async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await packageService.getPackages(token, activeFilter || undefined, page);
+      const res = await packageService.getPackages(token, activeFilter || undefined, page, 10, showArchived);
       setPackages(res.items);
       setTotalPages(res.meta.totalPages);
     } catch (err: any) {
-      setError(err.message);
+        console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // ... (getStatusBadge function remains same)
+  const handleArchiveClick = () => {
+      if (!token) return;
+      const toArchive = packages
+        .filter(p => p.status === 'delivered' || p.status === 'cancelled')
+        .map(p => p.id);
+
+      if (toArchive.length === 0) {
+          setConfirmState({
+              isOpen: true,
+              title: 'Información',
+              message: 'No hay paquetes finalizados (Entregados o Cancelados) para limpiar en esta página.',
+              variant: 'info',
+              isLoading: false,
+              hideCancel: true,
+              confirmText: 'Entendido',
+              action: async () => {} // Just close
+          });
+          return;
+      }
+
+      setConfirmState({
+          isOpen: true,
+          title: 'Limpiar Paquetes Finalizados',
+          message: `Se moverán ${toArchive.length} paquetes (Entregados o Cancelados) a la sección de Expirados. ¿Deseas continuar?`,
+          variant: 'warning',
+          isLoading: false,
+          action: async () => {
+              setConfirmState(prev => ({ ...prev, isLoading: true }));
+              try {
+                  await packageService.archivePackages(token, toArchive);
+                  await fetchPackages(); 
+                  setConfirmState(prev => ({ ...prev, isOpen: false }));
+              } catch (e) {
+                  console.error(e);
+                  setConfirmState(prev => ({ ...prev, isLoading: false, isOpen: false }));
+                  alert("Error al archivar paquetes"); 
+              }
+          }
+      });
+  };
+
+  const handleDeleteClick = () => {
+      if (!token) return;
+      const toDelete = packages.map(p => p.id);
+
+      if (toDelete.length === 0) return;
+
+      setConfirmState({
+          isOpen: true,
+          title: 'Eliminar Historial Definitivamente',
+          message: `Estás a punto de ELIMINAR PERMANENTEMENTE ${toDelete.length} paquetes archivados de esta página. Esta acción no se puede deshacer.`,
+          variant: 'danger',
+          isLoading: false,
+          action: async () => {
+              setConfirmState(prev => ({ ...prev, isLoading: true }));
+              try {
+                  await packageService.deletePackages(token, toDelete);
+                  await fetchPackages();
+                  setConfirmState(prev => ({ ...prev, isOpen: false }));
+              } catch (e) {
+                  console.error(e);
+                  setConfirmState(prev => ({ ...prev, isLoading: false })); 
+                  alert("Error al eliminar paquetes");
+              }
+          }
+      });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -63,17 +152,53 @@ export function PackagesPage() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Package className="h-8 w-8 text-blue-500" />
-            Gestión de Paquetes
+            {showArchived ? 'Paquetes Expirados' : 'Gestión de Paquetes'}
           </h1>
-          <p className="text-slate-400 mt-1">Administra todos los envíos y su estado actual.</p>
+          <p className="text-slate-400 mt-1">
+              {showArchived ? 'Historial de envíos archivados.' : 'Administra todos los envíos y su estado actual.'}
+          </p>
         </div>
-        <button
-          onClick={() => navigate('/packages/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/30 transition-all"
-        >
-          <Plus className="h-5 w-5" />
-          Nuevo Paquete
-        </button>
+        <div className="flex gap-2">
+            <button
+                onClick={() => { setShowArchived(!showArchived); setPage(1); }}
+                className={clsx(
+                    "flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-all border",
+                    showArchived 
+                        ? "bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+                        : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                )}
+            >
+                {showArchived ? 'Volver a Activos' : 'Ver Expirados'}
+            </button>
+
+            {!showArchived && (
+                <>
+                    <button
+                        onClick={handleArchiveClick}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:bg-orange-900/40 hover:text-orange-400 hover:border-orange-500/50 text-slate-300 font-medium rounded-lg transition-all"
+                        title="Mover paquetes entregados/cancelados a Expirados"
+                    >
+                        Limpiar Finalizados
+                    </button>
+                    <button
+                        onClick={() => navigate('/packages/new')}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/30 transition-all"
+                    >
+                        <Plus className="h-5 w-5" />
+                        Nuevo Paquete
+                    </button>
+                </>
+            )}
+
+            {showArchived && (
+                 <button
+                    onClick={handleDeleteClick}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600/20 border border-red-500/50 hover:bg-red-600 hover:text-white text-red-500 font-medium rounded-lg transition-all"
+                >
+                    Vaciar Lista
+                </button>
+            )}
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -89,7 +214,7 @@ export function PackagesPage() {
             />
          </div>
          <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-             {['', 'pending', 'assigned', 'in_transit', 'delivered'].map((status) => (
+             {['', 'pending', 'assigned', 'in_transit', 'delivered', 'cancelled'].map((status) => (
                <button
                  key={status}
                  onClick={() => { setActiveFilter(status); setPage(1); }} // Reset page on filter change
@@ -115,7 +240,7 @@ export function PackagesPage() {
         ) : filteredPackages.length === 0 ? (
              <div className="p-12 text-center text-slate-500">
                 <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No se encontraron paquetes en esta página.</p>
+                <p>No se encontraron paquetes.</p>
              </div>
         ) : (
           <div className="overflow-x-auto">
@@ -190,6 +315,18 @@ export function PackagesPage() {
                </button>
            </div>
        </div>
+
+       {/* Confirm Dialog */}
+       <ConfirmDialog
+           isOpen={confirmState.isOpen}
+           onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+           onConfirm={confirmState.action}
+           title={confirmState.title}
+           message={confirmState.message}
+           variant={confirmState.variant}
+           isLoading={confirmState.isLoading}
+           confirmText={confirmState.variant === 'danger' ? 'Borrar Todo' : 'Confirmar'}
+       />
     </div>
   );
 }

@@ -67,11 +67,12 @@ export const packageService = {
     return res.json();
   },
 
-  async getPackages(token: string, status?: string, page = 1, limit = 10): Promise<PaginatedResponse<Package>> {
+  async getPackages(token: string, status?: string, page = 1, limit = 10, isArchived = false): Promise<PaginatedResponse<Package>> {
     const query = new URLSearchParams();
     if (status) query.append('status', status);
     query.append('page', page.toString());
     query.append('limit', limit.toString());
+    query.append('isArchived', isArchived.toString());
     
     const res = await fetch(`/api/packages?${query.toString()}`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -86,5 +87,57 @@ export const packageService = {
     });
     if (!res.ok) throw new Error('Failed to fetch stats');
     return res.json();
+  },
+
+  async archivePackages(token: string, packageIds: string[]) {
+      const res = await fetch('/api/packages/archive', {
+          method: 'POST',
+          headers: { 
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}` 
+          },
+          body: JSON.stringify({ packageIds })
+      });
+      if (!res.ok) throw new Error('Failed to archive packages');
+      return res.json();
+  },
+
+  async deletePackages(token: string, packageIds: string[]) {
+      const res = await fetch('/api/packages/delete', {
+          method: 'POST',
+          headers: { 
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}` 
+          },
+          body: JSON.stringify({ packageIds })
+      });
+      if (!res.ok) throw new Error('Failed to delete packages');
+      return res.json();
+  },
+
+  // Driver Methods
+  async getMyPackages(token: string): Promise<Package[]> {
+      const res = await fetch('/api/packages/my-packages', {
+          headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch my packages');
+      return res.json();
+  },
+
+  async updateStatus(token: string, packageId: string, status: string, lat?: number, lng?: number) {
+      const res = await fetch(`/api/packages/${packageId}/status`, {
+          method: 'PATCH',
+          headers: { 
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}` 
+          },
+          body: JSON.stringify({ status, lat, lng })
+      });
+      
+      if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || err.error || 'Failed to update status');
+      }
+      return res.json();
   }
 };

@@ -12,6 +12,9 @@ import { DispatchPage } from "./pages/DispatchPage";
 import { MonitorPage } from "./pages/MonitorPage";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContext";
+import { DriverLayout } from "./layouts/DriverLayout";
+import { DriverDashboard } from "./pages/DriverDashboard";
+import { DriverMap } from "./pages/DriverMap";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { token } = useAuth();
@@ -22,12 +25,21 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  const { user } = useAuth();
+  
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       
+      {/* Driver Routes */}
+      <Route path="/driver" element={<ProtectedRoute><DriverLayout /></ProtectedRoute>}>
+          <Route index element={<DriverDashboard />} />
+          <Route path="map" element={<DriverMap />} />
+      </Route>
+
+      {/* Admin/Dispatcher Routes */}
       <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-        <Route index element={<Dashboard />} />
+        <Route index element={user?.role === 'driver' ? <Navigate to="/driver" replace /> : <Dashboard />} />
         
         {/* Dispatch Control */}
         <Route path="/dispatch" element={<DispatchPage />} />
