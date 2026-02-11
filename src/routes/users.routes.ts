@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createUser } from "../controllers/users.controller";
+import { createUser, changePassword } from "../controllers/users.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
@@ -26,5 +26,6 @@ const router = Router();
  *         description: Created
  */
 router.post("/", auth, requireRole("admin", "dispatcher"), validate(createUserSchema), createUser);
+router.put("/password", auth, changePassword);
 
 export default router;

@@ -5,9 +5,9 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package } from '../services/packageService';
-import { Navigation, Package as PackageIcon, MapPin, User } from 'lucide-react';
+import { useDriverLocation } from '../hooks/useDriverLocation';
+import { Navigation, Package as PackageIcon } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { toast } from 'sonner';
 
 // --- Icons ---
 const createDriverIcon = () => {
@@ -57,6 +57,9 @@ export function DriverMap() {
     const [packages, setPackages] = useState<Package[]>([]);
     const [myLoc, setMyLoc] = useState<[number, number] | null>(null);
 
+    // Global Tracking
+    useDriverLocation();
+
     useEffect(() => {
         if (!token) return;
         
@@ -66,14 +69,14 @@ export function DriverMap() {
             setPackages(active);
         }).catch(console.error);
 
-        // 2. Watch Position
+        // 2. Watch Position (Local Map Only)
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
                 setMyLoc([pos.coords.latitude, pos.coords.longitude]);
-                // Update server? Not strictly needed for THIS view, but good for admin monitor.
-                // driverService.updateLocation(token, ...) - skipped for simplicity now
             },
-            (err) => console.error("Geo error", err),
+            () => {
+                // console.error("Geo error", err); // Handled by hook
+            },
             { enableHighAccuracy: true }
         );
 
@@ -137,6 +140,14 @@ export function DriverMap() {
                     </Marker>
                 ))}
             </MapContainer>
+
+            {/* Warning if packages have no location */}
+            {packages.length > 0 && !packages.some(p => p.lat && p.lng) && (
+                <div className="absolute top-4 left-4 right-4 bg-yellow-500/90 text-black p-3 rounded-lg z-[1000] text-center text-sm font-bold shadow-lg">
+                    ⚠️ Tienes {packages.length} paquetes sin ubicación GPS.
+                    <br/>Revisa la lista para ver las direcciones.
+                </div>
+            )}
 
             {/* Bottom Floating Stats */}
             <div className="absolute bottom-20 left-4 right-4 bg-slate-900/90 backdrop-blur border border-slate-700 p-4 rounded-xl z-[1000] shadow-2xl flex justify-between items-center">

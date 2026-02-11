@@ -14,6 +14,8 @@ export interface Package {
   status: 'pending' | 'assigned' | 'in_transit' | 'delivered' | 'cancelled';
   zoneId: string;
   zone?: Zone;
+  lat?: number;
+  lng?: number;
   createdAt: string;
   updatedAt: string;
 }

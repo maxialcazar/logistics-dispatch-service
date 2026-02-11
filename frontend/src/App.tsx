@@ -15,13 +15,64 @@ import { SocketProvider } from "./context/SocketContext";
 import { DriverLayout } from "./layouts/DriverLayout";
 import { DriverDashboard } from "./pages/DriverDashboard";
 import { DriverMap } from "./pages/DriverMap";
+import { ReportsPage } from "./pages/ReportsPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { HelpPage } from "./pages/HelpPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { token } = useAuth();
     if (!token) {
         return <Navigate to="/login" replace />;
     }
-    return <SocketProvider token={token}>{children}</SocketProvider>;
+    return (
+        <SocketProvider token={token}>
+            <NotificationListener />
+            {children}
+        </SocketProvider>
+    );
+}
+
+import { NotificationProvider, useNotifications } from "./context/NotificationContext";
+import { useSocket } from "./context/SocketContext";
+import { useEffect } from "react";
+
+function NotificationListener() {
+    const { socket } = useSocket();
+    const { addNotification } = useNotifications();
+
+    useEffect(() => {
+        if (!socket) return;
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handlePackageUpdate = (data: any) => {
+            if (data.status === 'in_transit') {
+                addNotification('Paquete en Camino', `El paquete ${data.packageId} está en camino`, 'info');
+            } else if (data.status === 'delivered') {
+                addNotification('Paquete Entregado', `El paquete ${data.packageId} ha sido entregado`, 'success');
+            } else if (data.status === 'cancelled') {
+                addNotification('Paquete Cancelado', `El paquete ${data.packageId} ha sido cancelado`, 'warning');
+            }
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const handleDriverStatus = (data: any) => {
+             if (data.status === 'online') {
+                  addNotification('Conductor Conectado', `${data.name || 'Un conductor'} se ha conectado`, 'info');
+             } else if (data.status === 'offline') {
+                  addNotification('Conductor Desconectado', `${data.name || 'Un conductor'} se ha desconectado`, 'warning');
+             }
+        };
+
+        socket.on('package-status-updated', handlePackageUpdate);
+        socket.on('driver-status-updated', handleDriverStatus);
+
+        return () => {
+            socket.off('package-status-updated', handlePackageUpdate);
+            socket.off('driver-status-updated', handleDriverStatus);
+        };
+    }, [socket, addNotification]);
+
+    return null;
 }
 
 function AppRoutes() {
@@ -57,8 +108,12 @@ function AppRoutes() {
         {/* Drivers Module */}
         <Route path="/drivers" element={<DriversPage />} />
     
-        {/* Analytics Module (Placeholder for now) */}
-         <Route path="/analytics" element={<div className="p-8 text-center text-slate-500">Analytics Dashboard (Coming Soon)</div>} />
+        {/* Analytics Module */}
+        <Route path="/analytics" element={<ReportsPage />} />
+        
+        {/* System Pages */}
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/help" element={<HelpPage />} />
 
       </Route>
     </Routes>
@@ -69,27 +124,29 @@ export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
-        <Toaster 
-          expand={true}
-          visibleToasts={6}
-          position="top-right" 
-          closeButton
-          theme="dark"
-          toastOptions={{
-            classNames: {
-              toast: 'bg-slate-900 border border-slate-800 shadow-2xl shadow-blue-900/10 text-slate-200 rounded-xl',
-              title: 'text-white font-semibold text-sm',
-              description: 'text-slate-400 text-xs',
-              actionButton: 'bg-blue-600 hover:bg-blue-500 text-white',
-              cancelButton: 'bg-slate-800 hover:bg-slate-700 text-white',
-              error: 'border-red-900/50 bg-red-950/30 text-red-200',
-              success: 'border-green-900/50 bg-green-950/30 text-green-200',
-              warning: 'border-yellow-900/50 bg-yellow-950/30 text-yellow-200',
-              info: 'border-blue-900/50 bg-blue-950/30 text-blue-200',
-            },
-          }}
-        />
+        <NotificationProvider>
+            <AppRoutes />
+            <Toaster 
+              expand={true}
+              visibleToasts={6}
+              position="top-right" 
+              closeButton
+              theme="dark"
+              toastOptions={{
+                classNames: {
+                  toast: 'bg-slate-900 border border-slate-800 shadow-2xl shadow-blue-900/10 text-slate-200 rounded-xl',
+                  title: 'text-white font-semibold text-sm',
+                  description: 'text-slate-400 text-xs',
+                  actionButton: 'bg-blue-600 hover:bg-blue-500 text-white',
+                  cancelButton: 'bg-slate-800 hover:bg-slate-700 text-white',
+                  error: 'border-red-900/50 bg-red-950/30 text-red-200',
+                  success: 'border-green-900/50 bg-green-950/30 text-green-200',
+                  warning: 'border-yellow-900/50 bg-yellow-950/30 text-yellow-200',
+                  info: 'border-blue-900/50 bg-blue-950/30 text-blue-200',
+                },
+              }}
+            />
+        </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>
   );

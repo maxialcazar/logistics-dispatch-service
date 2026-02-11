@@ -8,8 +8,17 @@ export async function createUser(req: AuthRequest, res: Response) {
     res.json(user);
   } catch (error: any) {
     if (error.message === "username_exists") {
-      return res.status(400).json({ error: "username already exists" });
     }
     res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+export async function changePassword(req: AuthRequest, res: Response) {
+  const { newPassword } = req.body;
+  try {
+     await UserService.changePassword(req.user!.id, newPassword);
+     res.json({ message: "Password updated successfully" });
+  } catch (error) {
+     res.status(500).json({ error: "Failed to update password" });
   }
 }

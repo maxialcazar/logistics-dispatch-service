@@ -35,21 +35,40 @@ export function initSocket(server: HttpServer) {
                     const room = `company-${decoded.companyId}`;
                     socket.join(room);
                     logger.info(`🔐 Client ${socket.id} joined secure room: ${room}`);
+
+                    if (decoded.role === 'driver') {
+                         // Notify company that driver is online
+                         io.to(room).emit('driver-status-updated', { 
+                             driverId: decoded.id || decoded.userId, // JWT usually has id/userId
+                             status: 'online',
+                             name: decoded.username 
+                         });
+                    }
+
+                    socket.on("disconnect", () => {
+			            logger.info(`🔌 Client disconnected: ${socket.id}`);
+                        if (decoded.role === 'driver') {
+                             io.to(room).emit('driver-status-updated', { 
+                                 driverId: decoded.id || decoded.userId, 
+                                 status: 'offline',
+                                 name: decoded.username 
+                             });
+                        }
+		            });
                 }
             } catch (error) {
                 logger.warn(`⚠️ Client ${socket.id} provided invalid token, denied room access.`);
+                socket.on("disconnect", () => {
+			        logger.info(`🔌 Client disconnected: ${socket.id}`);
+		        });
             }
+        } else {
+             socket.on("disconnect", () => {
+			    logger.info(`🔌 Client disconnected: ${socket.id}`);
+		    });
         }
-
-		socket.on("join-room", (room: string) => {
-            // Legacy/Optional: Allow manual join if needed, but prefer auto-join
-			socket.join(room);
-			logger.info(`🏠 Client ${socket.id} joined room manually: ${room}`);
-		});
-
-		socket.on("disconnect", () => {
-			logger.info(`🔌 Client disconnected: ${socket.id}`);
-		});
+		
+		// socket.on("join-room", ... ) // Removed/Legacy
 	});
 
 	return io;

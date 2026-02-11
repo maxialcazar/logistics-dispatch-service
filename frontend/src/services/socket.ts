@@ -40,9 +40,13 @@ class SocketService {
       this.socket.on(event, callback);
   }
 
-  off(event: string) {
+  off(event: string, callback?: any) {
       if (!this.socket) return;
-      this.socket.off(event);
+      if (callback) {
+          this.socket.off(event, callback);
+      } else {
+          this.socket.off(event);
+      }
   }
 }
 

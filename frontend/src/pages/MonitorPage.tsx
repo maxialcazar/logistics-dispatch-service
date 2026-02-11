@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { driverService } from '../services/driverService';
 import { zoneService } from '../services/zoneService';
 import { packageService } from '../services/packageService';
+import { useSocket } from '../context/SocketContext';
+import { socketService } from '../services/socket';
 import { LiveMap } from '../components/LiveMap';
 import { Skeleton } from '../components/Skeleton';
 import { Map, MapPin, Truck, Search, X, Check } from 'lucide-react';
@@ -34,6 +36,8 @@ export function MonitorPage() {
     const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
     const [packageSearch, setPackageSearch] = useState('');
 
+    const { isConnected } = useSocket();
+
     // Fetch Initial Data
     useEffect(() => {
         if (!token) return;
@@ -61,6 +65,32 @@ export function MonitorPage() {
         };
         load();
     }, [token]);
+
+    // WebSocket Listener for Package Updates
+    useEffect(() => {
+        if (!isConnected) return;
+
+        const handlePackageUpdate = (data: any) => {
+             setActivePackages(prev => prev.map(p => {
+                 if (p.id === data.packageId) {
+                     return { 
+                         ...p, 
+                         status: data.status, 
+                         // Preserve existing lat/lng if update is missing them or 0
+                         lat: (data.lat && data.lat !== 0) ? data.lat : p.lat,
+                         lng: (data.lng && data.lng !== 0) ? data.lng : p.lng
+                     };
+                 }
+                 return p;
+             }));
+        };
+
+        socketService.on('package-status-updated', handlePackageUpdate);
+
+        return () => {
+             socketService.off('package-status-updated', handlePackageUpdate);
+        };
+    }, [isConnected]);
 
     // Derived Visible Drivers
     const visibleDriverIds = useMemo(() => {

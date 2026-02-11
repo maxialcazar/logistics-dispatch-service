@@ -25,4 +25,12 @@ export class UserService {
     const { password: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
+
+  static async changePassword(userId: string, newPassword: string) {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+  }
 }

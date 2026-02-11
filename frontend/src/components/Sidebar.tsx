@@ -85,11 +85,11 @@ export function Sidebar() {
              <div className={clsx("px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider", collapsed && "hidden")}>
                 Sistema
              </div>
-            <a href="#" className="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition-colors group">
+            <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition-colors group">
                 <Settings className="h-5 w-5 flex-shrink-0 group-hover:text-blue-400 transition-colors" />
                 <span className={clsx("font-medium text-sm", collapsed ? "hidden" : "block")}>Configuración</span>
             </a>
-            <a href="#" className="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition-colors group">
+            <a href="/help" className="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition-colors group">
                 <HelpCircle className="h-5 w-5 flex-shrink-0 group-hover:text-emerald-400 transition-colors" />
                 <span className={clsx("font-medium text-sm", collapsed ? "hidden" : "block")}>Ayuda</span>
             </a>

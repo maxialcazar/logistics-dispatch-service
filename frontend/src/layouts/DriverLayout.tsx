@@ -33,7 +33,10 @@ export function DriverLayout() {
       </header>
 
       {/* Content Area */}
-      <main className="flex-1 overflow-y-auto pb-20 relative">
+      <main className={clsx(
+        "flex-1 relative",
+        isMap ? "flex flex-col overflow-hidden pb-[64px]" : "overflow-y-auto pb-24"
+      )}>
         <Outlet />
       </main>
 

@@ -5,12 +5,16 @@ import { packageService, type Package } from '../services/packageService';
 import { MapPin, Truck, Check, X, Navigation, Phone, Clock } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
+import { useDriverLocation } from '../hooks/useDriverLocation';
 
 export function DriverDashboard() {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+
+  // Enable Real-Time Tracking
+  useDriverLocation();
 
   useEffect(() => {
     fetchMyPackages();
@@ -39,19 +43,8 @@ export function DriverDashboard() {
     const loadingToast = toast.loading('Actualizando estado...');
 
     try {
-        // Get current location if possible
-        let lat, lng;
-        try {
-            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject);
-            });
-            lat = pos.coords.latitude;
-            lng = pos.coords.longitude;
-        } catch (e) {
-            console.warn("Location unavailable for status update", e);
-        }
-        
-        await packageService.updateStatus(token, pkg.id, newStatus, lat, lng);
+        // Do not update location - preserve destination coordinates
+        await packageService.updateStatus(token, pkg.id, newStatus);
         
         toast.success(`Paquete ${newStatus === 'delivered' ? 'entregado' : newStatus}`, { id: loadingToast });
         
@@ -71,10 +64,14 @@ export function DriverDashboard() {
   };
 
   const openNavigation = (pkg: Package) => {
-      // Use Waze or Google Maps based on device preference (generic geo uri)
-      // Or specifically google if we want reliability
-      const dest = pkg.lat && pkg.lng ? `${pkg.lat},${pkg.lng}` : encodeURIComponent(`${pkg.recipientAddress}, Cordoba, Argentina`);
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank');
+      //if (pkg.lat && pkg.lng) {
+          // Navigate to exact coordinates
+          //window.open(`https://www.google.com/maps/dir/?api=1&destination=${pkg.lat},${pkg.lng}`, '_blank');
+      //}
+    // Fallback: Search by address with Country context to avoid US default
+    const cleanAddress = pkg.recipientAddress.trim();
+    const query = encodeURIComponent(`${cleanAddress}, Argentina`);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
   };
 
   if (loading) {

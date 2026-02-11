@@ -57,5 +57,18 @@ export const driverService = {
     });
     if (!res.ok) throw new Error('Failed to assign zones');
     return res.json();
+  },
+
+  async updateLocation(token: string, lat: number, lng: number) {
+    const res = await fetch('/api/drivers/location', {
+      method: 'PATCH',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ lat, lng })
+    });
+    if (!res.ok) throw new Error('Failed to update location');
+    return res.json();
   }
 };

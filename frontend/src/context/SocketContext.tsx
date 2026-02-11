@@ -11,31 +11,33 @@ interface DriverLocation {
 interface SocketContextData {
   isConnected: boolean;
   locations: Map<string, DriverLocation>;
+  socket: any; // Expose socket instance directly
 }
 
 const SocketContext = createContext<SocketContextData>({
   isConnected: false,
   locations: new Map(),
+  socket: null,
 });
 
 export function SocketProvider({ children, token }: { children: React.ReactNode, token: string | null }) {
   const [isConnected, setIsConnected] = useState(false);
   const [locations, setLocations] = useState<Map<string, DriverLocation>>(new Map());
+  // We can just use the socketService.socket directly or state, but socketService is singleton-ish
+  const sock = socketService.socket;
 
   useEffect(() => {
     if (!token) return;
 
-    // Connect socket
     socketService.connect(token);
-    const socket = socketService.socket;
 
-    if (!socket) return;
+    if (!sock) return;
 
-    socket.on('connect', () => setIsConnected(true));
-    socket.on('disconnect', () => setIsConnected(false));
+    sock.on('connect', () => setIsConnected(true));
+    sock.on('disconnect', () => setIsConnected(false));
     
     // Core Logic: Listen for driver updates
-    socket.on('driver-location-updated', (data: DriverLocation) => {
+    sock.on('driver-location-updated', (data: DriverLocation) => {
         setLocations((prev) => {
             const newMap = new Map(prev);
             newMap.set(data.driverId, data);
@@ -44,16 +46,20 @@ export function SocketProvider({ children, token }: { children: React.ReactNode,
     });
 
     return () => {
-        socket.off('driver-location-updated');
+        sock.off('driver-location-updated');
+        sock.off('disconnect');
+        sock.off('connect');
         socketService.disconnect();
     };
-  }, [token]);
+  }, [token]); 
 
   return (
-    <SocketContext.Provider value={{ isConnected, locations }}>
+    <SocketContext.Provider value={{ isConnected, locations, socket: socketService.socket }}>
       {children}
     </SocketContext.Provider>
   );
 }
 
-export const useSocket = () => useContext(SocketContext);
+export function useSocket() {
+  return useContext(SocketContext);
+}

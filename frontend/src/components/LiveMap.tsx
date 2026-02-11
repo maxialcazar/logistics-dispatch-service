@@ -33,15 +33,19 @@ interface PackageLocation {
 
 // --- Icons Generator ---
 // Creates a divIcon with a Truck SVG inside
-const createCustomIcon = (driver: DriverInfo | undefined, active: boolean) => {
-    const color = active ? '#10b981' : '#64748b'; // Green or Slate
+const createCustomIcon = (driver: DriverInfo | undefined, status: string) => {
+    const isOnline = status === 'online';
+    
+    // Green (Online) or Gray (Offline)
+    const colorBg = isOnline ? 'bg-green-600' : 'bg-slate-600'; 
+    const colorPulse = isOnline ? 'bg-green-500 animate-pulse' : 'bg-slate-500 hidden';
+
     const html = renderToStaticMarkup(
         <div className="relative flex items-center justify-center w-8 h-8">
-            <div className={`absolute inset-0 rounded-full opacity-20 ${active ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`}></div>
-            <div className={`relative z-10 p-1.5 rounded-full border-2 border-white shadow-lg ${active ? 'bg-green-600' : 'bg-slate-700'}`}>
+            <div className={`absolute inset-0 rounded-full opacity-20 ${colorPulse}`}></div>
+            <div className={`relative z-10 p-1.5 rounded-full border-2 border-white shadow-lg ${colorBg}`}>
                 <Truck color="white" size={14} />
             </div>
-            {/* Tiny arrow potentially for bearing (future) */}
         </div>
     );
 
@@ -110,20 +114,45 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
     }, [packages]);
     
     const activeDrivers = useMemo(() => {
-        const allLocs = Array.from(locations.values());
-        // Filter by visibility
-        const filtered = visibleDriverIds 
-            ? allLocs.filter(d => visibleDriverIds.includes(d.driverId))
-            : allLocs;
-            
-        // Enrich with metadata
-        return filtered.map(loc => {
-            const meta = allDrivers.find(d => d.id === loc.driverId);
-            return { ...loc, meta };
+        const driversMap = new Map<string, any>();
+
+        // 1. Populate with DB Drivers (Offline/Static)
+        allDrivers.forEach(d => {
+             // Skip if no location available in DB
+             // Note: d object from API needs lat/lng. If interface is missing it, we cast.
+             const dAny = d as any;
+             if (dAny.lat && dAny.lng) {
+                 driversMap.set(d.id, {
+                     driverId: d.id,
+                     lat: dAny.lat,
+                     lng: dAny.lng,
+                     timestamp: 0, // Old
+                     status: 'offline', // Mark as offline initially
+                     meta: d
+                 });
+             }
         });
+
+        // 2. Override with Real-Time Socket Data (Online)
+        locations.forEach((loc, driverId) => {
+             const meta = allDrivers.find(d => d.id === driverId);
+             // Use socket location as authoritative
+             driversMap.set(driverId, { 
+                 ...loc, 
+                 status: 'online', 
+                 meta 
+             });
+        });
+
+        // 3. Filter by Visibility
+        const result = Array.from(driversMap.values());
+        if (visibleDriverIds) {
+            return result.filter(d => visibleDriverIds.includes(d.driverId));
+        }
+        return result;
     }, [locations, visibleDriverIds, allDrivers]);
 
-    const center: [number, number] = [-34.6037, -58.3816]; // Buenos Aires default
+    const center: [number, number] = [-31.43547, -64.20090]; // Buenos Aires default
 
     return (
         <div className="h-full w-full relative z-0">
@@ -146,7 +175,7 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
                     <Marker 
                         key={d.driverId} 
                         position={[d.lat, d.lng]}
-                        icon={createCustomIcon(d.meta, true)}
+                        icon={createCustomIcon(d.meta, d.status)}
                     >
                         <Popup className="custom-popup-dark">
                             <div className="p-1 min-w-[200px]">
@@ -165,9 +194,13 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
                                         <span>{d.lat.toFixed(4)}, {d.lng.toFixed(4)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="font-medium text-green-600">En Línea</span>
-                                        <span className="text-slate-400 ml-auto">{new Date(d.timestamp).toLocaleTimeString()}</span>
+                                        <div className={`h-1.5 w-1.5 rounded-full ${d.status === 'online' ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`} />
+                                        <span className={`font-medium ${d.status === 'online' ? 'text-green-600' : 'text-slate-500'}`}>
+                                            {d.status === 'online' ? 'En Línea' : 'Desconectado'}
+                                        </span>
+                                        <span className="text-slate-400 ml-auto">
+                                            {d.timestamp > 0 ? new Date(d.timestamp).toLocaleTimeString() : 'N/A'}
+                                        </span>
                                     </div>
                                     
                                     {d.meta?.zones && d.meta.zones.length > 0 && (
