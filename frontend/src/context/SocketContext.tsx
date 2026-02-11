@@ -8,22 +8,32 @@ interface DriverLocation {
   timestamp: number;
 }
 
+interface AppEvent {
+  id: string;
+  type: 'DELIVERY' | 'ISSUE' | 'SYSTEM' | 'LOCATION';
+  title: string;
+  description: string;
+  timestamp: number;
+}
+
 interface SocketContextData {
   isConnected: boolean;
   locations: Map<string, DriverLocation>;
-  socket: any; // Expose socket instance directly
+  events: AppEvent[];
+  socket: any; 
 }
 
 const SocketContext = createContext<SocketContextData>({
   isConnected: false,
   locations: new Map(),
+  events: [],
   socket: null,
 });
 
 export function SocketProvider({ children, token }: { children: React.ReactNode, token: string | null }) {
   const [isConnected, setIsConnected] = useState(false);
   const [locations, setLocations] = useState<Map<string, DriverLocation>>(new Map());
-  // We can just use the socketService.socket directly or state, but socketService is singleton-ish
+  const [events, setEvents] = useState<AppEvent[]>([]);
   const sock = socketService.socket;
 
   useEffect(() => {
@@ -45,8 +55,14 @@ export function SocketProvider({ children, token }: { children: React.ReactNode,
         });
     });
 
+    // Listen for business events
+    sock.on('business-event', (event: AppEvent) => {
+        setEvents(prev => [event, ...prev].slice(0, 50)); // Keep last 50 events
+    });
+
     return () => {
         sock.off('driver-location-updated');
+        sock.off('business-event');
         sock.off('disconnect');
         sock.off('connect');
         socketService.disconnect();
@@ -54,7 +70,7 @@ export function SocketProvider({ children, token }: { children: React.ReactNode,
   }, [token]); 
 
   return (
-    <SocketContext.Provider value={{ isConnected, locations, socket: socketService.socket }}>
+    <SocketContext.Provider value={{ isConnected, locations, events, socket: socketService.socket }}>
       {children}
     </SocketContext.Provider>
   );

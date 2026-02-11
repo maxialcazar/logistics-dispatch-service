@@ -33,6 +33,13 @@ export default {
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'scan': 'scan 2s linear infinite',
+      },
+      keyframes: {
+        scan: {
+          '0%, 100%': { top: '0%' },
+          '50%': { top: '100%' },
+        }
       }
     },
   },

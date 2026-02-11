@@ -86,9 +86,6 @@ export function CreatePackagePage() {
 
       await packageService.createPackage(token!, payload);
       setSuccess(`¡Paquete ${formData.trackingCode} creado exitosamente!`);
-      if (coords.lat) {
-         console.log(`Geocoded to: ${coords.lat}, ${coords.lng}`);
-      }
 
       // Reset form
       setFormData(prev => ({ 

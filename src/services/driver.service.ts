@@ -160,7 +160,7 @@ export class DriverService {
       if (!all || Object.keys(all).length === 0) return;
 
       const driverIds = Object.keys(all);
-      // console.log(`[Sync] Persisting ${driverIds.length} locations to DB...`);
+
 
       const ops = driverIds.map(id => {
           try {

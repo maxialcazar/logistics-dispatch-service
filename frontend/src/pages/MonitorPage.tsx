@@ -54,7 +54,6 @@ export function MonitorPage() {
                     ...drv,
                     zones: drv.zones || []
                 }));
-                // console.log("[MonitorPage] Loaded Drivers:", mappedDrivers);
                 setDrivers(mappedDrivers);
                 setActivePackages(p.items || []);
             } catch (e) {

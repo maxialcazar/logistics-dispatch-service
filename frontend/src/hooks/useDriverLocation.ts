@@ -11,8 +11,6 @@ export function useDriverLocation() {
     useEffect(() => {
         if (!token || !isDriver) return;
 
-        console.log("📍 Starting Location Tracking...");
-
         const success = (pos: GeolocationPosition) => {
             const now = Date.now();
             // Throttle: Only update every 10 seconds
@@ -21,13 +19,12 @@ export function useDriverLocation() {
             const { latitude, longitude } = pos.coords;
             lastUpdate.current = now;
 
-            driverService.updateLocation(token, latitude, longitude).catch(err => {
-                console.error("Failed to update location", err);
+            driverService.updateLocation(token, latitude, longitude).catch(() => {
+                // Silent fail or retry logic here
             });
         };
 
         const error = (err: GeolocationPositionError) => {
-            console.warn("Location tracking error:", err);
             if (err.code === 1) { // PERMISSION_DENIED
                 toast.error("Habilita la ubicación para aparecer en el mapa.");
             }
@@ -42,7 +39,6 @@ export function useDriverLocation() {
         const watchId = navigator.geolocation.watchPosition(success, error, options);
 
         return () => {
-            console.log("📍 Stopping Location Tracking...");
             navigator.geolocation.clearWatch(watchId);
         };
     }, [token, isDriver]);

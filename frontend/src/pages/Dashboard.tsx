@@ -1,4 +1,4 @@
-import { PackageCheck, Truck, Clock, AlertTriangle, Radio, Navigation } from 'lucide-react';
+import { PackageCheck, Truck, Clock, AlertTriangle, Radio, Navigation, CheckCircle, XCircle, Info, LayoutList } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { packageService } from '../services/packageService';
@@ -6,7 +6,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { LiveMap } from '../components/LiveMap';
 
 export function Dashboard() {
-  const { locations, isConnected } = useSocket();
+  const { locations, isConnected, events } = useSocket();
   const { token } = useAuth();
   
   const [metrics, setMetrics] = useState({ 
@@ -15,7 +15,7 @@ export function Dashboard() {
       avgDeliveryTimeMinutes: 0 
   });
 
-  // Fetch Stats Loop (Every 60s)
+  // Fetch Stats Loop
   useEffect(() => {
       if (!token) return;
       const loadStats = () => {
@@ -34,7 +34,7 @@ export function Dashboard() {
   // Dynamic Stats Configuration
   const dynamicStats = [
       { 
-          label: 'Paquetes Entregados', // Reset at 00:00 implemented in backend query
+          label: 'Paquetes Entregados', 
           value: metrics.deliveredToday.toString(), 
           trend: 'Hoy', 
           trendColor: 'text-slate-400', 
@@ -48,7 +48,7 @@ export function Dashboard() {
           icon: Clock 
       },
       { 
-          label: 'En Ruta Ahora', // Replaces "Incidencias"
+          label: 'En Ruta Ahora', 
           value: metrics.inTransit.toString(), 
           trend: 'Activos', 
           trendColor: 'text-blue-400', 
@@ -56,10 +56,20 @@ export function Dashboard() {
       },
   ];
 
+  const getEventIcon = (type: string) => {
+      switch (type) {
+          case 'DELIVERY': return <CheckCircle className="h-5 w-5 text-green-500" />;
+          case 'ISSUE': return <XCircle className="h-5 w-5 text-red-500" />;
+          case 'SYSTEM': return <Info className="h-5 w-5 text-blue-500" />;
+          case 'LOCATION': return <Navigation className="h-5 w-5 text-purple-500" />;
+          default: return <Radio className="h-5 w-5 text-slate-500" />;
+      }
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 h-[calc(100vh-100px)] flex flex-col">
       {/* Metrics Row */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 flex-shrink-0">
         {/* Dynamic Card for Active Drivers (From Socket) */}
          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-6 shadow-sm transition-all hover:bg-slate-800/50 hover:shadow-md">
             <div>
@@ -97,45 +107,53 @@ export function Dashboard() {
       </div>
 
       {/* Main Content: Map & Activity */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 flex-1 min-h-0">
         {/* Map Area (Takes 2/3 width) */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="lg:col-span-2 space-y-4 flex flex-col h-full">
+          <div className="flex items-center justify-between flex-shrink-0">
             <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Radio className={`h-4 w-4 ${isConnected ? 'text-green-500 animate-pulse' : 'text-slate-600'}`} />
                 Mapa de Flota en Vivo
             </h2>
-            <div className="flex gap-2">
-              <button className="text-xs font-medium text-blue-400 hover:underline">Pantalla Completa</button>
-            </div>
           </div>
-          <div className="h-[400px] w-full rounded-xl border border-slate-800 bg-slate-900 shadow-inner flex items-center justify-center relative overflow-hidden group">
-            {/* Real React-Leaflet Map */}
+          <div className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900 shadow-inner flex items-center justify-center relative overflow-hidden group min-h-[400px]">
             <LiveMap />
           </div>
         </div>
 
         {/* Activity Feed (Takes 1/3 width) */}
-        <div className="space-y-4">
-           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Actividad Reciente</h2>
+        <div className="space-y-4 flex flex-col h-full">
+           <div className="flex items-center justify-between flex-shrink-0">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+                <LayoutList className="h-5 w-5 text-purple-400" />
+                Novedades
+            </h2>
             <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">En Vivo</span>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-4 space-y-4 h-[400px] overflow-y-auto custom-scrollbar">
-             {activeDrivers.slice(0, 10).map((driver) => (
-               <div key={driver.driverId + driver.timestamp} className="flex gap-4 border-b border-slate-800/50 pb-4 last:border-0 last:pb-0 animate-in slide-in-from-right-5">
-                  <div className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-green-500 ring-4 ring-green-500/20" />
+          <div className="flex-1 rounded-xl border border-slate-800 bg-slate-900/30 p-4 space-y-4 overflow-y-auto custom-scrollbar">
+             {events.length === 0 && (
+                 <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-2">
+                     <Radio className="h-8 w-8 opacity-20" />
+                     <p className="text-sm">Esperando eventos del sistema...</p>
+                 </div>
+             )}
+             
+             {events.map((evt) => (
+               <div key={evt.id} className="flex gap-4 border-b border-slate-800/50 pb-4 last:border-0 last:pb-0 animate-in slide-in-from-right-5 fade-in duration-300">
+                  <div className="mt-1 flex-shrink-0">
+                      {getEventIcon(evt.type)}
+                  </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-200">Ubicación Actualizada</p>
-                    <p className="text-xs text-slate-500">Conductor {driver.driverId.substring(0,8)} en <span className="text-blue-400">{driver.lat.toFixed(3)}, {driver.lng.toFixed(3)}</span></p>
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-slate-200">{evt.title}</p>
+                        <span className="text-[10px] text-slate-600 font-mono whitespace-nowrap">
+                            {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">{evt.description}</p>
                   </div>
                </div>
              ))}
-             {activeDrivers.length === 0 && (
-                 <div className="text-center text-slate-600 text-sm py-10">
-                     Esperando eventos...
-                 </div>
-             )}
           </div>
         </div>
       </div>

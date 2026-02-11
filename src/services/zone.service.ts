@@ -87,7 +87,6 @@ export class ZoneService {
 
       // Business Logic: If activated, assign pending packages in this zone
       if (data.isActive === true) {
-        console.log(`Activating zone ${zoneId}, updating packages...`);
         try {
             await prisma.package.updateMany({
               where: {
