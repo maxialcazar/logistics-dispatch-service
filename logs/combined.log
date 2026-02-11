@@ -394164,3 +394164,6 @@
 {"level":"info","message":"🔌 Client connected: tAfOA-rVXWmbZmDUAAAD","timestamp":"2026-02-11T04:11:46.959Z"}
 {"level":"info","message":"🔐 Client tAfOA-rVXWmbZmDUAAAD joined secure room: company-cfe934ca-5b2e-453b-87ab-38cac4568693","timestamp":"2026-02-11T04:11:46.961Z"}
 {"level":"info","message":"📡 EventBus connected to Redis Pub/Sub","timestamp":"2026-02-11T04:12:15.636Z"}
+{"level":"info","message":"📡 EventBus connected to Redis Pub/Sub","timestamp":"2026-02-11T04:12:19.992Z"}
+{"level":"info","message":"::1 - - [11/Feb/2026:04:12:37 +0000] \"GET /api/packages/my-packages HTTP/1.1\" 304 - \"http://localhost:5173/driver\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36\"","timestamp":"2026-02-11T04:12:37.396Z"}
+{"level":"info","message":"::1 - - [11/Feb/2026:04:12:44 +0000] \"GET /api/packages/my-packages HTTP/1.1\" 304 - \"http://localhost:5173/driver\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36\"","timestamp":"2026-02-11T04:12:44.987Z"}

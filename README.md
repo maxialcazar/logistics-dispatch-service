@@ -16,14 +16,20 @@
 - **Monitoreo en Vivo:** Mapa interactivo con la ubicación real de toda la flota y estado de entregas.
 - **Gestión de Zonas y Conductores:** CRUD completo con validaciones de seguridad.
 
-### 2. App Móvil para Conductores
+### 2. App Móvil Progressive Web App (PWA)
 
-- **Dashboard Personalizado:** Lista de entregas asignadas ordenada por prioridad.
-- **Navegación Integrada:** Botones inteligentes para abrir Google Maps/Waze con un toque.
-- **Gestión de Estado:** Actualización de paquetes (En Tránsito -> Entregado / Fallido) con geolocalización automática.
-- **Modo Mapa:** Visualización de ruta y paradas pendientes en el mapa del móvil.
+- **Instalable:** Manifiesto web para "Agregar a Pantalla de Inicio" y experiencia nativa.
 
-### 3. Backend de Alto Rendimiento
+- **Dashboard Personalizado:** Lista de entregas priorizada y optimización de ruta.
+- **Navegación:** Integración directa con Google Maps/Waze.
+
+### 3. Módulo de Inteligencia de Negocio (Nuevo)
+
+- **Analíticas Avanzadas:** Reportes visuales con Recharts (Gráficos de Barras, Tortas).
+- **KPIs en Tiempo Real:** Métricas de eficiencia, tiempos de entrega y distribución por zonas.
+- **Top Conductores:** Ranking de productividad semanal.
+
+### 4. Backend de Alto Rendimiento
 
 - **Arquitectura Híbrida:** Redis Write-Back Buffer para ingesta masiva de GPS.
 - **Event-Driven:** WebSocket (Socket.io) para actualizaciones en <100ms.

@@ -4,7 +4,7 @@
 
 ---
 
-## 1. Inicio de Sesión
+## 1. Acceso al Sistema
 
 1.  Abre la aplicación en tu navegador web móvil (Chrome/Safari).
 2.  Ingresa tus credenciales proporcionadas por la empresa:
@@ -13,6 +13,15 @@
 3.  Pulsa "Iniciar Sesión".
 
 > ℹ️ El sistema detectará automáticamente tu perfil de **Conductor** y te redirigirá a la vista móvil.
+
+### 1.1 Instalación (App Nativa)
+
+Para una mejor experiencia, instala la aplicación en tu teléfono:
+
+- **Android (Chrome):** Menú (3 puntos) -> "Instalar aplicación" o "Agregar a pantalla principal".
+- **iPhone (Safari):** Botón Compartir -> "Agregar al inicio" (Add to Home Screen).
+
+Esto eliminará la barra del navegador y funcionará como una app real.
 
 ---
 

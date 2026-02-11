@@ -1,19 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package } from '../services/packageService';
-import { MapPin, Truck, Check, X, Navigation, Phone, Route, Scan } from 'lucide-react';
+import { MapPin, Truck, Check, X, Navigation, Phone, Route } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { useDriverLocation } from '../hooks/useDriverLocation';
-
-// ... (existing imports)
 
 export function DriverDashboard() {
   const { token } = useAuth();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
 
   // Enable Real-Time Tracking
   useDriverLocation();
@@ -128,26 +125,11 @@ export function DriverDashboard() {
     );
   };
 
-  const handleSimulateScan = () => {
-      if (packages.length > 0) {
-          const randomPkg = packages[Math.floor(Math.random() * packages.length)];
-          toast.success(`¡Paquete Escaneado! ${randomPkg.trackingCode}`);
-          // Scroll to package or highlight it ideally
-          // For now just close scanner
-          setShowScanner(false);
-      } else {
-          toast.error("No hay paquetes para escanear");
-          setShowScanner(false);
-      }
-  };
-
   if (loading) {
       return <div className="p-8 text-center text-slate-500 animate-pulse">Cargando tareas...</div>;
   }
 
-  // ... (Empty state suppressed for brevity if needed, but keeping it is better)
-  // Re-adding Empty State Logic
-  if (packages.length === 0 && !loading) {
+  if (packages.length === 0) {
        return (
           <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full gap-4">
               <div className="h-20 w-20 bg-slate-800 rounded-full flex items-center justify-center">
@@ -162,39 +144,6 @@ export function DriverDashboard() {
 
   return (
     <div className="p-4 space-y-4 pb-24 relative">
-       {/* Scanner Modal */}
-       {showScanner && (
-           <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
-               <div className="absolute top-4 right-4 z-10">
-                   <button onClick={() => setShowScanner(false)} className="p-2 bg-slate-800 rounded-full text-white">
-                       <X className="h-6 w-6" />
-                   </button>
-               </div>
-               <div className="relative w-full max-w-sm aspect-[3/4] bg-slate-900 border-2 border-slate-700 rounded-lg overflow-hidden flex flex-col items-center justify-center">
-                   <div className="absolute inset-0 bg-transparent border-[40px] border-black/50 pointer-events-none z-10"></div>
-                   <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)] z-0 animate-scan"></div>
-                   
-                   <p className="text-slate-400 mt-64 z-20">Apunta el código QR</p>
-                   
-                   <button 
-                     onClick={handleSimulateScan}
-                     className="absolute bottom-8 z-20 bg-white text-black px-6 py-2 rounded-full font-bold shadow-lg active:scale-95"
-                   >
-                       Simular Escaneo
-                   </button>
-               </div>
-               <p className="text-xs text-slate-500 mt-4">Simulación de Cámara</p>
-           </div>
-       )}
-
-       {/* Floating Scan Button */}
-       <button 
-           onClick={() => setShowScanner(true)}
-           className="fixed bottom-24 right-4 z-40 h-14 w-14 bg-white text-black rounded-full shadow-xl flex items-center justify-center ring-4 ring-slate-900 hover:scale-105 transition-transform active:scale-95"
-       >
-           <Scan className="h-6 w-6" />
-       </button>
-
        <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
            <span>Mis Entregas ({packages.length})</span>
            <div className="flex gap-2">

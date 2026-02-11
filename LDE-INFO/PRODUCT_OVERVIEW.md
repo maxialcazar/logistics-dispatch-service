@@ -26,16 +26,25 @@ El centro de comando para los operadores logísticos.
   - Métricas de rendimiento de la flota hoy.
 - **Gestión de Inventario (CRUD):** Creación manual de paquetes con geocodificación automática de direcciones.
 
-### 2. Aplicación para Conductores (App Móvil / PWA)
+### 2. Aplicación para Conductores (PWA / Mobile)
 
 Una interfaz simplificada y libre de distracciones diseñada para ser usada en movimiento.
 
-- **Sin Configuraciones:** El conductor solo inicia sesión con sus credenciales.
-- **Dashboard Priorizado:** Lista de entregas ordenada, ocultando lo que ya se completó.
-- **Navegación en un Click:** Botón "Navegar" que abre automáticamente Google Maps con la ruta más rápida hacia el destino.
-- **Actualización de Estado:** Botones grandes y claros para marcar "Entregado" o "Fallido", lo que sincroniza instantáneamente con la central.
+- **PWA Instalable:** Funciona como app nativa (icono en pantalla de inicio) sin tiendas de aplicaciones.
 
-### 3. Motor Backend (API + Workers)
+- **Dashboard Priorizado:** Lista de entregas ordenada, ocultando lo que ya se completó.
+- **Navegación Inteligente:** Integración directa con Google Maps/Waze para rutas óptimas.
+- **Gestión de Estado:** Botones grandes para marcar "Entregado" o "Fallido" con sincronización instantánea y modo offline.
+
+### 3. Módulo de Inteligencia de Negocio (Analytics)
+
+Herramientas de toma de decisiones basadas en datos reales.
+
+- **Dashboard Ejecutivo:** KPIs de entregas diarias, tiempos promedio y eficiencia de flota.
+- **Gráficos Interactivos:** Visualización de tendencias semanales y distribución por zonas (Recharts).
+- **Ranking de Conductores:** Tabla de desempeño para incentivar la productividad.
+
+### 4. Motor Backend (API + Workers)
 
 El cerebro invisible que procesa miles de eventos por segundo.
 
