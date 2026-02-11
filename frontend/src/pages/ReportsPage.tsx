@@ -97,7 +97,7 @@ export function ReportsPage() {
                 paddingAngle={5}
                 dataKey="value"
               >
-                {stats.zoneDistribution.map((entry, index) => (
+                {stats.zoneDistribution.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

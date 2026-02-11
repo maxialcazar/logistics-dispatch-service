@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Package, MapPin, Phone, Calendar, Search, Filter } from 'lucide-react';
+import { Plus, Package, MapPin, Phone, Calendar, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package as IPackage } from '../services/packageService';
@@ -52,6 +52,7 @@ export function PackagesPage() {
       setTotalPages(res.meta.totalPages);
     } catch (err: any) {
         console.error(err);
+        setError("Error al cargar paquetes");
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,7 @@
 ![Frontend](https://img.shields.io/badge/Frontend-React_18-blue?style=for-the-badge&logo=react)
 ![Backend](https://img.shields.io/badge/Backend-Node.js-green?style=for-the-badge&logo=nodedotjs)
 ![Database](https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql)
+![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
 
 **LDE (Logistics Dispatch Enterprise)** es una solución completa para la gestión logística de despacho y seguimiento de flotas en tiempo real. Combina un potente backend de alto rendimiento con una interfaz de administración moderna y una aplicación móvil progresiva para conductores.
 
@@ -37,13 +38,38 @@
 
 ---
 
-## 🚀 Quick Start (Desarrollo Local)
+## 🐳 Despliegue con Docker (Recomendado)
+
+La forma más rápida de levantar todo el ecosistema (Database, Redis, Backend y Frontend) es utilizando Docker Compose.
 
 ### Prerrequisitos
 
-- Node.js 18+
-- Docker (opcional, para Base de Datos y Redis)
-- PostgreSQL y Redis corriendo localmente.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y corriendo.
+
+### 1. Iniciar Aplicación
+
+```bash
+# Construir y levantar contenedores
+docker-compose up --build
+```
+
+### 2. Acceso
+
+- **Frontend (Admin & Dashboard):** [http://localhost:8080](http://localhost:8080)
+- **Backend API:** [http://localhost:3010](http://localhost:3010)
+- **PostgreSQL:** Puerto `5433` (interno 5432)
+- **Redis:** Puerto `6380` (interno 6379)
+
+---
+
+## 🚀 Desarrollo Local (Manual)
+
+Si prefieres correr los servicios de forma independiente para desarrollo activo:
+
+### Prerrequisitos
+
+- **Node.js 20+**
+- **PostgreSQL y Redis** (puedes usar los contenedores: `docker-compose up db redis -d`)
 
 ### 1. Configuración del Backend
 
@@ -51,11 +77,9 @@
 # Instalar dependencias
 npm install
 
-# Configurar variables de entorno (crear .env basado en .env.example)
-# Asegurar DATABASE_URL y REDIS_URL
-
-# Iniciar Base de Datos (si usa Docker)
-docker-compose up -d
+# Configurar variables de entorno (.env)
+# DATABASE_URL="postgresql://postgres:postgres@localhost:5433/logistics?schema=public"
+# REDIS_URL="redis://localhost:6380"
 
 # Migrar Schema
 npx prisma db push
@@ -68,15 +92,11 @@ npm run dev
 
 ```bash
 cd frontend
-
-# Instalar dependencias
 npm install
-
-# Iniciar Cliente React (Puerto 5173)
 npm run dev
 ```
 
-Acceder a: `http://localhost:5173`
+Acceder a: `http://localhost:5173` (Vite Proxy redirigirá a :3010)
 
 ---
 

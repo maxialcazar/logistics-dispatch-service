@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Map, User, Search, Check, Power, Truck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { zoneService, type Zone } from '../services/zoneService';
-import { driverService, type Driver } from '../services/driverService';
+import { driverService, type AppDriver } from '../services/driverService';
 import { Modal } from '../components/Modal';
 import { Skeleton } from '../components/Skeleton';
 import { toast } from 'sonner';
@@ -14,7 +14,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 export function ZonesPage() {
   const { token } = useAuth();
   const [zones, setZones] = useState<Zone[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<AppDriver[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Create Modal

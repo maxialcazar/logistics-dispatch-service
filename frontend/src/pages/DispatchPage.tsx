@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { driverService } from '../services/driverService';
+import { driverService, type AppDriver } from '../services/driverService';
 import { zoneService } from '../services/zoneService';
 import { MapPin, Truck, Search, GripVertical, CheckCircle, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
@@ -14,18 +14,10 @@ interface Zone {
     description?: string;
 }
 
-interface Driver {
-    id: string;
-    name: string;
-    user: { username: string };
-    zones: { id: string, name: string }[];
-}
-
-export function DispatchPage() {
+    export function DispatchPage() {
     const { token } = useAuth();
     const [zones, setZones] = useState<Zone[]>([]);
-    const [drivers, setDrivers] = useState<Driver[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [drivers, setDrivers] = useState<AppDriver[]>([]);
     const [searchZone, setSearchZone] = useState('');
     const [searchDriver, setSearchDriver] = useState('');
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -57,7 +49,7 @@ export function DispatchPage() {
         }).catch(err => {
             console.error(err);
             toast.error('Error al cargar datos');
-        }).finally(() => setLoading(false));
+        });
     }, [token]);
 
     // Drag & Drop Logic
@@ -72,7 +64,7 @@ export function DispatchPage() {
         e.dataTransfer.dropEffect = 'copy';
     };
 
-    const handleDrop = async (e: React.DragEvent, driver: Driver) => {
+    const handleDrop = async (e: React.DragEvent, driver: AppDriver) => {
         e.preventDefault();
         const zoneId = e.dataTransfer.getData('zoneId');
         const zoneName = e.dataTransfer.getData('zoneName');
@@ -80,7 +72,7 @@ export function DispatchPage() {
         if (!zoneId) return;
 
         // Check if already assigned
-        if (driver.zones.some(z => z.id === zoneId)) {
+        if (driver.zones?.some(z => z.id === zoneId)) {
             toast.error(`La zona ${zoneName} ya está asignada a ${driver.name}`);
             return;
         }
@@ -94,8 +86,8 @@ export function DispatchPage() {
         });
     };
 
-    const removeZone = async (driver: Driver, zoneId: string) => {
-        const zone = driver.zones.find(z => z.id === zoneId);
+    const removeZone = async (driver: AppDriver, zoneId: string) => {
+        const zone = driver.zones?.find(z => z.id === zoneId);
         if (!zone) return;
 
         setConfirmConfig({
@@ -107,18 +99,19 @@ export function DispatchPage() {
         });
     };
 
-    const performAction = async (type: 'assign' | 'remove', driver: Driver, zoneId: string, zoneName: string) => {
+    const performAction = async (type: 'assign' | 'remove', driver: AppDriver, zoneId: string, zoneName: string) => {
         setConfirmLoading(true);
         setLoadingAction(driver.id);
         const toastId = toast.loading(type === 'assign' ? 'Asignando zona...' : 'Desasignando zona...');
 
         try {
             let newZones: string[];
+            const currentZones = driver.zones || [];
             
             if (type === 'assign') {
-                newZones = [...driver.zones.map(z => z.id), zoneId];
+                newZones = [...currentZones.map(z => z.id), zoneId];
             } else {
-                newZones = driver.zones.filter(z => z.id !== zoneId).map(z => z.id);
+                newZones = currentZones.filter(z => z.id !== zoneId).map(z => z.id);
             }
 
             await driverService.assignZones(token!, driver.id, newZones);
@@ -128,9 +121,10 @@ export function DispatchPage() {
             // Optimistic Update
             setDrivers(prev => prev.map(d => {
                 if (d.id === driver.id) {
+                    const current = d.zones || [];
                     const updatedZones = type === 'assign' 
-                        ? [...d.zones, { id: zoneId, name: zoneName }]
-                        : d.zones.filter(z => z.id !== zoneId);
+                        ? [...current, { id: zoneId, name: zoneName }]
+                        : current.filter(z => z.id !== zoneId);
                     return { ...d, zones: updatedZones };
                 }
                 return d;
@@ -154,7 +148,7 @@ export function DispatchPage() {
 
     const filteredDrivers = drivers.filter(d => 
         d.name.toLowerCase().includes(searchDriver.toLowerCase()) || 
-        d.user.username.toLowerCase().includes(searchDriver.toLowerCase())
+        d.user?.username.toLowerCase().includes(searchDriver.toLowerCase())
     );
 
     return (
@@ -258,7 +252,7 @@ export function DispatchPage() {
                                             <div className="text-xs text-slate-500">@{driver.user?.username || 'sin-usuario'}</div>
                                         </div>
                                     </div>
-                                    {driver.zones?.length > 0 ? (
+                                    {(driver.zones?.length || 0) > 0 ? (
                                         <span className="bg-green-500/10 text-green-500 text-xs px-2 py-1 rounded border border-green-500/20 flex items-center gap-1">
                                             <CheckCircle className="h-3 w-3" /> Activo
                                         </span>

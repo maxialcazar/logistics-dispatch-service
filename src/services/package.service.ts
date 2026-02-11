@@ -346,6 +346,10 @@ export class PackageService {
     });
   }
 
+  static async getPackagesByDriver(companyId: string, driverId: string) {
+    return this.getMyPackages(companyId, driverId);
+  }
+
   static async getMyPackages(companyId: string, driverId: string) {
     return prisma.package.findMany({
       where: { 

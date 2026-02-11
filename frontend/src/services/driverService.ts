@@ -1,4 +1,4 @@
-export interface Driver {
+export interface AppDriver {
   id: string;
   name: string;
   user?: {
@@ -22,7 +22,7 @@ interface PaginatedResponse<T> {
 }
 
 export const driverService = {
-  async getDrivers(token: string, page = 1, limit = 100): Promise<PaginatedResponse<Driver>> {
+  async getDrivers(token: string, page = 1, limit = 100): Promise<PaginatedResponse<AppDriver>> {
     const res = await fetch(`/api/drivers?page=${page}&limit=${limit}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -30,7 +30,7 @@ export const driverService = {
     return res.json();
   },
 
-  async createDriver(token: string, data: { name: string; username: string; password: string }): Promise<Driver> {
+  async createDriver(token: string, data: { name: string; username: string; password: string }): Promise<AppDriver> {
     const res = await fetch('/api/drivers', {
       method: 'POST',
       headers: { 

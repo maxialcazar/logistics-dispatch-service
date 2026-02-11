@@ -1,19 +1,36 @@
+version: '3.8'
+
 services:
-  app:
-    container_name: logistics-api
+  backend:
+    container_name: logistics-backend
     build: .
     ports:
-      - "3001:3001"
+      - "3010:3010"
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - PORT=3010
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/logistics?schema=public
       - REDIS_ENABLED=true
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=super_secret_docker_key
+      - CORS_ORIGIN=*
     depends_on:
       - db
       - redis
+    networks:
+      - logistics-net
+    restart: always
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  frontend:
+    container_name: logistics-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
     networks:
       - logistics-net
     restart: always

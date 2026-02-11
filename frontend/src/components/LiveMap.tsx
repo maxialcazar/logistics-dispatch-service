@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Popup, Marker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -33,7 +33,7 @@ interface PackageLocation {
 
 // --- Icons Generator ---
 // Creates a divIcon with a Truck SVG inside
-const createCustomIcon = (driver: DriverInfo | undefined, status: string) => {
+const createCustomIcon = (_driver: DriverInfo | undefined, status: string) => {
     const isOnline = status === 'online';
     
     // Green (Online) or Gray (Offline)
@@ -207,7 +207,7 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
                                         <div className="mt-2 pt-2 border-t border-slate-100">
                                             <span className="text-[10px] uppercase font-bold text-slate-400">Zonas Asignadas:</span>
                                             <div className="flex flex-wrap gap-1 mt-1">
-                                                {d.meta.zones.map(z => (
+                                                {d.meta.zones.map((z: any) => (
                                                     <span key={z.id} className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] border border-purple-200">
                                                         {z.name}
                                                     </span>

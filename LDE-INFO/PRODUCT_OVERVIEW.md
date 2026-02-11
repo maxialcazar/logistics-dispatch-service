@@ -100,8 +100,21 @@ _Pruebas realizadas simulando 125 conductores activos simultáneamente._
 
 ---
 
+## 🐳 Despliegue & Containerización (Docker)
+
+A partir de la versión **2.5**, LDE está completamente containerizado, lo que garantiza paridad absoluta entre entornos de desarrollo, testing y producción.
+
+### Ventajas de nuestra arquitectura Docker:
+
+- **Orquestación con Docker Compose:** Levanta el ecosistema completo (Frontend, Backend, DB, Redis) con un solo comando.
+- **Nginx como Reverse Proxy:** El contenedor de frontend incluye Nginx pre-configurado para servir los assets estáticos y actuar como gateway hacia la API del backend, eliminando problemas de CORS y latencia.
+- **Auto-Migraciones:** El contenedor de Backend ejecuta automáticamente `prisma migrate deploy` al iniciar, asegurando que la base de datos esté siempre sincronizada con el código.
+- **Imágenes Multi-Stage:** Dockerfiles optimizados para producción (basados en Alpine Linux) para reducir el tamaño de las imágenes y aumentar la seguridad.
+
+---
+
 ## 🎯 ¿Por qué elegir LDE?
 
 LDE no es solo un "tracker" de GPS. Es un **Sistema Operativo Logístico**. Permite que una empresa pequeña opere con la misma eficiencia tecnológica que una multinacional, automatizando la asignación, el seguimiento y la auditoría de cada entrega.
 
-_Documento actualizado el 2026-02-09 con Arquitectura Full-Stack._
+_Documento actualizado el 2026-02-11 con Arquitectura Dockerizada._

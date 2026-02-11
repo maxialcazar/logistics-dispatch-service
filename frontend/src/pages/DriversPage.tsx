@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Users, UserPlus, X, Loader2, AlertCircle, Shield } from 'lucide-react';
+import { Users, UserPlus, X, Loader2, AlertCircle, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { driverService, type Driver } from '../services/driverService';
+import { driverService, type AppDriver } from '../services/driverService';
 
 export function DriversPage() {
   const { token } = useAuth();
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<AppDriver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   

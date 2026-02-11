@@ -18,7 +18,7 @@ npm test
 npm test -- --watch
 ```
 
-> **Nota:** Los tests requieren una instancia de Redis corriendo (o Docker). Si el test falla por `ECONNREFUSED`, asegúrate de que Redis esté activo en el puerto 6379 o configura `.env`.
+> **Nota:** Los tests requieren una instancia de Redis corriendo (o Docker). Si el test falla por `ECONNREFUSED`, asegúrate de que Redis esté activo en el puerto **6380** (mapeado desde el 6379 de Docker) o configura `.env`.
 
 ---
 
@@ -44,39 +44,33 @@ Este no es un simple script de "ping"; es un simulador de tráfico realista que 
 
 Para validar tanto la capacidad bruta como la latencia "percibida" en tiempo real:
 
-1.  **Iniciar Servidor Backend:**
+1.  **Iniciar Infraestructura (Docker):**
+
+    ```bash
+    docker-compose up -d db redis
+    ```
+
+2.  **Iniciar Servidor Backend:**
 
     ```bash
     npm run dev
     ```
 
-2.  **Abrir Dashboard de Monitoreo:**
+3.  **Abrir Dashboard de Monitoreo:**
     - Navega a `http://localhost:3010/monitor.html`.
     - Haz clic en **"Connect (Auto-Retry)"**.
     - _Nota: Verás errores de conexión hasta que el script cree la empresa._
 
-3.  **Lanzar Simulador de Carga:**
+4.  **Lanzar Simulador de Carga:**
     En otra terminal:
+
     ```bash
+    # Reset de DB para prueba limpia
     npx prisma db push --force-reset
+
+    # Ejecutar script
     npx ts-node scripts/load-test.ts
     ```
-
-### Interpretación del Reporte (2026 Benchmark)
-
-Al finalizar (aprox. 90 segundos), verás una tabla como esta:
-
-```text
-┌─────────┬───────────────────────────────┬───────┬──────────┬────────┬─────────┬─────────┬─────────┐
-│ (index) │ Label                         │ Reqs  │ RPS      │ Err%   │ Med(ms) │ p95(ms) │ p99(ms) │
-├─────────┼───────────────────────────────┼───────┼──────────┼────────┼─────────┼─────────┼─────────┤
-│ 1       │ 'PATCH /drivers/location'     │ 18000 │ '185.0'  │ '0.0%' │ '90'    │ '350'   │ '500'   │
-│ 9       │ 'WS Broadcast Lag'            │ 430000│ '4500.0' │ '0.0%' │ '73'    │ '260'   │ '400'   │
-└─────────┴───────────────────────────────┴───────┴──────────┴────────┴─────────┴─────────┴─────────┘
-```
-
-- **WS Broadcast Lag:** Es la métrica crítica. Mide el tiempo desde que el conductor envía su posición hasta que el monitor la recibe. **Objetivo: < 100ms (Mediana).**
-- **RPS (Throughput):** Volumen total de eventos procesados. **Objetivo: > 4,000 ops/seg.**
 
 ---
 
@@ -84,22 +78,7 @@ Al finalizar (aprox. 90 segundos), verás una tabla como esta:
 
 El sistema expone métricas en tiempo real. Esto es útil para monitorear la salud del servicio durante las pruebas de carga.
 
-**Endpoint:** `GET /api/admin/metrics`
-
-**Respuesta:**
-
-```json
-{
-  "status": "online",
-  "uptime": 345,
-  "resources": { "memory_rss_mb": 120, "memory_heap_mb": 85 },
-  "components": {
-    "database": { "status": "ok", "latency_ms": 2 },
-    "redis": { "status": "ok", "latency_ms": 1 },
-    "websockets": { "connected_clients": 50 }
-  }
-}
-```
+**Endpoint:** `GET http://localhost:3010/api/admin/metrics` (o via Docker porta 3010)
 
 ---
 
@@ -107,5 +86,8 @@ El sistema expone métricas en tiempo real. Esto es útil para monitorear la sal
 
 Para validar la resiliencia:
 
-1.  **Matar Redis:** `docker stop logistics-redis`. El API dejará de transmitir eventos en vivo pero **NO** debe caerse (las peticiones HTTP seguirán funcionando).
-2.  **Saturación:** Ejecuta el `load-test.ts` con `DISPATCHERS_COUNT = 50`. Verás cómo el `p95` aumenta, pero el `Err%` debe mantenerse bajo gracias al Rate Limiting.
+1.  **Matar Redis:** `docker-compose stop redis`. El API dejará de transmitir eventos en vivo pero **NO** debe caerse (las peticiones HTTP seguirán funcionando).
+2.  **Reconexión Automática:** Al volver a encender Redis (`docker-compose start redis`), los sockets deben reconectarse automáticamente en <2s.
+3.  **Saturación:** Ejecuta el `load-test.ts` con `DISPATCHERS_COUNT = 50`. Verás cómo el `p95` aumenta, pero el `Err%` debe mantenerse bajo gracias al Rate Limiting.
+
+_Guía actualizada el 2026-02-11 para entorno Dockerizado._

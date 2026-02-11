@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 
-const URL = import.meta.env.VITE_API_URL || undefined; // Use window origin (proxy) by default
+// Use relative path by default to let Nginx handle proxying
+const URL = import.meta.env.VITE_API_URL || undefined;
 
 class SocketService {
   public socket: Socket | null = null;
@@ -9,6 +10,7 @@ class SocketService {
     if (this.socket) return;
 
     this.socket = io(URL, {
+      path: '/socket.io', // Explicitly set path often helps with Nginx
       auth: { token },
       transports: ['websocket', 'polling'], // Fallback options
       reconnectionAttempts: 5,

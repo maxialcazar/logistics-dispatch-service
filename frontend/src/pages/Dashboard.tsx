@@ -1,4 +1,4 @@
-import { PackageCheck, Truck, Clock, AlertTriangle, Radio, Navigation, CheckCircle, XCircle, Info, LayoutList } from 'lucide-react';
+import { PackageCheck, Truck, Clock, Radio, Navigation, CheckCircle, XCircle, Info, LayoutList } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { packageService } from '../services/packageService';
