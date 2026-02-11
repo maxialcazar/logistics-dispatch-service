@@ -1,0 +1,17 @@
+{
+  "name": "LogiNav Driver App",
+  "short_name": "LogiNav",
+  "description": "Aplicación de navegación y entregas para conductores",
+  "start_url": "/driver",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

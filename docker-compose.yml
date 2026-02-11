@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  backend:
+    container_name: logistics-backend
+    build: .
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=production
+      - PORT=3010
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/logistics?schema=public
+      - REDIS_ENABLED=true
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=super_secret_docker_key
+      - CORS_ORIGIN=*
+    depends_on:
+      - db
+      - redis
+    networks:
+      - logistics-net
+    restart: always
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  frontend:
+    container_name: logistics-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - logistics-net
+    restart: always
+
+  db:
+    container_name: logistics-db
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: logistics
+    ports:
+      - "5433:5432" # Mapped to 5433 host to avoid conflict with local postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - logistics-net
+
+  redis:
+    container_name: logistics-redis
+    image: redis:alpine
+    restart: always
+    ports:
+      - "6380:6379" # Mapped to 6380 to avoid conflict with local redis
+    networks:
+      - logistics-net
+
+networks:
+  logistics-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
