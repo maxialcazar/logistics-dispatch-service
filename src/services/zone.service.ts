@@ -118,4 +118,44 @@ export class ZoneService {
       throw error;
     }
   }
+
+  static async setAllZonesStatus(companyId: string, isActive: boolean) {
+      const where: any = { companyId };
+      
+      // If activating, only include zones with drivers
+      if (isActive) {
+          where.driverId = { not: null };
+      }
+
+      const result = await prisma.zone.updateMany({
+          where,
+          data: { isActive }
+      });
+
+      // If activating, update pending packages to assigned
+      if (isActive) {
+          // Find all zones that were just activated (i.e. possess a driver)
+          const zones = await prisma.zone.findMany({ where: { companyId, isActive: true, driverId: { not: null } }, select: { id: true } });
+          const zoneIds = zones.map(z => z.id);
+
+          if (zoneIds.length > 0) {
+              await prisma.package.updateMany({
+                  where: {
+                      companyId,
+                      zoneId: { in: zoneIds },
+                      status: 'pending'
+                  },
+                  data: {
+                      status: 'assigned',
+                      updatedAt: new Date()
+                  }
+              });
+          }
+      }
+
+      await redis.delPrefix(`zones:${companyId}`);
+      await redis.delPrefix(`drivers:${companyId}`);
+
+      return { count: result.count };
+  }
 }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { driverService } from '../services/driverService';
 import { toast } from 'sonner';
@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 export function useDriverLocation() {
     const { token, user } = useAuth();
     const isDriver = user?.role === 'driver';
+    const lastUpdate = useRef<number>(0);
 
     useEffect(() => {
         if (!token || !isDriver) return;
@@ -13,10 +14,13 @@ export function useDriverLocation() {
         console.log("📍 Starting Location Tracking...");
 
         const success = (pos: GeolocationPosition) => {
+            const now = Date.now();
+            // Throttle: Only update every 10 seconds
+            if (now - lastUpdate.current < 10000) return;
+
             const { latitude, longitude } = pos.coords;
-            // Throttle? The service/backend should handle high frequency, 
-            // but navigator.watchPosition can be chatty. 
-            // Redis write-back buffer handles backend load.
+            lastUpdate.current = now;
+
             driverService.updateLocation(token, latitude, longitude).catch(err => {
                 console.error("Failed to update location", err);
             });

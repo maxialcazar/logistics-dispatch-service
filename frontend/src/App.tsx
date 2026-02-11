@@ -17,7 +17,6 @@ import { DriverDashboard } from "./pages/DriverDashboard";
 import { DriverMap } from "./pages/DriverMap";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { HelpPage } from "./pages/HelpPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { token } = useAuth();
@@ -113,7 +112,6 @@ function AppRoutes() {
         
         {/* System Pages */}
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/help" element={<HelpPage />} />
 
       </Route>
     </Routes>

@@ -31,15 +31,19 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
       onClose();
       setUsername('');
       setPassword('');
-    } catch (err: any) {
-      toast.error(err.message || 'Error al crear despachador', { id: toastId });
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+          toast.error(err.message, { id: toastId });
+      } else {
+          toast.error('Error al crear despachador', { id: toastId });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed top-0 right-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
         
         {/* Header */}

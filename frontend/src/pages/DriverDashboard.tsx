@@ -1,11 +1,13 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package } from '../services/packageService';
-import { MapPin, Truck, Check, X, Navigation, Phone, Clock } from 'lucide-react';
+import { MapPin, Truck, Check, X, Navigation, Phone, Route } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { useDriverLocation } from '../hooks/useDriverLocation';
+
+// ... (existing imports)
 
 export function DriverDashboard() {
   const { token } = useAuth();
@@ -16,17 +18,12 @@ export function DriverDashboard() {
   // Enable Real-Time Tracking
   useDriverLocation();
 
-  useEffect(() => {
-    fetchMyPackages();
-  }, [token]);
-
-  const fetchMyPackages = async () => {
+  const fetchMyPackages = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
       const data = await packageService.getMyPackages(token);
-      // Filter out completed packages? maybe show them if delivered recently?
-      // Assuming we want active tasks primarily.
+      // Filter out completed packages
       const active = data.filter(p => !['delivered', 'cancelled'].includes(p.status));
       setPackages(active);
     } catch (err) {
@@ -35,7 +32,11 @@ export function DriverDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchMyPackages();
+  }, [fetchMyPackages]);
 
   const handleStatusUpdate = async (pkg: Package, newStatus: string) => {
     if (!token) return;
@@ -43,35 +44,91 @@ export function DriverDashboard() {
     const loadingToast = toast.loading('Actualizando estado...');
 
     try {
-        // Do not update location - preserve destination coordinates
         await packageService.updateStatus(token, pkg.id, newStatus);
         
         toast.success(`Paquete ${newStatus === 'delivered' ? 'entregado' : newStatus}`, { id: loadingToast });
         
-        // Optimistic Remove if completed
         if (['delivered', 'cancelled'].includes(newStatus)) {
             setPackages(prev => prev.filter(p => p.id !== pkg.id));
         } else {
-             // Re-fetch to be safe on state transitions
              fetchMyPackages();
         }
 
-    } catch (err: any) {
-        toast.error(err.message || 'Error al actualizar', { id: loadingToast });
+    } catch (err: unknown) {
+        let msg = 'Error al actualizar';
+        if (err instanceof Error) msg = err.message;
+        toast.error(msg, { id: loadingToast });
     } finally {
         setUpdating(null);
     }
   };
 
   const openNavigation = (pkg: Package) => {
-      //if (pkg.lat && pkg.lng) {
-          // Navigate to exact coordinates
-          //window.open(`https://www.google.com/maps/dir/?api=1&destination=${pkg.lat},${pkg.lng}`, '_blank');
-      //}
-    // Fallback: Search by address with Country context to avoid US default
-    const cleanAddress = pkg.recipientAddress.trim();
-    const query = encodeURIComponent(`${cleanAddress}, Argentina`);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
+      if (pkg.lat && pkg.lng) {
+          window.open(`https://www.google.com/maps/dir/?api=1&destination=${pkg.lat},${pkg.lng}`, '_blank');
+      } else {
+          const cleanAddress = pkg.recipientAddress.trim();
+          const query = encodeURIComponent(`${cleanAddress}, Argentina`);
+          window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
+      }
+  };
+
+  const handleOptimizeRoute = () => {
+    if (packages.length < 2) {
+        toast.info("No hay suficientes paquetes para optimizar");
+        return;
+    }
+
+    const toastId = toast.loading("Calculando ruta óptima...");
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const { latitude: startLat, longitude: startLng } = pos.coords;
+            
+            // Separate packages with and without GPS
+            const withGPS = packages.filter(p => p.lat && p.lng);
+            const withoutGPS = packages.filter(p => !p.lat || !p.lng);
+
+            // Nearest Neighbor Algorithm
+            let currentLat = startLat;
+            let currentLng = startLng;
+            const optimized: Package[] = [];
+            const remaining = [...withGPS];
+
+            while (remaining.length > 0) {
+                // Find closest to current point
+                let closestIndex = -1;
+                let minDist = Infinity;
+
+                remaining.forEach((p, idx) => {
+                    // Simple Euclidean is sufficient for local sorting, 
+                    // Haversine is better but costly for many points in JS loop.
+                    // d = sqrt((x2-x1)^2 + (y2-y1)^2)
+                    const d = Math.pow(p.lat! - currentLat, 2) + Math.pow(p.lng! - currentLng, 2);
+                    if (d < minDist) {
+                        minDist = d;
+                        closestIndex = idx;
+                    }
+                });
+
+                if (closestIndex !== -1) {
+                    const nextPkg = remaining[closestIndex];
+                    optimized.push(nextPkg);
+                    currentLat = nextPkg.lat!;
+                    currentLng = nextPkg.lng!;
+                    remaining.splice(closestIndex, 1);
+                }
+            }
+
+            // Combine: Optimized GPS + Non-GPS at end
+            setPackages([...optimized, ...withoutGPS]);
+            toast.success("Ruta optimizada por cercanía", { id: toastId });
+        },
+        (err) => {
+            console.error(err);
+            toast.error("No se pudo obtener ubicación para optimizar", { id: toastId });
+        }
+    );
   };
 
   if (loading) {
@@ -95,7 +152,15 @@ export function DriverDashboard() {
     <div className="p-4 space-y-4 pb-24">
        <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
            <span>Mis Entregas ({packages.length})</span>
-           <button onClick={() => fetchMyPackages()} className="text-xs text-blue-400 bg-blue-900/20 px-2 py-1 rounded">Refrescar</button>
+           <div className="flex gap-2">
+               <button 
+                  onClick={handleOptimizeRoute} 
+                  className="text-xs text-purple-400 bg-purple-900/20 px-2 py-1 rounded border border-purple-500/20 flex items-center gap-1 hover:bg-purple-900/40 transition-colors"
+                >
+                  <Route size={12} /> Optimizar
+               </button>
+               <button onClick={() => fetchMyPackages()} className="text-xs text-blue-400 bg-blue-900/20 px-2 py-1 rounded hover:bg-blue-900/40 transition-colors">Refrescar</button>
+           </div>
        </h2>
        
        {packages.map(pkg => (

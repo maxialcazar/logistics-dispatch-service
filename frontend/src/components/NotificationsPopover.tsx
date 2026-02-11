@@ -18,7 +18,7 @@ export function NotificationsPopover({ isOpen, onClose }: Props) {
         {/* Backdrop to close */}
         <div className="fixed inset-0 z-40" onClick={onClose} />
 
-        <div className="absolute right-20 top-16 w-80 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute right-200 top-0 w-80 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="p-3 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center">
                 <h3 className="font-bold text-white text-sm flex items-center gap-2">
                     <Bell size={14} className="text-blue-400" /> Notificaciones

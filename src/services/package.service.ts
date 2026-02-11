@@ -431,10 +431,37 @@ export class PackageService {
         avgTimeMinutes = Math.floor((totalTimeMs / deliveredPackages.length) / 1000 / 60);
     }
 
+    // 4. Zone Distribution (Active Packages)
+    const activeDistribution = await prisma.package.groupBy({
+        by: ['zoneId'],
+        where: {
+            companyId,
+            status: { in: ['pending', 'assigned', 'in_transit'] }
+        },
+        _count: {
+            _all: true
+        }
+    });
+
+    // Get Zone Names
+    const zones = await prisma.zone.findMany({
+        where: { companyId },
+        select: { id: true, name: true }
+    });
+
+    const zoneStats = activeDistribution.map(item => {
+        const zone = zones.find(z => z.id === item.zoneId);
+        return {
+            name: zone?.name || 'Sin Zona',
+            value: item._count._all
+        };
+    });
+
     return {
         deliveredToday: deliveredTodayCount,
         inTransit: inTransitCount,
-        avgDeliveryTimeMinutes: avgTimeMinutes
+        avgDeliveryTimeMinutes: avgTimeMinutes,
+        zoneDistribution: zoneStats
     };
   }
 }

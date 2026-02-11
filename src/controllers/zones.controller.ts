@@ -45,3 +45,18 @@ export async function updateZone(req: AuthRequest, res: Response) {
       res.status(500).json({ error: 'Failed to update zone' });
   }
 }
+
+export async function setAllZonesStatus(req: AuthRequest, res: Response) {
+    const isActive = req.body.isActive as boolean;
+    if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ error: 'isActive boolean is required' });
+    }
+
+    try {
+        const result = await ZoneService.setAllZonesStatus(req.user!.companyId, isActive);
+        res.json(result);
+    } catch (error) {
+        console.error("Bulk Zone Update Error:", error);
+        res.status(500).json({ error: 'Failed to update zones' });
+    }
+}

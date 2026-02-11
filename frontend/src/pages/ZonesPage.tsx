@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Plus, Map, X, Loader2, AlertCircle, User, Search, Check, Power, Truck } from 'lucide-react';
+import { Plus, Map, User, Search, Check, Power, Truck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { zoneService, type Zone } from '../services/zoneService';
 import { driverService, type Driver } from '../services/driverService';
@@ -8,6 +8,8 @@ import { Modal } from '../components/Modal';
 import { Skeleton } from '../components/Skeleton';
 import { toast } from 'sonner';
 import clsx from 'clsx';
+
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export function ZonesPage() {
   const { token } = useAuth();
@@ -25,9 +27,21 @@ export function ZonesPage() {
   const [searchDriver, setSearchDriver] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, [token]);
+  // Confirm Dialog
+  const [confirmConfig, setConfirmConfig] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      variant: 'danger' | 'warning' | 'info';
+      onConfirm: () => Promise<void>;
+  }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      variant: 'info',
+      onConfirm: async () => {},
+  });
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const fetchData = async () => {
     if (!token) return;
@@ -38,13 +52,18 @@ export function ZonesPage() {
       ]);
       setZones(zonesData.items || []);
       setDrivers(driversData.items || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error('Error al cargar datos');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleCreateZone = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,8 +79,12 @@ export function ZonesPage() {
       setNewZoneName('');
       setShowCreateModal(false);
       fetchData(); 
-    } catch (err: any) {
-      toast.error(err.message || 'Error al crear zona', { id: toastId });
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+           toast.error(err.message, { id: toastId });
+      } else {
+           toast.error('Error al crear zona', { id: toastId });
+      }
     } finally {
       setCreateLoading(false);
     }
@@ -87,8 +110,9 @@ export function ZonesPage() {
         if (newStatus) {
             toast.info('Los paquetes pendientes en esta zona han sido asignados al conductor');
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         toast.error('Error al actualizar estado', { id: toastId });
+        console.error(err);
     }
   };
 
@@ -105,34 +129,56 @@ export function ZonesPage() {
           setAssignZone(null);
           // Refresh to get full object updates or do manual optimistic
           fetchData();
-      } catch (err: any) {
+      } catch (err: unknown) {
           toast.error('Error al asignar conductor', { id: toastId });
+          console.error(err);
       } finally {
           setActionLoading(false);
       }
   };
 
+  const handleBulkStatus = (isActive: boolean) => {
+    setConfirmConfig({
+        isOpen: true,
+        title: isActive ? 'Activar Todas las Zonas' : 'Desactivar Todas las Zonas',
+        message: isActive 
+             ? '¿Estás seguro de que deseas activar todas las zonas que tienen un conductor asignado? Esta acción asignará automáticamente los paquetes pendientes.' 
+             : '¿Estás seguro de que deseas desactivar TODAS las zonas? Los conductores dejarán de recibir nuevas asignaciones.',
+        variant: isActive ? 'info' : 'warning', // Warning for deactivation is safer than danger
+        onConfirm: async () => {
+             setConfirmLoading(true);
+             const toastId = toast.loading(isActive ? 'Activando zonas...' : 'Desactivando zonas...');
+             try {
+                 await zoneService.setAllZonesStatus(token!, isActive);
+                 toast.success(isActive ? 'Zonas activadas' : 'Zonas desactivadas', { id: toastId });
+                 await fetchData();
+                 setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+             } catch (err: unknown) {
+                 if (err instanceof Error) {
+                      toast.error(err.message, { id: toastId });
+                 } else {
+                      toast.error('Error al actualizar estado masivo', { id: toastId });
+                 }
+             } finally {
+                 setConfirmLoading(false);
+             }
+        }
+    });
+  };
+
+  /*
   const handleUnassignDriver = async (zone: Zone) => {
-      if (!confirm('¿Desasignar conductor de esta zona?')) return; // Could use another modal but keep it simple or user request? Assuming they want aesthetic everywhere..
-      // Actually user asked for aesthetic popup only for "Assign". For unassign let's assume standard behavior or re-open modal. 
-      // Let's implement unassign insde the card as a small X button.
-      
+      if (!confirm('¿Desasignar conductor de esta zona?')) return;
       const toastId = toast.loading('Desasignando...');
       try {
-          await zoneService.updateZone(token!, zone.id, { driverId: null }); // BE needs to handle null
-          // If we pass null to updateZone driverId, does it remove it?
-          // My updateZone in service takes `driverId?: string`. Passing null might be tricky in TS if not typed `string | null`.
-          // Let's check service. YES I typed it `driverId?: string`. Passing null may be ignored by JSON.stringify if not careful, 
-          // or TS error. I should fetch with `driverId: null` explicitly.
-          // For now let's try passing empty string or specific flag. 
-          // Actually prisma update `driverId: null` works. Service needs `driverId?: string | null`.
-          
+          await zoneService.updateZone(token!, zone.id, { driverId: undefined });
           toast.success('Conductor desasignado', { id: toastId });
           setZones(prev => prev.map(z => z.id === zone.id ? { ...z, driver: undefined, isActive: false } : z));
       } catch (err) {
           toast.error('Error al desasignar');
       }
   };
+  */
 
   // Filter drivers for modal
   const modalDrivers = drivers.filter(d => 
@@ -162,13 +208,30 @@ export function ZonesPage() {
           </h1>
           <p className="text-slate-400 mt-1">Administra y asigna conductores a tus zonas geográficas.</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg shadow-lg shadow-purple-900/30 transition-all"
-        >
-          <Plus className="h-5 w-5" />
-          Nueva Zona
-        </button>
+          <div className="flex gap-2">
+            <button
+               onClick={() => handleBulkStatus(false)}
+               className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg border border-slate-700 transition-all hover:text-white"
+            >
+              <Power className="h-4 w-4 text-slate-400" />
+              <span className="hidden sm:inline">Desactivar Todas</span>
+            </button>
+            <button
+               onClick={() => handleBulkStatus(true)}
+               className="flex items-center gap-2 px-4 py-2 bg-green-600/10 hover:bg-green-600/20 text-green-400 font-medium rounded-lg border border-green-600/20 hover:border-green-600/30 transition-all"
+            >
+              <Power className="h-4 w-4" />
+              <span className="hidden sm:inline">Activar Todas</span>
+            </button>
+            <div className="w-px h-8 bg-slate-800 mx-2 hidden sm:block"></div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg shadow-lg shadow-purple-900/30 transition-all"
+            >
+              <Plus className="h-5 w-5" />
+              <span className="hidden sm:inline">Nueva Zona</span>
+            </button>
+          </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto min-h-0 pb-4 pr-2">
@@ -341,6 +404,16 @@ export function ZonesPage() {
               </div>
           </div>
       </Modal>
+
+      <ConfirmDialog 
+          isOpen={confirmConfig.isOpen}
+          onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+          onConfirm={confirmConfig.onConfirm}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          variant={confirmConfig.variant}
+          isLoading={confirmLoading}
+      />
     </div>
   );
 }

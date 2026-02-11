@@ -67,5 +67,18 @@ export const zoneService = {
       });
       if (!res.ok) throw new Error('Failed to delete zone');
       return true;
+  },
+
+  async setAllZonesStatus(token: string, isActive: boolean) {
+      const res = await fetch('/api/zones/bulk-status', {
+          method: 'POST',
+          headers: { 
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}` 
+          },
+          body: JSON.stringify({ isActive })
+      });
+      if (!res.ok) throw new Error('Failed to update all zones');
+      return res.json();
   }
 };

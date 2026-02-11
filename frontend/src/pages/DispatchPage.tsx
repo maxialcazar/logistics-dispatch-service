@@ -6,7 +6,7 @@ import { zoneService } from '../services/zoneService';
 import { MapPin, Truck, Search, GripVertical, CheckCircle, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
-import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface Zone {
     id: string;
@@ -30,13 +30,20 @@ export function DispatchPage() {
     const [searchDriver, setSearchDriver] = useState('');
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
-    // Confirmation Modal State
-    const [confirmAction, setConfirmAction] = useState<{
-        type: 'assign' | 'remove';
-        driver: Driver;
-        zoneId: string;
-        zoneName: string;
-    } | null>(null);
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        variant: 'danger' | 'warning' | 'info';
+        onConfirm: () => Promise<void>;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        variant: 'info',
+        onConfirm: async () => {},
+    });
+    const [confirmLoading, setConfirmLoading] = useState(false);
 
     // Initial Load
     useEffect(() => {
@@ -78,12 +85,12 @@ export function DispatchPage() {
             return;
         }
 
-        // Open Modal
-        setConfirmAction({
-            type: 'assign',
-            driver,
-            zoneId,
-            zoneName
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Confirmar Asignación',
+            message: `¿Estás seguro de asignar la zona "${zoneName}" al conductor ${driver.name}?`,
+            variant: 'info',
+            onConfirm: () => performAction('assign', driver, zoneId, zoneName)
         });
     };
 
@@ -91,20 +98,17 @@ export function DispatchPage() {
         const zone = driver.zones.find(z => z.id === zoneId);
         if (!zone) return;
 
-        // Open Modal
-        setConfirmAction({
-            type: 'remove',
-            driver,
-            zoneId,
-            zoneName: zone.name
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Confirmar Retiro',
+            message: `¿Estás seguro de retirar la zona "${zone.name}" del conductor ${driver.name}? El conductor dejará de recibir actualizaciones para esta zona inmediatamente.`,
+            variant: 'warning',
+            onConfirm: () => performAction('remove', driver, zoneId, zone.name)
         });
     };
 
-    // Execute Logic (called by Modal Confirm)
-    const executeAction = async () => {
-        if (!confirmAction) return;
-
-        const { type, driver, zoneId, zoneName } = confirmAction;
+    const performAction = async (type: 'assign' | 'remove', driver: Driver, zoneId: string, zoneName: string) => {
+        setConfirmLoading(true);
         setLoadingAction(driver.id);
         const toastId = toast.loading(type === 'assign' ? 'Asignando zona...' : 'Desasignando zona...');
 
@@ -132,12 +136,14 @@ export function DispatchPage() {
                 return d;
             }));
 
+            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
         } catch (err) {
             toast.error('Error al realizar la acción', { id: toastId });
             console.error(err);
         } finally {
             setLoadingAction(null);
-            setConfirmAction(null);
+            setConfirmLoading(false);
         }
     };
 
@@ -153,55 +159,15 @@ export function DispatchPage() {
 
     return (
         <div className="h-[calc(100vh-100px)] flex flex-col space-y-4">
-            {/* Modal */}
-            <Modal 
-                isOpen={!!confirmAction} 
-                onClose={() => setConfirmAction(null)}
-                title={confirmAction?.type === 'assign' ? 'Confirmar Asignación' : 'Confirmar Retiro'}
-                footer={
-                    <>
-                        <button 
-                            onClick={() => setConfirmAction(null)} 
-                            className="px-4 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-sm font-medium"
-                        >
-                            Cancelar
-                        </button>
-                        <button 
-                            onClick={executeAction} 
-                            className={clsx(
-                                "px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors shadow-lg",
-                                confirmAction?.type === 'assign' 
-                                    ? "bg-blue-600 hover:bg-blue-500 shadow-blue-900/20" 
-                                    : "bg-red-600 hover:bg-red-500 shadow-red-900/20"
-                            )}
-                        >
-                            {confirmAction?.type === 'assign' ? 'Asignar Zona' : 'Retirar Zona'}
-                        </button>
-                    </>
-                }
-            >
-                {confirmAction && (
-                    <div className="space-y-3">
-                        <p className="text-slate-400">
-                            {confirmAction.type === 'assign' 
-                                ? `¿Estás seguro de asignar la zona ` 
-                                : `¿Estás seguro de retirar la zona `
-                            }
-                            <span className="text-purple-400 font-semibold">{confirmAction.zoneName}</span>
-                            {confirmAction.type === 'assign' ? ' al conductor ' : ' del conductor '}
-                            <span className="text-blue-400 font-semibold">{confirmAction.driver.name}</span>?
-                        </p>
-                        {confirmAction.type === 'remove' && (
-                            <div className="p-3 bg-red-900/10 border border-red-900/30 rounded-lg flex items-start gap-3">
-                                <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                                <p className="text-xs text-red-400">
-                                    El conductor dejará de recibir actualizaciones para esta zona inmediatamente.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </Modal>
+            <ConfirmDialog 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                variant={confirmConfig.variant}
+                isLoading={confirmLoading}
+            />
 
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                 <GripVertical className="h-6 w-6 text-blue-500" />    

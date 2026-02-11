@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getZones, createZone, updateZone } from "../controllers/zones.controller";
+import { getZones, createZone, updateZone, setAllZonesStatus } from "../controllers/zones.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
@@ -60,6 +60,7 @@ router.use(auth);
  *                       type: integer
  */
 // allow admin to create zones too
+router.post("/bulk-status", requireRole("dispatcher", "admin"), setAllZonesStatus);
 router.get("/", requireRole("dispatcher", "admin"), getZones);
 
 /**

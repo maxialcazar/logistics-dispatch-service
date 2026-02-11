@@ -56,8 +56,12 @@ export function SettingsPage() {
           }
 
           toast.success('Configuración actualizada correctamente', { id: toastId });
-      } catch (err: any) {
-          toast.error(err.message || 'Error al guardar cambios', { id: toastId });
+      } catch (err: unknown) {
+          if (err instanceof Error) {
+              toast.error(err.message, { id: toastId });
+          } else {
+              toast.error('Error al guardar cambios', { id: toastId });
+          }
       } finally {
           setSaving(false);
       }
