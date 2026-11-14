@@ -1,5 +1,8 @@
 import { prisma } from "../prisma";
 import { redis } from "../redis";
+import { detectZone as geoDetectZone } from "../utils/geofencing";
+
+type Coord = [number, number];
 
 export class ZoneService {
   static async getAllZones(companyId: string, filters: { name?: string; page?: number; limit?: number } = {}) {
@@ -43,9 +46,19 @@ export class ZoneService {
     return result;
   }
 
-  static async createZone(companyId: string, name: string, description?: string) {
+  static async createZone(
+    companyId: string,
+    name: string,
+    description?: string,
+    polygon?: Coord[]
+  ) {
     const zone = await prisma.zone.create({ 
-      data: { name, description, companyId } 
+      data: { 
+        name, 
+        description, 
+        companyId,
+        ...(polygon ? { polygon } : {}),
+      } 
     });
     
     await redis.delPrefix(`zones:${companyId}:`); 
@@ -60,6 +73,7 @@ export class ZoneService {
       description?: string; 
       driverId?: string | null; 
       name?: string;
+      polygon?: Coord[] | null;
     }
   ) {
     try {
@@ -80,7 +94,8 @@ export class ZoneService {
           description: data.description,
           isActive: data.isActive,
           driverId: data.driverId,
-          name: data.name
+          name: data.name,
+          ...(data.polygon !== undefined ? { polygon: data.polygon as any } : {}),
         },
         include: { driver: true }
       });
@@ -156,5 +171,18 @@ export class ZoneService {
       await redis.delPrefix(`drivers:${companyId}`);
 
       return { count: result.count };
+  }
+
+  /**
+   * Auto-detect which zone contains the given coordinates.
+   * Evaluates all zones with a defined polygon for the company.
+   * Returns the matching zone or null if none match.
+   */
+  static async detectZone(
+    companyId: string,
+    lat: number,
+    lng: number
+  ): Promise<{ id: string; name: string } | null> {
+    return geoDetectZone(companyId, lat, lng);
   }
 }

@@ -77,7 +77,7 @@ export async function getPackagesByDriver(req: AuthRequest, res: Response) {
 
 export async function updatePackageStatus(req: AuthRequest, res: Response) {
   const { packageId } = req.params;
-  const { status, lat, lng, estimatedDeliveryAt } = req.body;
+  const { status, lat, lng, estimatedDeliveryAt, signature, photo } = req.body;
 
   try {
     const updated = await PackageService.updateStatus(req.user!.companyId, {
@@ -89,11 +89,14 @@ export async function updatePackageStatus(req: AuthRequest, res: Response) {
       lat,
       lng,
       estimatedDeliveryAt: estimatedDeliveryAt ? new Date(estimatedDeliveryAt) : undefined,
+      signature,
+      photo,
     });
     res.json(updated);
   } catch (error: any) {
     if (error.message === "package_not_found") {
       return res.status(404).json({ error: "package not found" });
+      
     }
     if (error.message === "not_authorized_for_zone") {
       return res.status(403).json({ error: "not authorized for this zone" });

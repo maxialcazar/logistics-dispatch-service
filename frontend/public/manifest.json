@@ -1,17 +1,22 @@
 {
-  "name": "LogiNav Driver App",
-  "short_name": "LogiNav",
-  "description": "Aplicación de navegación y entregas para conductores",
-  "start_url": "/driver",
+  "name": "Logistics Dispatch — Driver App",
+  "short_name": "Dispatch",
+  "description": "Aplicación móvil para conductores del servicio de despacho logístico.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "lang": "es",
   "icons": [
     {
       "src": "/vite.svg",
-      "sizes": "512x512",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false
 }

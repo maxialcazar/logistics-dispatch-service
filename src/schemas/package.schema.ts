@@ -41,6 +41,9 @@ export const updatePackageStatusSchema = z.object({
     lat: z.number().optional(),
     lng: z.number().optional(),
     estimatedDeliveryAt: z.string().datetime().optional(),
+    // Proof of Delivery (POD) - only relevant when status is 'delivered'
+    signature: z.string().optional(), // Base64 data URI of the recipient's signature
+    photo: z.string().optional(),     // Base64 data URI of the delivery photo evidence
   }),
 });
 

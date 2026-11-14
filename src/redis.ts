@@ -74,6 +74,18 @@ export const redis = {
     async hDel(key: string, ...fields: string[]) {
         if (!redisEnabled || !client.isOpen) return;
         await client.hDel(key, fields);
+    },
+    async rename(oldKey: string, newKey: string): Promise<boolean> {
+        if (!redisEnabled || !client.isOpen) return false;
+        try {
+            await client.rename(oldKey, newKey);
+            return true;
+        } catch (error: any) {
+            if (error.message && error.message.includes("no such key")) {
+                return false;
+            }
+            throw error;
+        }
     }
 };
 

@@ -12,6 +12,9 @@ export function useDriverLocation() {
         if (!token || !isDriver) return;
 
         const success = (pos: GeolocationPosition) => {
+            // Skip location updates when offline — no point trying to reach the server
+            if (!navigator.onLine) return;
+
             const now = Date.now();
             // Throttle: Only update every 10 seconds
             if (now - lastUpdate.current < 10000) return;
@@ -20,7 +23,7 @@ export function useDriverLocation() {
             lastUpdate.current = now;
 
             driverService.updateLocation(token, latitude, longitude).catch(() => {
-                // Silent fail or retry logic here
+                // Silent fail — the network may be briefly unstable
             });
         };
 

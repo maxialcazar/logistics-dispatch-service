@@ -43,7 +43,7 @@ RUN npx prisma generate
 RUN mkdir logs
 
 # Expose API port
-EXPOSE 3001
+EXPOSE 3010
 
 # Start application
 CMD ["npm", "start"]

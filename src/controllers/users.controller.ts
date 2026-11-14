@@ -9,7 +9,7 @@ export async function createUser(req: AuthRequest, res: Response) {
   } catch (error: any) {
     if (error.message === "username_exists") {
     }
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(400).json({ error: "username already exists" });
   }
 }
 

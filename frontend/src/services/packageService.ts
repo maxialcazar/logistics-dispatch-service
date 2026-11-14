@@ -126,14 +126,20 @@ export const packageService = {
       return res.json();
   },
 
-  async updateStatus(token: string, packageId: string, status: string, lat?: number, lng?: number) {
+  async updateStatus(token: string, packageId: string, status: string, lat?: number, lng?: number, signature?: string, photo?: string) {
       const res = await fetch(`/api/packages/${packageId}/status`, {
           method: 'PATCH',
           headers: { 
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}` 
           },
-          body: JSON.stringify({ status, lat, lng })
+          body: JSON.stringify({ 
+            status, 
+            lat, 
+            lng,
+            ...(signature && { signature }),
+            ...(photo && { photo }),
+          })
       });
       
       if (!res.ok) {

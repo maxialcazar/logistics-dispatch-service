@@ -5,21 +5,19 @@ services:
     container_name: logistics-backend
     build: .
     ports:
-      - "3010:3010"
-    environment:
-      - NODE_ENV=production
-      - PORT=3010
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/logistics?schema=public
-      - REDIS_ENABLED=true
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=super_secret_docker_key
-      - CORS_ORIGIN=*
+      - "${PORT:-3010}:3010"
+    env_file:
+      - .env.production
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - logistics-net
-    restart: always
+    restart: unless-stopped
+    volumes:
+      - uploads_data:/app/public/uploads
     command: sh -c "npx prisma migrate deploy && npm start"
 
   frontend:
@@ -33,18 +31,19 @@ services:
       - backend
     networks:
       - logistics-net
-    restart: always
+    restart: unless-stopped
 
   db:
     container_name: logistics-db
     image: postgres:15-alpine
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: logistics
-    ports:
-      - "5433:5432" # Mapped to 5433 host to avoid conflict with local postgres
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-logistics}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -52,10 +51,54 @@ services:
 
   redis:
     container_name: logistics-redis
-    image: redis:alpine
-    restart: always
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - logistics-net
+
+  # ── Monitoring ────────────────────────────────────────────────────────────
+  prometheus:
+    container_name: logistics-prometheus
+    image: prom/prometheus:v2.51.2
+    restart: unless-stopped
     ports:
-      - "6380:6379" # Mapped to 6380 to avoid conflict with local redis
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - backend
+    networks:
+      - logistics-net
+
+  grafana:
+    container_name: logistics-grafana
+    image: grafana/grafana:10.4.3
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-logistics_admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_DOMAIN: localhost
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus
     networks:
       - logistics-net
 
@@ -65,3 +108,6 @@ networks:
 
 volumes:
   postgres_data:
+  uploads_data:
+  prometheus_data:
+  grafana_data:

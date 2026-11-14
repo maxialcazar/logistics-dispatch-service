@@ -1,26 +1,274 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package } from '../services/packageService';
-import { MapPin, Truck, Check, X, Navigation, Phone, Route } from 'lucide-react';
+import { MapPin, Truck, Check, X, Navigation, Phone, Route, Camera, PenLine, Trash2, ShieldCheck, WifiOff, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { useDriverLocation } from '../hooks/useDriverLocation';
+import { useOfflineSync } from '../hooks/useOfflineSync';
+import { enqueueStatusUpdate } from '../services/offlineQueue';
 
+// ---------- Canvas Signature Pad Hook ----------
+function useSignaturePad(canvasRef: React.RefObject<HTMLCanvasElement>) {
+  const isDrawing = useRef(false);
+
+  const getPos = (e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const source = 'touches' in e ? e.touches[0] : e;
+    return {
+      x: (source.clientX - rect.left) * (canvas.width / rect.width),
+      y: (source.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  };
+
+  const startDraw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    e.preventDefault();
+    isDrawing.current = true;
+    const ctx = canvas.getContext('2d')!;
+    const pos = getPos(e.nativeEvent as MouseEvent | TouchEvent, canvas);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }, [canvasRef]);
+
+  const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    e.preventDefault();
+    const ctx = canvas.getContext('2d')!;
+    const pos = getPos(e.nativeEvent as MouseEvent | TouchEvent, canvas);
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#e2e8f0'; // slate-200
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  }, [canvasRef]);
+
+  const endDraw = useCallback(() => {
+    isDrawing.current = false;
+  }, []);
+
+  const clearCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }, [canvasRef]);
+
+  const isEmpty = useCallback((): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return true;
+    const ctx = canvas.getContext('2d')!;
+    const pixelBuffer = new Uint32Array(
+      ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer
+    );
+    return !pixelBuffer.some(color => color !== 0);
+  }, [canvasRef]);
+
+  const getDataUrl = useCallback((): string | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    return canvas.toDataURL('image/png');
+  }, [canvasRef]);
+
+  return { startDraw, draw, endDraw, clearCanvas, isEmpty, getDataUrl };
+}
+
+// ---------- POD Modal Component ----------
+interface PODModalProps {
+  pkg: Package;
+  onConfirm: (pkg: Package, signature: string | null, photo: string | null) => void;
+  onClose: () => void;
+}
+
+function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { startDraw, draw, endDraw, clearCanvas, isEmpty, getDataUrl } = useSignaturePad(canvasRef);
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setPhotoDataUrl(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleConfirm = () => {
+    const sig = isEmpty() ? null : getDataUrl();
+    setSubmitting(true);
+    onConfirm(pkg, sig, photoDataUrl);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal Sheet */}
+      <div className="relative w-full sm:max-w-md bg-slate-900 border border-slate-700/50 rounded-t-3xl sm:rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-slate-700" />
+        </div>
+
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center border border-green-500/20">
+              <ShieldCheck className="h-4 w-4 text-green-400" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm">Confirmar Entrega</h3>
+              <p className="text-xs text-slate-500 font-mono">#{pkg.trackingCode}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-5 overflow-y-auto max-h-[80vh]">
+          {/* Recipient info */}
+          <div className="bg-slate-800/50 rounded-xl p-3 flex items-start gap-3 border border-slate-700/30">
+            <MapPin className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-white text-sm font-semibold">{pkg.recipientName}</p>
+              <p className="text-slate-400 text-xs leading-tight mt-0.5">{pkg.recipientAddress}</p>
+            </div>
+          </div>
+
+          {/* Signature Pad */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <PenLine size={12} />
+                Firma del Receptor
+              </label>
+              <button
+                onClick={clearCanvas}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-400 transition-colors"
+              >
+                <Trash2 size={11} />
+                Borrar
+              </button>
+            </div>
+            <div className="relative rounded-xl overflow-hidden border-2 border-dashed border-slate-700 bg-slate-950 hover:border-slate-600 transition-colors">
+              <canvas
+                ref={canvasRef}
+                width={380}
+                height={140}
+                className="w-full touch-none cursor-crosshair block"
+                onMouseDown={startDraw}
+                onMouseMove={draw}
+                onMouseUp={endDraw}
+                onMouseLeave={endDraw}
+                onTouchStart={startDraw}
+                onTouchMove={draw}
+                onTouchEnd={endDraw}
+              />
+              <p className="absolute inset-0 flex items-center justify-center text-slate-600 text-xs pointer-events-none select-none font-medium">
+                Firmar aquí
+              </p>
+            </div>
+          </div>
+
+          {/* Photo Evidence */}
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+              <Camera size={12} />
+              Foto de Evidencia (Opcional)
+            </label>
+
+            {photoDataUrl ? (
+              <div className="relative rounded-xl overflow-hidden border border-slate-700">
+                <img
+                  src={photoDataUrl}
+                  alt="Evidencia de entrega"
+                  className="w-full max-h-44 object-cover"
+                />
+                <button
+                  onClick={() => setPhotoDataUrl(null)}
+                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white hover:bg-red-600 transition-colors"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 hover:border-blue-500/50 hover:bg-slate-900 transition-all flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-blue-400"
+              >
+                <Camera size={24} />
+                <span className="text-xs font-medium">Tomar foto del paquete</span>
+              </button>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoCapture}
+            />
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="px-5 py-4 border-t border-slate-800 grid grid-cols-2 gap-3">
+          <button
+            onClick={onClose}
+            className="py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 font-medium transition-all text-sm"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={submitting}
+            className={clsx(
+              "py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
+              submitting
+                ? "bg-green-700/50 text-green-300 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30 active:scale-95"
+            )}
+          >
+            <Check size={16} />
+            {submitting ? 'Enviando...' : 'Confirmar Entrega'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Main DriverDashboard ----------
 export function DriverDashboard() {
   const { token } = useAuth();
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [podPackage, setPodPackage] = useState<Package | null>(null);
 
-  // Enable Real-Time Tracking
+  // Enable Real-Time GPS Tracking
   useDriverLocation();
+
+  // Offline sync — drains IndexedDB queue when connectivity is restored
+  const { isOnline, pendingCount, syncNow } = useOfflineSync({ token });
 
   const fetchMyPackages = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
       const data = await packageService.getMyPackages(token);
-      // Filter out completed packages
+      // Filter out completed packages from the active list
       const active = data.filter(p => !['delivered', 'cancelled'].includes(p.status));
       setPackages(active);
     } catch (err) {
@@ -35,206 +283,293 @@ export function DriverDashboard() {
     fetchMyPackages();
   }, [fetchMyPackages]);
 
+  // Generic status update (for non-delivery transitions)
   const handleStatusUpdate = async (pkg: Package, newStatus: string) => {
     if (!token) return;
     setUpdating(pkg.id);
-    const loadingToast = toast.loading('Actualizando estado...');
 
-    try {
-        await packageService.updateStatus(token, pkg.id, newStatus);
-        
-        toast.success(`Paquete ${newStatus === 'delivered' ? 'entregado' : newStatus}`, { id: loadingToast });
-        
-        if (['delivered', 'cancelled'].includes(newStatus)) {
-            setPackages(prev => prev.filter(p => p.id !== pkg.id));
-        } else {
-             fetchMyPackages();
-        }
-
-    } catch (err: unknown) {
-        let msg = 'Error al actualizar';
-        if (err instanceof Error) msg = err.message;
-        toast.error(msg, { id: loadingToast });
-    } finally {
+    // OFFLINE PATH — queue for later sync
+    if (!isOnline) {
+      try {
+        await enqueueStatusUpdate({ packageId: pkg.id, status: newStatus });
+        toast.warning('Sin conexión — actualización guardada localmente', {
+          description: `Se enviará cuando vuelva la red (${pendingCount + 1} pendiente/s)`,
+          duration: 5000,
+        });
+        // Optimistically update local list so the driver sees the change
+        setPackages(prev => prev.map(p =>
+          p.id === pkg.id ? { ...p, status: newStatus as Package['status'] } : p
+        ));
+      } catch (err) {
+        toast.error('No se pudo guardar la actualización offline');
+      } finally {
         setUpdating(null);
+      }
+      return;
+    }
+
+    // ONLINE PATH
+    const loadingToast = toast.loading('Actualizando estado...');
+    try {
+      await packageService.updateStatus(token, pkg.id, newStatus);
+      toast.success(
+        newStatus === 'in_transit' ? 'Viaje iniciado' : `Estado: ${newStatus}`,
+        { id: loadingToast }
+      );
+      fetchMyPackages();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al actualizar';
+      toast.error(msg, { id: loadingToast });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // POD delivery with signature and photo
+  const handleDeliveryConfirm = async (pkg: Package, signature: string | null, photo: string | null) => {
+    if (!token) return;
+    setPodPackage(null);
+    setUpdating(pkg.id);
+
+    // OFFLINE PATH — queue for later sync
+    if (!isOnline) {
+      try {
+        await enqueueStatusUpdate({
+          packageId: pkg.id,
+          status: 'delivered',
+          signature: signature ?? undefined,
+          photo: photo ?? undefined,
+        });
+        toast.warning('Sin conexión — entrega guardada localmente', {
+          description: `Se sincronizará cuando vuelva la red (${pendingCount + 1} pendiente/s)`,
+          duration: 5000,
+        });
+        setPackages(prev => prev.filter(p => p.id !== pkg.id));
+      } catch (err) {
+        toast.error('No se pudo guardar la entrega offline');
+      } finally {
+        setUpdating(null);
+      }
+      return;
+    }
+
+    // ONLINE PATH
+    const loadingToast = toast.loading('Registrando entrega...');
+    try {
+      await packageService.updateStatus(
+        token, pkg.id, 'delivered',
+        undefined, undefined,
+        signature ?? undefined,
+        photo ?? undefined
+      );
+      toast.success('✅ Entrega confirmada con evidencia', { id: loadingToast });
+      setPackages(prev => prev.filter(p => p.id !== pkg.id));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al confirmar entrega';
+      toast.error(msg, { id: loadingToast });
+    } finally {
+      setUpdating(null);
     }
   };
 
   const openNavigation = (pkg: Package) => {
-      if (pkg.lat && pkg.lng) {
-          window.open(`https://www.google.com/maps/dir/?api=1&destination=${pkg.lat},${pkg.lng}`, '_blank');
-      } else {
-          const cleanAddress = pkg.recipientAddress.trim();
-          const query = encodeURIComponent(`${cleanAddress}, Argentina`);
-          window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
-      }
+    if (pkg.lat && pkg.lng) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${pkg.lat},${pkg.lng}`, '_blank');
+    } else {
+      const query = encodeURIComponent(`${pkg.recipientAddress.trim()}, Argentina`);
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
+    }
   };
 
   const handleOptimizeRoute = () => {
     if (packages.length < 2) {
-        toast.info("No hay suficientes paquetes para optimizar");
-        return;
+      toast.info('No hay suficientes paquetes para optimizar');
+      return;
     }
-
-    const toastId = toast.loading("Calculando ruta óptima...");
-
+    const toastId = toast.loading('Calculando ruta óptima...');
     navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const { latitude: startLat, longitude: startLng } = pos.coords;
-            
-            // Separate packages with and without GPS
-            const withGPS = packages.filter(p => p.lat && p.lng);
-            const withoutGPS = packages.filter(p => !p.lat || !p.lng);
+      (pos) => {
+        const { latitude: startLat, longitude: startLng } = pos.coords;
+        const withGPS = packages.filter(p => p.lat && p.lng);
+        const withoutGPS = packages.filter(p => !p.lat || !p.lng);
 
-            // Nearest Neighbor Algorithm
-            let currentLat = startLat;
-            let currentLng = startLng;
-            const optimized: Package[] = [];
-            const remaining = [...withGPS];
+        let currentLat = startLat;
+        let currentLng = startLng;
+        const optimized: Package[] = [];
+        const remaining = [...withGPS];
 
-            while (remaining.length > 0) {
-                // Find closest to current point
-                let closestIndex = -1;
-                let minDist = Infinity;
-
-                remaining.forEach((p, idx) => {
-                    const d = Math.pow(p.lat! - currentLat, 2) + Math.pow(p.lng! - currentLng, 2);
-                    if (d < minDist) {
-                        minDist = d;
-                        closestIndex = idx;
-                    }
-                });
-
-                if (closestIndex !== -1) {
-                    const nextPkg = remaining[closestIndex];
-                    optimized.push(nextPkg);
-                    currentLat = nextPkg.lat!;
-                    currentLng = nextPkg.lng!;
-                    remaining.splice(closestIndex, 1);
-                }
-            }
-
-            // Combine: Optimized GPS + Non-GPS at end
-            setPackages([...optimized, ...withoutGPS]);
-            toast.success("Ruta optimizada por cercanía", { id: toastId });
-        },
-        (err) => {
-            console.error(err);
-            toast.error("No se pudo obtener ubicación para optimizar", { id: toastId });
+        while (remaining.length > 0) {
+          let closestIndex = -1;
+          let minDist = Infinity;
+          remaining.forEach((p, idx) => {
+            const d = Math.pow(p.lat! - currentLat, 2) + Math.pow(p.lng! - currentLng, 2);
+            if (d < minDist) { minDist = d; closestIndex = idx; }
+          });
+          if (closestIndex !== -1) {
+            const next = remaining[closestIndex];
+            optimized.push(next);
+            currentLat = next.lat!;
+            currentLng = next.lng!;
+            remaining.splice(closestIndex, 1);
+          }
         }
+        setPackages([...optimized, ...withoutGPS]);
+        toast.success('Ruta optimizada por cercanía', { id: toastId });
+      },
+      () => toast.error('No se pudo obtener ubicación para optimizar', { id: toastId })
     );
   };
 
+  // ---------- Render States ----------
   if (loading) {
-      return <div className="p-8 text-center text-slate-500 animate-pulse">Cargando tareas...</div>;
+    return <div className="p-8 text-center text-slate-500 animate-pulse">Cargando tareas...</div>;
   }
 
   if (packages.length === 0) {
-       return (
-          <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full gap-4">
-              <div className="h-20 w-20 bg-slate-800 rounded-full flex items-center justify-center">
-                  <Check className="h-10 w-10 text-green-500" />
-              </div>
-              <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
-              <p>No tienes paquetes pendientes asignados.</p>
-              <button onClick={() => fetchMyPackages()} className="text-blue-500 underline text-sm">Actualizar</button>
-          </div>
-      );
+    return (
+      <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full gap-4">
+        <div className="h-20 w-20 bg-slate-800 rounded-full flex items-center justify-center">
+          <Check className="h-10 w-10 text-green-500" />
+        </div>
+        <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
+        <p>No tienes paquetes pendientes asignados.</p>
+        <button onClick={fetchMyPackages} className="text-blue-500 underline text-sm">Actualizar</button>
+      </div>
+    );
   }
 
   return (
-    <div className="p-4 space-y-4 pb-24 relative">
-       <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
-           <span>Mis Entregas ({packages.length})</span>
-           <div className="flex gap-2">
-               <button 
-                  onClick={handleOptimizeRoute} 
-                  className="text-xs text-purple-400 bg-purple-900/20 px-2 py-1 rounded border border-purple-500/20 flex items-center gap-1 hover:bg-purple-900/40 transition-colors"
+    <>
+      {/* POD Modal */}
+      {podPackage && (
+        <PODModal
+          pkg={podPackage}
+          onConfirm={handleDeliveryConfirm}
+          onClose={() => setPodPackage(null)}
+        />
+      )}
+
+      {/* Offline Banner */}
+      {!isOnline && (
+        <div className="sticky top-0 z-40 flex items-center justify-between gap-3 bg-amber-500/10 border-b border-amber-500/30 px-4 py-2.5 backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-amber-400">
+            <WifiOff size={15} className="flex-shrink-0" />
+            <span className="text-xs font-semibold">
+              Sin conexión{pendingCount > 0 ? ` — ${pendingCount} entrega(s) en cola` : ''}
+            </span>
+          </div>
+          <button
+            onClick={syncNow}
+            className="flex items-center gap-1 text-xs text-amber-300 hover:text-amber-100 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Sincronizar
+          </button>
+        </div>
+      )}
+
+      <div className="p-4 space-y-4 pb-24 relative">
+        <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
+          <span>Mis Entregas ({packages.length})</span>
+          <div className="flex gap-2">
+            <button
+              onClick={handleOptimizeRoute}
+              className="text-xs text-purple-400 bg-purple-900/20 px-2 py-1 rounded border border-purple-500/20 flex items-center gap-1 hover:bg-purple-900/40 transition-colors"
+            >
+              <Route size={12} /> Optimizar
+            </button>
+            <button
+              onClick={fetchMyPackages}
+              className="text-xs text-blue-400 bg-blue-900/20 px-2 py-1 rounded hover:bg-blue-900/40 transition-colors"
+            >
+              Refrescar
+            </button>
+          </div>
+        </h2>
+
+        {packages.map(pkg => (
+          <div key={pkg.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg relative">
+            {/* Status color bar */}
+            <div className={clsx('h-1.5 w-full',
+              pkg.status === 'in_transit' ? 'bg-purple-500 animate-pulse' :
+              pkg.status === 'assigned'   ? 'bg-blue-500' : 'bg-slate-700'
+            )} />
+
+            <div className="p-4">
+              {/* Tracking code + status badge */}
+              <div className="flex justify-between items-start mb-2">
+                <span className="font-mono text-xs text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+                  #{pkg.trackingCode}
+                </span>
+                <span className={clsx(
+                  'text-xs font-bold px-2 py-0.5 rounded-full uppercase',
+                  pkg.status === 'in_transit' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                  pkg.status === 'assigned'   ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                  'bg-slate-700 text-slate-400'
+                )}>
+                  {pkg.status.replace('_', ' ')}
+                </span>
+              </div>
+
+              <h3 className="text-lg font-bold text-white mb-1">{pkg.recipientName}</h3>
+
+              <div className="flex items-start gap-2 text-slate-300 text-sm mb-3">
+                <MapPin className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <span className="leading-tight">{pkg.recipientAddress}</span>
+              </div>
+
+              {pkg.recipientPhone && (
+                <div className="flex items-center gap-2 text-slate-400 text-xs mb-4">
+                  <Phone className="h-3 w-3" />
+                  <span>{pkg.recipientPhone}</span>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <button
+                  onClick={() => openNavigation(pkg)}
+                  className="col-span-2 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-700 transition-all"
                 >
-                  <Route size={12} /> Optimizar
-               </button>
-               <button onClick={() => fetchMyPackages()} className="text-xs text-blue-400 bg-blue-900/20 px-2 py-1 rounded hover:bg-blue-900/40 transition-colors">Refrescar</button>
-           </div>
-       </h2>
-       
-       {packages.map(pkg => (
-           <div key={pkg.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg relative">
-               {/* Header Status Bar */}
-               <div className={clsx("h-1.5 w-full", 
-                   pkg.status === 'in_transit' ? 'bg-purple-500 animate-pulse' : 
-                   pkg.status === 'assigned' ? 'bg-blue-500' : 'bg-slate-700'
-               )} />
+                  <Navigation className="h-4 w-4 text-blue-400" />
+                  Navegar a Destino
+                </button>
 
-               <div className="p-4">
-                   <div className="flex justify-between items-start mb-2">
-                       <span className="font-mono text-xs text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">#{pkg.trackingCode}</span>
-                       <span className={clsx(
-                           "text-xs font-bold px-2 py-0.5 rounded-full uppercase",
-                           pkg.status === 'in_transit' ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" :
-                           pkg.status === 'assigned' ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" : 
-                           "bg-slate-700 text-slate-400"
-                       )}>
-                           {pkg.status.replace('_', ' ')}
-                       </span>
-                   </div>
-
-                   <h3 className="text-lg font-bold text-white mb-1">{pkg.recipientName}</h3>
-                   
-                   <div className="flex items-start gap-2 text-slate-300 text-sm mb-3">
-                       <MapPin className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
-                       <span className="leading-tight">{pkg.recipientAddress}</span>
-                   </div>
-
-                   {pkg.recipientPhone && (
-                       <div className="flex items-center gap-2 text-slate-400 text-xs mb-4">
-                           <Phone className="h-3 w-3" />
-                           <span>{pkg.recipientPhone}</span>
-                       </div>
-                   )}
-                
-                   {/* ACTION BUTTONS */}
-                   <div className="grid grid-cols-2 gap-3 mt-4">
-                       <button 
-                           onClick={() => openNavigation(pkg)}
-                           className="col-span-2 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-700 transition-all"
-                       >
-                           <Navigation className="h-4 w-4 text-blue-400" />
-                           Navegar a Destino
-                       </button>
-
-                       {pkg.status !== 'in_transit' ? (
-                           <button 
-                               onClick={() => handleStatusUpdate(pkg, 'in_transit')}
-                               disabled={!!updating}
-                               className="col-span-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                           >
-                               <Truck className="h-5 w-5" />
-                               Iniciar Viaje
-                           </button>
-                       ) : (
-                           <>
-                               <button 
-                                   onClick={() => handleStatusUpdate(pkg, 'delivered')}
-                                   disabled={!!updating}
-                                   className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                               >
-                                   <Check className="h-5 w-5" />
-                                   Entregado
-                               </button>
-                               <button 
-                                   onClick={() => handleStatusUpdate(pkg, 'cancelled')}
-                                   disabled={!!updating}
-                                   className="bg-red-600/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-500 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                               >
-                                   <X className="h-5 w-5" />
-                                   Fallido
-                               </button>
-                           </>
-                       )}
-                   </div>
-               </div>
-           </div>
-       ))}
-    </div>
+                {pkg.status !== 'in_transit' ? (
+                  <button
+                    onClick={() => handleStatusUpdate(pkg, 'in_transit')}
+                    disabled={!!updating}
+                    className="col-span-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                  >
+                    <Truck className="h-5 w-5" />
+                    Iniciar Viaje
+                  </button>
+                ) : (
+                  <>
+                    {/* Delivery button now opens the POD modal */}
+                    <button
+                      onClick={() => setPodPackage(pkg)}
+                      disabled={!!updating}
+                      className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                    >
+                      <ShieldCheck className="h-5 w-5" />
+                      Entregado
+                    </button>
+                    <button
+                      onClick={() => handleStatusUpdate(pkg, 'cancelled')}
+                      disabled={!!updating}
+                      className="bg-red-600/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-500 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                    >
+                      <X className="h-5 w-5" />
+                      Fallido
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

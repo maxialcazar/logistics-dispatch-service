@@ -81,12 +81,6 @@ export function getIO() {
 	return io;
 }
 
-export function emitToAll(event: string, data: any) {
-	if (io) {
-		io.emit(event, data);
-	}
-}
-
 export function emitToRoom(room: string, event: string, data: any) {
 	if (io) {
 		io.to(room).emit(event, data);

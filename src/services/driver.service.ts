@@ -1,7 +1,7 @@
 import { prisma } from "../prisma";
 import bcrypt from "bcrypt";
 import { redis } from "../redis";
-import { emitToAll } from "../websocket";
+import { emitToRoom } from "../websocket";
 
 export class DriverService {
   static async getAllDrivers(companyId: string, filters: { name?: string; page?: number; limit?: number } = {}) {
@@ -120,7 +120,7 @@ export class DriverService {
       redis.delPrefix(`zones:${companyId}:`),
     ]);
 
-    emitToAll("zones-reassigned", { driverId, zoneIds });
+    emitToRoom(`company-${companyId}`, "zones-reassigned", { driverId, zoneIds });
 
     return result;
   }
@@ -155,28 +155,34 @@ export class DriverService {
   // Background Worker to flush Redis buffer to Postgres
   static async syncLocationBuffer() {
       const bufferKey = "drivers:locations:buffer";
-      const all = await redis.hGetAll(bufferKey);
-      
-      if (!all || Object.keys(all).length === 0) return;
+      const syncKey = "drivers:locations:buffer:sync";
 
-      const driverIds = Object.keys(all);
+      // Atomically move buffer to a sync key to prevent race conditions
+      const hasData = await redis.rename(bufferKey, syncKey);
+      if (!hasData) return;
 
+      try {
+          const all = await redis.hGetAll(syncKey);
+          if (!all || Object.keys(all).length === 0) return;
 
-      const ops = driverIds.map(id => {
-          try {
-            const data = JSON.parse(all[id]);
-            return prisma.driver.update({
-                where: { id },
-                data: { lat: data.lat, lng: data.lng }
-            });
-          } catch (e) { return null; } // Skip malformed
-      }).filter(op => op !== null) as any[];
+          const driverIds = Object.keys(all);
 
-      if (ops.length > 0) {
-          await prisma.$transaction(ops);
+          const ops = driverIds.map(id => {
+              try {
+                const data = JSON.parse(all[id]);
+                return prisma.driver.update({
+                    where: { id },
+                    data: { lat: data.lat, lng: data.lng }
+                });
+              } catch (e) { return null; } // Skip malformed
+          }).filter(op => op !== null) as any[];
+
+          if (ops.length > 0) {
+              await prisma.$transaction(ops);
+          }
+      } finally {
+          // Always clean up the temp sync key
+          await redis.del(syncKey);
       }
-
-      // Clear processed keys
-      await redis.hDel(bufferKey, ...driverIds);
   }
 }

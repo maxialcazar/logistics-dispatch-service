@@ -1,8 +1,10 @@
 import { prisma } from "../prisma";
 // Force recompile after prisma generate
 import { PackageStatus } from "@prisma/client";
-import { emitToAll, emitToRoom } from "../websocket";
+import { emitToRoom } from "../websocket";
 import { geocodeAddress } from "../utils/geocoder";
+import { saveBase64Image } from "../utils/fileUpload";
+import { ZoneService } from "./zone.service";
 
 export class PackageService {
   static async getAllPackages(companyId: string, filters: {
@@ -114,9 +116,10 @@ export class PackageService {
       zoneId, userId, lat, lng, estimatedDeliveryAt 
     } = data;
     
-    // Validate Zone
-    if (zoneId) {
-        const zone = await prisma.zone.findFirst({ where: { id: zoneId, companyId } });
+    // Validate Zone (if provided manually)
+    let resolvedZoneId = zoneId;
+    if (resolvedZoneId) {
+        const zone = await prisma.zone.findFirst({ where: { id: resolvedZoneId, companyId } });
         if (!zone) {
             throw new Error("zone_not_found");
         }
@@ -145,6 +148,20 @@ export class PackageService {
     }
     // -----------------------
 
+    // --- Auto Geofencing: detect zone if not provided ---
+    if (!resolvedZoneId && finalLat && finalLng) {
+        try {
+            const detected = await ZoneService.detectZone(companyId, finalLat, finalLng);
+            if (detected) {
+                resolvedZoneId = detected.id;
+            }
+        } catch (geoErr) {
+            // Non-fatal: proceed without zone if geofencing fails
+            console.warn('⚠️ Geofencing detection failed (non-fatal):', geoErr);
+        }
+    }
+    // ----------------------------------------------------
+
     return prisma.$transaction(async (tx) => {
       const pkg = await tx.package.create({
         data: { 
@@ -164,7 +181,7 @@ export class PackageService {
           lat: finalLat,
           lng: finalLng,
           estimatedDeliveryAt,
-          zoneId,
+          zoneId: resolvedZoneId,
           companyId,
           status: "pending",
           history: {
@@ -182,7 +199,7 @@ export class PackageService {
         },
       });
       
-      emitToAll("package-created", pkg);
+      emitToRoom(`company-${companyId}`, "package-created", pkg);
       
       // Emit Business Event
       emitToRoom(`company-${companyId}`, "business-event", {
@@ -208,8 +225,10 @@ export class PackageService {
     lat?: number;
     lng?: number;
     estimatedDeliveryAt?: Date;
+    signature?: string; // Base64 data URI of recipient's signature
+    photo?: string;     // Base64 data URI of delivery photo evidence
   }) {
-    const { packageId, status, userId, userRole, userDriverId, lat, lng, estimatedDeliveryAt } = params;
+    const { packageId, status, userId, userRole, userDriverId, lat, lng, estimatedDeliveryAt, signature, photo } = params;
     
     // Scoped find
     const pkg = await prisma.package.findFirst({ 
@@ -239,6 +258,31 @@ export class PackageService {
       throw new Error(`invalid_transition:${pkg.status}:${status}`);
     }
 
+    // --- Proof of Delivery (POD) ---
+    // Process base64 images BEFORE the transaction to avoid holding the DB connection.
+    let signatureUrl: string | undefined;
+    let photoUrl: string | undefined;
+
+    if (status === 'delivered') {
+      if (signature) {
+        try {
+          signatureUrl = saveBase64Image(signature, 'signature', packageId);
+        } catch (e) {
+          console.error('Failed to save signature image:', e);
+          // Non-fatal: proceed without signature if saving fails
+        }
+      }
+      if (photo) {
+        try {
+          photoUrl = saveBase64Image(photo, 'photo', packageId);
+        } catch (e) {
+          console.error('Failed to save photo evidence:', e);
+          // Non-fatal: proceed without photo if saving fails
+        }
+      }
+    }
+    // --------------------------------
+
     return prisma.$transaction(async (tx) => {
       const updated = await tx.package.update({
         where: { id: packageId },
@@ -246,7 +290,9 @@ export class PackageService {
           status,
           lat,
           lng,
-          estimatedDeliveryAt
+          estimatedDeliveryAt,
+          ...(signatureUrl && { signatureUrl }),
+          ...(photoUrl && { photoUrl }),
         }
       });
 
@@ -255,16 +301,20 @@ export class PackageService {
           packageId,
           status,
           userId,
-          notes: `Status updated to ${status}`
+          notes: status === 'delivered'
+            ? `Entregado con evidencia: firma=${!!signatureUrl}, foto=${!!photoUrl}`
+            : `Status updated to ${status}`
         }
       });
 
-      emitToAll("package-status-updated", { 
+      emitToRoom(`company-${companyId}`, "package-status-updated", { 
         packageId, 
         status, 
         lat, 
         lng, 
-        estimatedDeliveryAt 
+        estimatedDeliveryAt,
+        signatureUrl,
+        photoUrl,
       });
 
       // Emit Business Event
@@ -278,7 +328,7 @@ export class PackageService {
           eventType = 'ISSUE';
           title = 'Entrega Fallida/Cancelada';
       } else if (status === 'in_transit') {
-          eventType = 'LOCATION'; // Or SYSTEM
+          eventType = 'LOCATION';
           title = 'En Camino';
       }
 
@@ -331,7 +381,7 @@ export class PackageService {
         }
       });
 
-      emitToAll("package-assigned", { packageId, driverId, driverName: driver.name });
+      emitToRoom(`company-${companyId}`, "package-assigned", { packageId, driverId, driverName: driver.name });
       
       // Emit Business Event
       emitToRoom(`company-${companyId}`, "business-event", {
