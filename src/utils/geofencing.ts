@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 
 /**
@@ -55,7 +56,7 @@ export async function detectZone(
   const zones = await prisma.zone.findMany({
     where: {
       companyId,
-      polygon: { not: null },
+      polygon: { not: Prisma.DbNull },
     },
     select: {
       id: true,

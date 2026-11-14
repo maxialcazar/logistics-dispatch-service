@@ -67,6 +67,10 @@ export const redis = {
         if (!redisEnabled || !client.isOpen) return;
         await client.hSet(key, field, value);
     },
+    async hGet(key: string, field: string) {
+        if (!redisEnabled || !client.isOpen) return null;
+        return (await client.hGet(key, field)) ?? null;
+    },
     async hGetAll(key: string) {
         if (!redisEnabled || !client.isOpen) return {};
         return client.hGetAll(key);

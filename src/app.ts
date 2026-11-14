@@ -23,7 +23,6 @@ import { swaggerSpec } from "./swagger";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import logger from "./utils/logger";
-import { metricsRegistry, httpRequestsTotal, httpRequestDurationMs } from "./utils/metrics";
 
 dotenv.config();
 
@@ -63,18 +62,6 @@ app.use(morgan("combined", {
 	stream: { write: (message) => logger.info(message.trim()) }
 }));
 
-// Prometheus metrics middleware — measures latency and counts every request
-app.use((req, res, next) => {
-	const start = Date.now();
-	res.on('finish', () => {
-		// Normalize route: prefer express matched route, fallback to raw url (capped)
-		const route = (req.route?.path ?? req.path ?? 'unknown').toString().slice(0, 100);
-		const labels = { method: req.method, route, status_code: String(res.statusCode) };
-		httpRequestsTotal.inc(labels);
-		httpRequestDurationMs.observe(labels, Date.now() - start);
-	});
-	next();
-});
 
 // Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
