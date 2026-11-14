@@ -26,6 +26,7 @@ lerna-debug.log*
 *.md
 .antigravityignore
 .serena
+.agents\agents\claude-reviewer.md
 
 # OS files
 .DS_Store
