@@ -39,7 +39,7 @@ export function initSocket(server: HttpServer) {
                     if (decoded.role === 'driver') {
                          // Notify company that driver is online
                          io.to(room).emit('driver-status-updated', { 
-                             driverId: decoded.id || decoded.userId, // JWT usually has id/userId
+                             driverId: decoded.driverId || decoded.userId || decoded.id, // JWT usually has id/userId
                              status: 'online',
                              name: decoded.username 
                          });
@@ -49,7 +49,7 @@ export function initSocket(server: HttpServer) {
 			            logger.info(`🔌 Client disconnected: ${socket.id}`);
                         if (decoded.role === 'driver') {
                              io.to(room).emit('driver-status-updated', { 
-                                 driverId: decoded.id || decoded.userId, 
+                                 driverId: decoded.driverId || decoded.userId || decoded.id, 
                                  status: 'offline',
                                  name: decoded.username 
                              });
