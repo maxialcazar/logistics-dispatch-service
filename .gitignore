@@ -22,6 +22,9 @@ lerna-debug.log*
 .idea/
 *.swp
 *.swo
+.agents
+*.md
+.antigravityignore
 
 # OS files
 .DS_Store
