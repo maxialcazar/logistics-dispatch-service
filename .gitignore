@@ -25,6 +25,7 @@ lerna-debug.log*
 .agents
 *.md
 .antigravityignore
+.serena
 
 # OS files
 .DS_Store
