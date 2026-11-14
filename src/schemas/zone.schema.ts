@@ -13,6 +13,9 @@ export const createZoneSchema = z.object({
 });
 
 export const updateZoneSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+  }),
   body: z.object({
     name: z.string().min(2).optional(),
     description: z.string().optional(),

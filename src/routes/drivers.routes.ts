@@ -10,7 +10,7 @@ import {
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createDriverSchema, assignZonesSchema, updateLocationSchema } from "../schemas/driver.schema";
+import { createDriverSchema, assignZonesSchema, updateLocationSchema, getDriverZonesSchema } from "../schemas/driver.schema";
 
 const router = Router();
 
@@ -116,7 +116,7 @@ router.get("/me/zones", requireRole("driver"), getMyZones);
  *       200:
  *         description: Success
  */
-router.get("/:driverId/zones", requireRole("dispatcher", "admin"), getDriverZones);
+router.get("/:driverId/zones", requireRole("dispatcher", "admin"), validate(getDriverZonesSchema), getDriverZones);
 
 /**
  * @openapi

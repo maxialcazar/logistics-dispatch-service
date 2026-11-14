@@ -139,8 +139,15 @@ export async function getMyPackages(req: AuthRequest, res: Response) {
     return res.status(403).json({ error: "not a driver" });
   }
 
-  const packages = await PackageService.getMyPackages(req.user.companyId, req.user.driverId);
-  res.json(packages);
+  try {
+    const packages = await PackageService.getMyPackages(req.user.companyId, req.user.driverId);
+    res.json(packages);
+  } catch (error: any) {
+    if (error.message === "driver_not_found") {
+      return res.status(404).json({ error: "driver not found" });
+    }
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 }
 
 export async function getPackageHistory(req: AuthRequest, res: Response) {

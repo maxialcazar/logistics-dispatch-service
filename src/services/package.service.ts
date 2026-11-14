@@ -397,19 +397,32 @@ export class PackageService {
   }
 
   static async getPackagesByDriver(companyId: string, driverId: string) {
-    return this.getMyPackages(companyId, driverId);
+    if (!companyId) throw new Error("company_id_required");
+
+    return prisma.$transaction(async (tx) => {
+      const driver = await tx.driver.findFirst({
+        where: { id: driverId, companyId },
+      });
+      if (!driver) {
+        throw new Error("driver_not_found");
+      }
+
+      return tx.package.findMany({
+        where: {
+          companyId,
+          zone: {
+            driverId: driverId,
+            companyId,
+          },
+        },
+        include: { zone: true },
+      });
+    });
   }
 
   static async getMyPackages(companyId: string, driverId: string) {
-    return prisma.package.findMany({
-      where: { 
-        companyId,
-        zone: {
-          driverId: driverId
-        }
-      },
-      include: { zone: true },
-    });
+    if (!companyId) throw new Error("company_id_required");
+    return this.getPackagesByDriver(companyId, driverId);
   }
 
   static async getPackageHistory(companyId: string, packageId: string) {

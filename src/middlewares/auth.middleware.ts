@@ -23,7 +23,17 @@ export function auth(req: AuthRequest, res: Response, next: NextFunction) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    
+    if (
+      typeof payload.userId !== "string" ||
+      !payload.userId ||
+      typeof payload.companyId !== "string" ||
+      !payload.companyId ||
+      typeof payload.role !== "string" ||
+      !payload.role
+    ) {
+      return res.status(401).json({ error: "invalid token" });
+    }
+
     req.user = {
       id: payload.userId,
       role: payload.role,

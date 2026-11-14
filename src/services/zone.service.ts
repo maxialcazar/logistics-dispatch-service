@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { redis } from "../redis";
 import { detectZone as geoDetectZone } from "../utils/geofencing";
@@ -76,58 +77,81 @@ export class ZoneService {
       polygon?: Coord[] | null;
     }
   ) {
+    if (!companyId) throw new Error("company_id_required");
+
     try {
-      const currentZone = await prisma.zone.findFirst({ where: { id: zoneId, companyId } });
-      if (!currentZone) throw new Error('Zone not found');
+      const updatedZone = await prisma.$transaction(async (tx) => {
+        const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM "Zone" WHERE id = ${zoneId} AND "companyId" = ${companyId} FOR UPDATE
+        `;
+        if (lockedRows.length === 0) throw new Error('Zone not found');
 
-      const willBeActive = data.isActive !== undefined ? data.isActive : currentZone.isActive;
-      const willHaveDriver = data.driverId !== undefined ? data.driverId : currentZone.driverId;
+        const currentZone = await tx.zone.findFirst({ where: { id: zoneId, companyId } });
+        if (!currentZone) throw new Error('Zone not found');
 
-      // Check logic: Can only activate if driver is assigned
-      if (willBeActive && !willHaveDriver) {
-        throw new Error('Cannot activate zone without an assigned driver');
-      }
+        if (data.driverId !== undefined && data.driverId !== null) {
+          const driver = await tx.driver.findFirst({
+            where: { id: data.driverId, companyId },
+          });
+          if (!driver) throw new Error('Driver not found');
+        }
 
-      const updatedZone = await prisma.zone.update({
-        where: { id: zoneId }, // ID is globally unique
-        data: {
-          description: data.description,
-          isActive: data.isActive,
-          driverId: data.driverId,
-          name: data.name,
-          ...(data.polygon !== undefined ? { polygon: data.polygon as any } : {}),
-        },
-        include: { driver: true }
+        const willBeActive = data.isActive !== undefined ? data.isActive : currentZone.isActive;
+        const willHaveDriver = data.driverId !== undefined ? data.driverId : currentZone.driverId;
+
+        // Check logic: Can only activate if driver is assigned
+        if (willBeActive && !willHaveDriver) {
+          throw new Error('Cannot activate zone without an assigned driver');
+        }
+
+        const zone = await tx.zone.update({
+          where: { id: zoneId, companyId },
+          data: {
+            description: data.description,
+            isActive: data.isActive,
+            driverId: data.driverId,
+            name: data.name,
+            ...(data.polygon !== undefined
+              ? { polygon: data.polygon === null ? Prisma.DbNull : (data.polygon as any) }
+              : {}),
+          },
+          include: { driver: true },
+        });
+
+        // Business Logic: If activated, assign pending packages in this zone
+        if (data.isActive === true) {
+          await tx.package.updateMany({
+            where: {
+              zoneId: zoneId,
+              status: 'pending',
+              companyId,
+            },
+            data: {
+              status: 'assigned',
+              updatedAt: new Date(),
+            },
+          });
+        }
+
+        return zone;
       });
 
-      // Business Logic: If activated, assign pending packages in this zone
-      if (data.isActive === true) {
-        try {
-            await prisma.package.updateMany({
-              where: {
-                zoneId: zoneId,
-                status: 'pending',
-                companyId
-              },
-              data: { 
-                status: 'assigned',
-                updatedAt: new Date()
-              }
-            });
-        } catch (pkgError) {
-            console.error("Error updating packages status (non-fatal):", pkgError);
+      const keysToInvalidate = [
+        `zones:${companyId}`,
+        `drivers:${companyId}`,
+      ];
+      await Promise.all(keysToInvalidate.map((k) => redis.delPrefix(`${k}:`)));
+
+      return updatedZone;
+    } catch (error: any) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new Error('Zone not found');
+        }
+        if (error.code === 'P2003') {
+          throw new Error('Driver not found');
         }
       }
-
-      const keysToInvalidate = [
-          `zones:${companyId}`,
-          `drivers:${companyId}`
-      ];
-      await Promise.all(keysToInvalidate.map(k => redis.delPrefix(`${k}:`)));
-      
-      return updatedZone;
-
-    } catch (error) {
       console.error("Error in ZoneService.updateZone:", error);
       throw error;
     }

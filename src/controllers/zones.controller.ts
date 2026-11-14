@@ -26,17 +26,8 @@ export async function createZone(req: AuthRequest, res: Response) {
 
 export async function updateZone(req: AuthRequest, res: Response) {
   const id = String(req.params.id);
-  const isActive = req.body.isActive as boolean | undefined;
-  const description = req.body.description ? String(req.body.description) : undefined;
-  const driverId = req.body.driverId !== undefined
-    ? (req.body.driverId === null ? null : String(req.body.driverId))
-    : undefined;
-  const name = req.body.name ? String(req.body.name) : undefined;
-  // polygon: undefined means "don't change"; null means "clear"; array means "set"
-  const polygon = req.body.polygon !== undefined
-    ? (req.body.polygon === null ? null : req.body.polygon as [number, number][])
-    : undefined;
-  
+  const { isActive, description, driverId, name, polygon } = req.body ?? {};
+
   try {
       const zone = await ZoneService.updateZone(id, req.user!.companyId, {
         isActive,
@@ -50,8 +41,8 @@ export async function updateZone(req: AuthRequest, res: Response) {
       if (error.message && error.message.includes('Cannot activate')) {
           return res.status(400).json({ error: error.message });
       }
-      if (error.message === 'Zone not found') {
-          return res.status(404).json({ error: 'Zone not found' });
+      if (error.message === 'Zone not found' || error.message === 'Driver not found') {
+          return res.status(404).json({ error: error.message });
       }
       console.error(error);
       res.status(500).json({ error: 'Failed to update zone' });

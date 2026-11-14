@@ -55,3 +55,9 @@ export const assignPackageSchema = z.object({
     driverId: z.string().uuid(),
   }),
 });
+
+export const getPackagesByDriverSchema = z.object({
+  params: z.object({
+    driverId: z.string().uuid(),
+  }),
+});

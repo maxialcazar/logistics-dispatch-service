@@ -14,7 +14,7 @@ import {
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createPackageSchema, updatePackageStatusSchema, assignPackageSchema } from "../schemas/package.schema";
+import { createPackageSchema, updatePackageStatusSchema, assignPackageSchema, getPackagesByDriverSchema } from "../schemas/package.schema";
 
 const router = Router();
 
@@ -147,7 +147,7 @@ router.get("/stats", requireRole("dispatcher", "admin"), getDashboardStats);
  *       200:
  *         description: Success
  */
-router.get("/driver/:driverId", requireRole("dispatcher", "admin"), getPackagesByDriver);
+router.get("/driver/:driverId", requireRole("dispatcher", "admin"), validate(getPackagesByDriverSchema), getPackagesByDriver);
 
 /**
  * @openapi

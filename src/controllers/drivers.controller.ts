@@ -39,9 +39,15 @@ export async function assignZonesToDriver(req: AuthRequest, res: Response) {
 
 export async function getDriverZones(req: AuthRequest, res: Response) {
   const { driverId } = req.params;
-  // TODO: Update service to support companyId check
-  const zones = await DriverService.getDriverZones(driverId as string);
-  res.json(zones);
+  try {
+    const zones = await DriverService.getDriverZones(req.user!.companyId, driverId as string);
+    res.json(zones);
+  } catch (error: any) {
+    if (error.message === "driver_not_found") {
+      return res.status(404).json({ error: "driver not found" });
+    }
+    res.status(500).json({ error: "Failed to fetch driver zones" });
+  }
 }
 
 export async function getMyZones(req: AuthRequest, res: Response) {
@@ -49,8 +55,15 @@ export async function getMyZones(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "Not a driver" });
   }
 
-  const zones = await DriverService.getDriverZones(req.user.driverId);
-  res.json(zones);
+  try {
+    const zones = await DriverService.getDriverZones(req.user.companyId, req.user.driverId);
+    res.json(zones);
+  } catch (error: any) {
+    if (error.message === "driver_not_found") {
+      return res.status(404).json({ error: "driver not found" });
+    }
+    res.status(500).json({ error: "Failed to fetch driver zones" });
+  }
 }
 
 export async function updateLocation(req: AuthRequest, res: Response) {

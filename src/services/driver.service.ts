@@ -102,7 +102,7 @@ export class DriverService {
       // 1. Liberar zonas previas de este driver
       await tx.zone.updateMany({
         where: { driverId, companyId },
-        data: { driverId: null },
+        data: { driverId: null, isActive: false },
       });
 
       // 2. Asignar nuevas zonas
@@ -125,10 +125,22 @@ export class DriverService {
     return result;
   }
 
-  static async getDriverZones(driverId: string) {
-    return prisma.zone.findMany({
-      where: { driverId },
+  static async getDriverZones(companyId: string, driverId: string) {
+    if (!companyId) throw new Error("company_id_required");
+
+    const driver = await prisma.driver.findFirst({
+      where: { id: driverId, companyId },
+      include: {
+        zones: {
+          where: { companyId },
+        },
+      },
     });
+    if (!driver) {
+      throw new Error("driver_not_found");
+    }
+
+    return driver.zones;
   }
 
   static async updateLocation(driverId: string, companyId: string, lat: number, lng: number) {

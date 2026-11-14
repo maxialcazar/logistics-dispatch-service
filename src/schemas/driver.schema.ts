@@ -22,3 +22,9 @@ export const updateLocationSchema = z.object({
     lng: z.number().min(-180).max(180),
   }),
 });
+
+export const getDriverZonesSchema = z.object({
+  params: z.object({
+    driverId: z.string().uuid(),
+  }),
+});

@@ -3,7 +3,7 @@ import { getZones, createZone, updateZone, setAllZonesStatus } from "../controll
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createZoneSchema } from "../schemas/zone.schema";
+import { createZoneSchema, updateZoneSchema } from "../schemas/zone.schema";
 
 const router = Router();
 
@@ -77,6 +77,6 @@ router.get("/", requireRole("dispatcher", "admin"), getZones);
  */
 router.post("/", requireRole("dispatcher", "admin"), validate(createZoneSchema), createZone);
 
-router.patch("/:id", requireRole("dispatcher", "admin"), updateZone);
+router.patch("/:id", requireRole("dispatcher", "admin"), validate(updateZoneSchema), updateZone);
 
 export default router;
