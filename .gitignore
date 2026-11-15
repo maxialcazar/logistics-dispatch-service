@@ -41,3 +41,5 @@ Thumbs.db
 # Local scripts / Temporary files
 check_users.ts
 test_hash.ts
+capturar_ui.py
+.tmp-ui-audit/
