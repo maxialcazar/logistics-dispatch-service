@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { driverService, type AppDriver } from '../services/driverService';
 import { zoneService } from '../services/zoneService';
-import { MapPin, Truck, Search, GripVertical, CheckCircle, AlertTriangle } from 'lucide-react';
+import { MapPin, Truck, Search, GripVertical, CheckCircle, AlertTriangle, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -21,6 +21,7 @@ interface Zone {
     const [searchZone, setSearchZone] = useState('');
     const [searchDriver, setSearchDriver] = useState('');
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
+    const [selectedZoneByDriver, setSelectedZoneByDriver] = useState<Record<string, string>>({});
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -64,14 +65,9 @@ interface Zone {
         e.dataTransfer.dropEffect = 'copy';
     };
 
-    const handleDrop = async (e: React.DragEvent, driver: AppDriver) => {
-        e.preventDefault();
-        const zoneId = e.dataTransfer.getData('zoneId');
-        const zoneName = e.dataTransfer.getData('zoneName');
-        
+    const requestAssignZone = (driver: AppDriver, zoneId: string, zoneName: string) => {
         if (!zoneId) return;
 
-        // Check if already assigned
         if (driver.zones?.some(z => z.id === zoneId)) {
             toast.error(`La zona ${zoneName} ya está asignada a ${driver.name}`);
             return;
@@ -84,6 +80,14 @@ interface Zone {
             variant: 'info',
             onConfirm: () => performAction('assign', driver, zoneId, zoneName)
         });
+    };
+
+    const handleDrop = async (e: React.DragEvent, driver: AppDriver) => {
+        e.preventDefault();
+        const zoneId = e.dataTransfer.getData('zoneId');
+        const zoneName = e.dataTransfer.getData('zoneName');
+
+        requestAssignZone(driver, zoneId, zoneName);
     };
 
     const removeZone = async (driver: AppDriver, zoneId: string) => {
@@ -130,6 +134,9 @@ interface Zone {
                 return d;
             }));
 
+            if (type === 'assign') {
+                setSelectedZoneByDriver(prev => ({ ...prev, [driver.id]: '' }));
+            }
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
         } catch (err) {
@@ -191,7 +198,13 @@ interface Zone {
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                        {filteredZones.map(zone => (
+                        {filteredZones.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-800 rounded-xl flex flex-col items-center justify-center">
+                                <MapPin className="h-8 w-8 mb-2 text-slate-600" />
+                                <p className="text-sm font-medium">No se encontraron zonas disponibles</p>
+                            </div>
+                        ) : (
+                        filteredZones.map(zone => (
                             <div 
                                 key={zone.id}
                                 draggable
@@ -207,7 +220,8 @@ interface Zone {
                                 </div>
                                 <div className="h-2 w-2 rounded-full bg-purple-500"></div>
                             </div>
-                        ))}
+                        ))
+                        )}
                     </div>
                 </div>
 
@@ -232,7 +246,19 @@ interface Zone {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {filteredDrivers.map(driver => (
+                        {filteredDrivers.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-800 rounded-xl flex flex-col items-center justify-center">
+                                <Truck className="h-8 w-8 mb-2 text-slate-600" />
+                                <p className="text-sm font-medium">No se encontraron conductores activos</p>
+                            </div>
+                        ) : (
+                        filteredDrivers.map(driver => {
+                            const assignedZoneIds = new Set((driver.zones || []).map(z => z.id));
+                            const availableZones = zones.filter(z => !assignedZoneIds.has(z.id));
+                            const selectedZoneId = selectedZoneByDriver[driver.id] || '';
+                            const selectedZone = availableZones.find(z => z.id === selectedZoneId);
+
+                            return (
                             <div 
                                 key={driver.id}
                                 onDragOver={handleDragOver}
@@ -266,22 +292,51 @@ interface Zone {
                                 {/* Assigned Zones List in Driver Card */}
                                 <div className="space-y-2">
                                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Zonas Asignadas</div>
-                                    {driver.zones?.length === 0 && (
-                                        <div className="text-sm text-slate-600 italic py-2 border-2 border-dashed border-slate-800 rounded-lg text-center">
-                                            Arrastra una zona aquí
+                                    {(!driver.zones || driver.zones.length === 0) && (
+                                        <div className="text-sm text-slate-400 italic py-2 px-3 border-2 border-dashed border-slate-800 rounded-lg text-center">
+                                            Sin zonas asignadas. Arrastra una zona aquí o asígnala con el botón.
                                         </div>
                                     )}
                                     <div className="flex flex-wrap gap-2">
                                         {driver.zones?.map(z => (
-                                            <div key={z.id} className="group flex items-center gap-1 bg-slate-800/100 border border-slate-700 text-slate-300 text-xs px-2 py-1.5 rounded-md hover:border-red-500/50 hover:bg-red-900/10 transition-colors cursor-pointer" onClick={() => removeZone(driver, z.id)}>
+                                            <div key={z.id} className="group flex items-center gap-1 bg-slate-800 border border-slate-700 text-slate-300 text-xs px-2 py-1.5 rounded-md hover:border-red-500/50 hover:bg-red-900/10 transition-colors cursor-pointer" onClick={() => removeZone(driver, z.id)}>
                                                 <MapPin className="h-3 w-3 text-purple-400" />
                                                 {z.name}
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* Accessible Zone Assignment */}
+                                    <div className="mt-3 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row gap-2">
+                                        <select
+                                            aria-label={`Seleccionar zona para ${driver.name}`}
+                                            value={selectedZoneId}
+                                            onChange={e => setSelectedZoneByDriver(prev => ({ ...prev, [driver.id]: e.target.value }))}
+                                            disabled={availableZones.length === 0 || loadingAction === driver.id}
+                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                                        >
+                                            <option value="">
+                                                {availableZones.length === 0 ? 'Todas las zonas asignadas' : 'Seleccionar zona para asignar...'}
+                                            </option>
+                                            {availableZones.map(z => (
+                                                <option key={z.id} value={z.id}>{z.name}</option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            disabled={!selectedZone || loadingAction === driver.id}
+                                            onClick={() => selectedZone && requestAssignZone(driver, selectedZone.id, selectedZone.name)}
+                                            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[36px] bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors"
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            Asignar
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })
+                        )}
                     </div>
                 </div>
             </div>
