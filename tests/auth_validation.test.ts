@@ -2,7 +2,11 @@ import "dotenv/config";
 import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/prisma";
+import { z } from "zod";
 import { redis } from "../src/redis";
+import { validate } from "../src/middlewares/validate.middleware";
+import { errorHandler, redactSensitiveFields } from "../src/middlewares/error.middleware";
+import logger from "../src/utils/logger";
 
 // ─── Test Fixtures ────────────────────────────────────────────────────────────
 const COMPANY_SLUG = `test-auth-${Date.now()}`;
@@ -174,5 +178,85 @@ describe("PUT /api/users/password", () => {
       password: newPassword,
     });
     expect(loginRes.status).toBe(200);
+  });
+});
+
+// ─── Middleware Security — Payload Redaction ──────────────────────────────────
+describe("Middleware Security — Payload Redaction", () => {
+  it("validate middleware should not log Original Payload or password on Zod failure", () => {
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const schema = z.object({
+      body: z.object({
+        username: z.string(),
+        password: z.string().min(8),
+      }),
+      query: z.any().optional(),
+      params: z.any().optional(),
+    });
+
+    const req = {
+      body: { username: "alice", password: "sec123" },
+      query: {},
+      params: {},
+    } as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as any;
+    const next = jest.fn();
+
+    validate(schema)(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    const allLoggedText = consoleSpy.mock.calls.flat().join(" ");
+    expect(allLoggedText).not.toContain("Original Payload");
+    expect(allLoggedText).not.toContain("sec123");
+    consoleSpy.mockRestore();
+  });
+
+  it("redactSensitiveFields and errorHandler should redact sensitive keys including nested objects", () => {
+    const payload = {
+      username: "bob",
+      password: "plainPassword",
+      currentPassword: "oldPassword",
+      newPassword: "newPassword123",
+      signature: "data:image/png;base64,abc",
+      photo: "data:image/jpeg;base64,xyz",
+      nested: {
+        password: "nestedPassword",
+        note: "keep-me",
+      },
+    };
+
+    const redacted = redactSensitiveFields(payload) as any;
+    expect(redacted.password).toBe("[REDACTED]");
+    expect(redacted.currentPassword).toBe("[REDACTED]");
+    expect(redacted.newPassword).toBe("[REDACTED]");
+    expect(redacted.signature).toBe("[REDACTED]");
+    expect(redacted.photo).toBe("[REDACTED]");
+    expect(redacted.nested.password).toBe("[REDACTED]");
+    expect(redacted.nested.note).toBe("keep-me");
+    expect(redacted.username).toBe("bob");
+
+    const loggerSpy = jest.spyOn(logger, "error").mockImplementation((() => logger) as any);
+    const req = { method: "POST", url: "/api/test", body: payload } as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as any;
+    const next = jest.fn();
+
+    errorHandler(new Error("Boom"), req, res, next);
+
+    expect(loggerSpy).toHaveBeenCalledTimes(1);
+    const loggedMeta = (loggerSpy.mock.calls[0] as any[])[1];
+    expect(loggedMeta.body.password).toBe("[REDACTED]");
+    expect(loggedMeta.body.currentPassword).toBe("[REDACTED]");
+    expect(loggedMeta.body.newPassword).toBe("[REDACTED]");
+    expect(loggedMeta.body.signature).toBe("[REDACTED]");
+    expect(loggedMeta.body.photo).toBe("[REDACTED]");
+    expect(loggedMeta.body.nested.password).toBe("[REDACTED]");
+    expect(loggedMeta.body.nested.note).toBe("keep-me");
+    loggerSpy.mockRestore();
   });
 });

@@ -12,7 +12,6 @@ export const validate = (schema: z.ZodObject<any>) => (req: Request, res: Respon
   } catch (error) {
     if (error instanceof ZodError) {
       console.error("❌ Validation Error:", JSON.stringify(error.issues, null, 2));
-      console.error("📩 Original Payload:", JSON.stringify(req.body, null, 2));
       return res.status(400).json({
         error: "Validation failed",
         details: error.issues.map((issue) => ({
