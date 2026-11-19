@@ -441,24 +441,47 @@ export class PackageService {
     });
   }
 
-  // Public Tracking 
-  // Note: Since trackingCode is scoped by company, this might return the first match found.
-  // Ideally, public tracking should include company slug in URL.
-  static async getPublicTracking(trackingCode: string) {
-    const pkg = await prisma.package.findFirst({
+  private static async findPublicPackage<T extends boolean = false>(
+    trackingCode: string,
+    companySlug?: string,
+    includeZone?: T
+  ) {
+    const normalizedSlug = companySlug?.trim();
+    const selectFields = {
+      trackingCode: true,
+      status: true,
+      recipientAddress: true,
+      lat: true,
+      lng: true,
+      estimatedDeliveryAt: true,
+      createdAt: true,
+      updatedAt: true,
+      ...(includeZone ? { zone: { select: { driverId: true } } } : {}),
+    };
+
+    if (normalizedSlug) {
+      return prisma.package.findFirst({
+        where: {
+          trackingCode,
+          company: { slug: normalizedSlug },
+        },
+        select: selectFields,
+      });
+    }
+
+    // Without companySlug, only return if globally unambiguous across tenants
+    const matches = await prisma.package.findMany({
       where: { trackingCode },
-      select: {
-        trackingCode: true,
-        status: true,
-        recipientAddress: true,
-        lat: true,
-        lng: true,
-        estimatedDeliveryAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      take: 2,
+      select: selectFields,
     });
 
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  // Public Tracking
+  static async getPublicTracking(trackingCode: string, companySlug?: string) {
+    const pkg = await this.findPublicPackage(trackingCode, companySlug, false);
     if (!pkg) return null;
 
     let displayAddress = pkg.recipientAddress;
@@ -467,19 +490,26 @@ export class PackageService {
       displayAddress = `${parts.slice(0, -1).join(" ")} ***`;
     }
 
-    return { ...pkg, recipientAddress: displayAddress };
+    const approxLat = pkg.lat !== null && pkg.lat !== undefined ? Math.round(pkg.lat * 100) / 100 : null;
+    const approxLng = pkg.lng !== null && pkg.lng !== undefined ? Math.round(pkg.lng * 100) / 100 : null;
+
+    return {
+      ...pkg,
+      recipientAddress: displayAddress,
+      lat: approxLat,
+      lng: approxLng,
+    };
   }
 
-  static async getAssignedDriverId(trackingCode: string) {
-    const pkg = await prisma.package.findFirst({
-      where: { trackingCode },
-      include: {
-        zone: true 
-      }
-    });
+  static async getAssignedDriverId(
+    trackingCode: string,
+    companySlug?: string
+  ): Promise<{ driverId: string | null } | null> {
+    const pkg = await this.findPublicPackage(trackingCode, companySlug, true);
+    if (!pkg) return null;
 
-    if (!pkg || !pkg.zone) return null;
-    return pkg.zone.driverId; 
+    const zone = (pkg as { zone?: { driverId: string | null } | null }).zone;
+    return { driverId: zone?.driverId ?? null };
   }
 
   static async getDashboardStats(companyId: string) {
