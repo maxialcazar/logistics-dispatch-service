@@ -260,3 +260,86 @@ describe("Middleware Security — Payload Redaction", () => {
     loggerSpy.mockRestore();
   });
 });
+
+// ─── POST /api/users ──────────────────────────────────────────────────────────
+describe("POST /api/users", () => {
+  let adminToken: string;
+  let dispatcherUsername: string;
+  const dispatcherPassword = "dispatcherPass123";
+
+  beforeAll(async () => {
+    dispatcherUsername = `disp_${Date.now()}`;
+    let loginRes = await request(app).post("/api/auth/login").send({
+      username: ADMIN_USER.username,
+      password: "StrongPassword1",
+    });
+    if (loginRes.status !== 200) {
+      loginRes = await request(app).post("/api/auth/login").send(ADMIN_USER);
+    }
+    expect(loginRes.status).toBe(200);
+    adminToken = loginRes.body.token;
+  });
+
+  it("should return 201 when admin creates a dispatcher without exposing password", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        username: dispatcherUsername,
+        password: dispatcherPassword,
+        role: "dispatcher",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBeDefined();
+    expect(res.body.username).toBe(dispatcherUsername);
+    expect(res.body.role).toBe("dispatcher");
+    expect(res.body.companyId).toBe(createdCompanyId);
+    expect(res.body.password).toBeUndefined();
+  });
+
+  it("should return 409 when username already exists", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        username: dispatcherUsername,
+        password: dispatcherPassword,
+        role: "dispatcher",
+      });
+
+    expect(res.status).toBe(409);
+  });
+
+  it("should return 403 when a dispatcher attempts to create a user", async () => {
+    const dispLogin = await request(app).post("/api/auth/login").send({
+      username: dispatcherUsername,
+      password: dispatcherPassword,
+    });
+    expect(dispLogin.status).toBe(200);
+
+    const res = await request(app)
+      .post("/api/users")
+      .set("Authorization", `Bearer ${dispLogin.body.token}`)
+      .send({
+        username: `unauth_disp_${Date.now()}`,
+        password: "dispatcherPass123",
+        role: "dispatcher",
+      });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("should return 400 when attempting to create a driver user without Driver profile", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        username: `orphan_driver_${Date.now()}`,
+        password: "driverPass123",
+        role: "driver",
+      });
+
+    expect(res.status).toBe(400);
+  });
+});

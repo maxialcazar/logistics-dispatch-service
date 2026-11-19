@@ -25,7 +25,7 @@ const router = Router();
  *       201:
  *         description: Created
  */
-router.post("/", auth, requireRole("admin", "dispatcher"), validate(createUserSchema), createUser);
+router.post("/", auth, requireRole("admin"), validate(createUserSchema), createUser);
 router.put("/password", auth, validate(changePasswordSchema), changePassword);
 
 export default router;
