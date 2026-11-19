@@ -1,4 +1,4 @@
-import { PackageCheck, Truck, Clock, Radio, Navigation, CheckCircle, XCircle, Info, LayoutList } from 'lucide-react';
+import { PackageCheck, Truck, Clock, Radio, Navigation, CheckCircle, XCircle, Info, LayoutList, AlertTriangle } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import { packageService } from '../services/packageService';
@@ -30,6 +30,7 @@ export function Dashboard() {
 
   // Convert Map to Array for rendering
   const activeDrivers = useMemo(() => Array.from(locations.values()), [locations]);
+  const activeAlertsCount = useMemo(() => events.filter(e => e.type === 'ISSUE').length, [events]);
 
   // Dynamic Stats Configuration
   const dynamicStats = [
@@ -54,6 +55,13 @@ export function Dashboard() {
           trendColor: 'text-blue-400', 
           icon: Navigation 
       },
+      { 
+          label: 'Alertas Activas', 
+          value: activeAlertsCount.toString(), 
+          trend: activeAlertsCount > 0 ? 'En atención' : 'Sin alertas', 
+          trendColor: activeAlertsCount > 0 ? 'text-red-400' : 'text-emerald-400', 
+          icon: AlertTriangle 
+      },
   ];
 
   const getEventIcon = (type: string) => {
@@ -67,22 +75,22 @@ export function Dashboard() {
   };
 
   return (
-    <div className="space-y-8 h-[calc(100vh-100px)] flex flex-col">
+    <div className="space-y-4 h-[calc(100vh-100px)] flex flex-col">
       {/* Metrics Row */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 flex-shrink-0">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 flex-shrink-0">
         {/* Dynamic Card for Active Drivers (From Socket) */}
-         <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-6 shadow-sm transition-all hover:bg-slate-800/50 hover:shadow-md">
-            <div>
+         <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4 shadow-sm transition-all hover:bg-slate-800/50 hover:shadow-md">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-slate-400">Conductores Conectados</p>
-              <p className="mt-2 text-3xl font-bold text-white">{activeDrivers.length}</p>
+              <p className="mt-1 text-2xl font-bold text-white">{activeDrivers.length}</p>
               <div className="mt-1 flex items-center gap-1 text-xs">
                  <span className={isConnected ? "text-green-400" : "text-red-400"}>
                     {isConnected ? "● Conexión en Vivo" : "○ Desconectado"}
                  </span>
               </div>
             </div>
-             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 text-blue-400 ring-1 ring-slate-700">
-              <Truck className="h-6 w-6" />
+             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-slate-800 text-blue-400 ring-1 ring-slate-700">
+              <Truck className="h-5 w-5" />
             </div>
          </div>
 
@@ -90,17 +98,17 @@ export function Dashboard() {
         {dynamicStats.map((stat, i) => (
           <div
             key={i}
-            className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-6 shadow-sm transition-all hover:bg-slate-800/50 hover:shadow-md"
+            className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4 shadow-sm transition-all hover:bg-slate-800/50 hover:shadow-md"
           >
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-slate-400">{stat.label}</p>
-              <p className="mt-2 text-3xl font-bold text-white">{stat.value}</p>
+              <p className="mt-1 text-2xl font-bold text-white">{stat.value}</p>
               <div className="mt-1 flex items-center gap-1 text-xs">
                 <span className={stat.trendColor}>{stat.trend}</span>
               </div>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 text-blue-400 ring-1 ring-slate-700">
-              <stat.icon className="h-6 w-6" />
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-slate-800 text-blue-400 ring-1 ring-slate-700">
+              <stat.icon className="h-5 w-5" />
             </div>
           </div>
         ))}
@@ -132,7 +140,7 @@ export function Dashboard() {
           </div>
           <div className="flex-1 rounded-xl border border-slate-800 bg-slate-900/30 p-4 space-y-4 overflow-y-auto custom-scrollbar">
              {events.length === 0 && (
-                 <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-2">
+                 <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
                      <Radio className="h-8 w-8 opacity-20" />
                      <p className="text-sm">Esperando eventos del sistema...</p>
                  </div>
@@ -146,7 +154,7 @@ export function Dashboard() {
                   <div>
                     <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-medium text-slate-200">{evt.title}</p>
-                        <span className="text-[10px] text-slate-600 font-mono whitespace-nowrap">
+                        <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap">
                             {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </div>
