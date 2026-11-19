@@ -28,6 +28,9 @@ dotenv.config();
 
 const app = express();
 
+// Trust the first proxy hop so req.ip and rate limiters resolve the real client IP
+app.set("trust proxy", 1);
+
 // Security Middleware
 app.use(helmet({
 	contentSecurityPolicy: false, // Disable CSP for simple monitoring usage
