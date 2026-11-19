@@ -3,7 +3,7 @@ import { prisma } from "../prisma";
 import { PackageStatus } from "@prisma/client";
 import { emitToRoom } from "../websocket";
 import { geocodeAddress } from "../utils/geocoder";
-import { saveBase64Image } from "../utils/fileUpload";
+import { saveBase64Image, deleteUploadedFile } from "../utils/fileUpload";
 import { ZoneService } from "./zone.service";
 
 export class PackageService {
@@ -68,21 +68,43 @@ export class PackageService {
   }
 
   static async deletePackages(companyId: string, packageIds: string[]) {
-      await prisma.packageHistory.deleteMany({
-          where: {
-              package: {
-                  companyId,
-                  id: { in: packageIds }
-              }
+    const packagesToDelete = await prisma.package.findMany({
+      where: {
+        companyId,
+        id: { in: packageIds }
+      },
+      select: {
+        signatureUrl: true,
+        photoUrl: true,
+      }
+    });
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.packageHistory.deleteMany({
+        where: {
+          package: {
+            companyId,
+            id: { in: packageIds }
           }
+        }
       });
 
-      return prisma.package.deleteMany({
-          where: {
-              companyId,
-              id: { in: packageIds }
-          }
+      return tx.package.deleteMany({
+        where: {
+          companyId,
+          id: { in: packageIds }
+        }
       });
+    });
+
+    const filesToRemove = packagesToDelete.flatMap((pkg) =>
+      [pkg.signatureUrl, pkg.photoUrl].filter((url): url is string => Boolean(url))
+    );
+    if (filesToRemove.length > 0) {
+      await Promise.allSettled(filesToRemove.map((url) => deleteUploadedFile(url)));
+    }
+
+    return result;
   }
 // ...
   static async createPackage(companyId: string, data: {
@@ -266,7 +288,7 @@ export class PackageService {
     if (status === 'delivered') {
       if (signature) {
         try {
-          signatureUrl = saveBase64Image(signature, 'signature', packageId);
+          signatureUrl = await saveBase64Image(signature, 'signature', packageId);
         } catch (e) {
           console.error('Failed to save signature image:', e);
           // Non-fatal: proceed without signature if saving fails
@@ -274,7 +296,7 @@ export class PackageService {
       }
       if (photo) {
         try {
-          photoUrl = saveBase64Image(photo, 'photo', packageId);
+          photoUrl = await saveBase64Image(photo, 'photo', packageId);
         } catch (e) {
           console.error('Failed to save photo evidence:', e);
           // Non-fatal: proceed without photo if saving fails
