@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package as IPackage } from '../services/packageService';
 import clsx from 'clsx';
+import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Skeleton } from '../components/Skeleton';
 
 export function PackagesPage() {
   const { token } = useAuth();
@@ -93,7 +95,7 @@ export function PackagesPage() {
               } catch (e) {
                   console.error(e);
                   setConfirmState(prev => ({ ...prev, isLoading: false, isOpen: false }));
-                  alert("Error al archivar paquetes"); 
+                  toast.error("Error al archivar paquetes"); 
               }
           }
       });
@@ -120,7 +122,7 @@ export function PackagesPage() {
               } catch (e) {
                   console.error(e);
                   setConfirmState(prev => ({ ...prev, isLoading: false })); 
-                  alert("Error al eliminar paquetes");
+                  toast.error("Error al eliminar paquetes");
               }
           }
       });
@@ -235,13 +237,25 @@ export function PackagesPage() {
       {/* Data Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         {loading ? (
-             <div className="p-12 text-center text-slate-500 animate-pulse">Cargando paquetes...</div>
+             <div className="p-6 space-y-4">
+                {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+             </div>
         ) : error ? (
              <div className="p-12 text-center text-red-400">Error: {error}</div>
         ) : filteredPackages.length === 0 ? (
-             <div className="p-12 text-center text-slate-500">
+             <div className="p-12 text-center text-slate-400 flex flex-col items-center">
                 <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No se encontraron paquetes.</p>
+                <p className="mb-4">No se encontraron paquetes.</p>
+                <button
+                    type="button"
+                    onClick={() => navigate('/packages/new')}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/30 transition-all"
+                >
+                    <Plus className="h-4 w-4" />
+                    Crear Paquete
+                </button>
              </div>
         ) : (
           <div className="overflow-x-auto">
