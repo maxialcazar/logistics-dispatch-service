@@ -161,9 +161,22 @@ export async function getMyPackages(req: AuthRequest, res: Response) {
 export async function getPackageHistory(req: AuthRequest, res: Response) {
   const packageId = req.params.packageId as string;
   try {
-    const history = await PackageService.getPackageHistory(req.user!.companyId, packageId);
+    const history = await PackageService.getPackageHistory(
+      req.user!.companyId,
+      packageId,
+      {
+        userRole: req.user!.role,
+        userDriverId: req.user!.driverId || null,
+      }
+    );
     res.json(history);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === "package_not_found") {
+      return res.status(404).json({ error: "package not found" });
+    }
+    if (error?.message === "not_authorized_for_zone") {
+      return res.status(403).json({ error: "not authorized for this zone" });
+    }
     res.status(500).json({ error: "Internal Server Error" });
   }
 }

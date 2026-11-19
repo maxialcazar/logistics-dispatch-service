@@ -516,24 +516,23 @@ export class PackageService {
   static async getPackagesByDriver(companyId: string, driverId: string) {
     if (!companyId) throw new Error("company_id_required");
 
-    return prisma.$transaction(async (tx) => {
-      const driver = await tx.driver.findFirst({
-        where: { id: driverId, companyId },
-      });
-      if (!driver) {
-        throw new Error("driver_not_found");
-      }
+    const driver = await prisma.driver.findFirst({
+      where: { id: driverId, companyId },
+    });
+    if (!driver) {
+      throw new Error("driver_not_found");
+    }
 
-      return tx.package.findMany({
-        where: {
+    return prisma.package.findMany({
+      where: {
+        companyId,
+        isArchived: false,
+        zone: {
+          driverId: driverId,
           companyId,
-          zone: {
-            driverId: driverId,
-            companyId,
-          },
         },
-        include: { zone: true },
-      });
+      },
+      include: { zone: true },
     });
   }
 
@@ -542,10 +541,23 @@ export class PackageService {
     return this.getPackagesByDriver(companyId, driverId);
   }
 
-  static async getPackageHistory(companyId: string, packageId: string) {
+  static async getPackageHistory(
+    companyId: string,
+    packageId: string,
+    options?: { userRole?: string; userDriverId?: string | null }
+  ) {
     // Verify ownership first
-    const pkg = await prisma.package.findFirst({ where: { id: packageId, companyId } });
+    const pkg = await prisma.package.findFirst({
+      where: { id: packageId, companyId },
+      include: { zone: true },
+    });
     if (!pkg) throw new Error("package_not_found");
+
+    if (options?.userRole === "driver") {
+      if (!pkg.zone || !options.userDriverId || pkg.zone.driverId !== options.userDriverId) {
+        throw new Error("not_authorized_for_zone");
+      }
+    }
 
     return prisma.packageHistory.findMany({
       where: { packageId },

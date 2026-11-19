@@ -214,6 +214,10 @@ router.get("/my-packages", auth, requireRole("driver"), getMyPackages);
  *     responses:
  *       200:
  *         description: Success
+ *       403:
+ *         description: Driver not authorized for this package's zone
+ *       404:
+ *         description: Package not found
  */
 router.get("/:packageId/history", auth, requireRole("dispatcher", "driver", "admin"), getPackageHistory);
 

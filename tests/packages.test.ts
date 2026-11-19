@@ -342,3 +342,123 @@ describe("Task 1.2.3 — Auto-assign on active zone & assignToDriver state guard
     expect(res.body.status).toBe("assigned");
   });
 });
+
+// ─── Task 1.2.5 — getMyPackages archive filter & getPackageHistory zone auth ──
+describe("Task 1.2.5 — getMyPackages archive filter & getPackageHistory zone authorization", () => {
+  let driver1Token: string;
+  let driver2Token: string;
+  let driver1ZoneId: string;
+  let driver2ZoneId: string;
+  let activePackageId: string;
+  let archivedPackageId: string;
+
+  beforeAll(async () => {
+    const suffix = Date.now();
+    const d1User = `drv1_hist_${suffix}`;
+    const d2User = `drv2_hist_${suffix}`;
+
+    const d1Res = await request(app)
+      .post("/api/drivers")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ name: "Driver One History", username: d1User, password: "driverpass123" });
+    expect(d1Res.status).toBe(201);
+
+    const d2Res = await request(app)
+      .post("/api/drivers")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ name: "Driver Two History", username: d2User, password: "driverpass123" });
+    expect(d2Res.status).toBe(201);
+
+    const [login1, login2] = await Promise.all([
+      request(app).post("/api/auth/login").send({ username: d1User, password: "driverpass123" }),
+      request(app).post("/api/auth/login").send({ username: d2User, password: "driverpass123" }),
+    ]);
+    driver1Token = login1.body.token;
+    driver2Token = login2.body.token;
+
+    const [z1, z2] = await Promise.all([
+      prisma.zone.create({
+        data: { name: "Driver 1 Zone", companyId: companyAId, driverId: d1Res.body.id, isActive: true },
+      }),
+      prisma.zone.create({
+        data: { name: "Driver 2 Zone", companyId: companyAId, driverId: d2Res.body.id, isActive: true },
+      }),
+    ]);
+    driver1ZoneId = z1.id;
+    driver2ZoneId = z2.id;
+
+    const activeCreate = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-MY-ACT-${suffix}`,
+        recipientName: "Active MyPkg",
+        recipientAddress: "Av. Colon 1000, Cordoba",
+        recipientPhone: "3519991111",
+        lat: -31.41,
+        lng: -64.19,
+        zoneId: driver1ZoneId,
+      });
+    expect(activeCreate.status).toBe(201);
+    activePackageId = activeCreate.body.id;
+
+    const archivedCreate = await prisma.package.create({
+      data: {
+        trackingCode: `PKG-MY-ARCH-${suffix}`,
+        recipientName: "Archived MyPkg",
+        recipientAddress: "Av. Colon 1001, Cordoba",
+        recipientPhone: "3519992222",
+        status: "delivered",
+        zoneId: driver1ZoneId,
+        companyId: companyAId,
+        isArchived: true,
+      },
+    });
+    archivedPackageId = archivedCreate.id;
+  });
+
+  it("GET /api/packages/my-packages excludes archived packages", async () => {
+    const res = await request(app)
+      .get("/api/packages/my-packages")
+      .set("Authorization", `Bearer ${driver1Token}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    const ids = res.body.map((p: any) => p.id);
+    expect(ids).toContain(activePackageId);
+    expect(ids).not.toContain(archivedPackageId);
+    expect(driver2ZoneId).toBeDefined();
+  });
+
+  it("GET /api/packages/:packageId/history returns 404 when package does not exist or belongs to another tenant", async () => {
+    const missingRes = await request(app)
+      .get("/api/packages/00000000-0000-4000-8000-000000000000/history")
+      .set("Authorization", `Bearer ${tokenA}`);
+    expect(missingRes.status).toBe(404);
+
+    const crossTenantRes = await request(app)
+      .get(`/api/packages/${activePackageId}/history`)
+      .set("Authorization", `Bearer ${tokenB}`);
+    expect(crossTenantRes.status).toBe(404);
+  });
+
+  it("GET /api/packages/:packageId/history returns 403 for unassigned driver and 200 for assigned driver/admin", async () => {
+    const unassignedRes = await request(app)
+      .get(`/api/packages/${activePackageId}/history`)
+      .set("Authorization", `Bearer ${driver2Token}`);
+    expect(unassignedRes.status).toBe(403);
+
+    const assignedRes = await request(app)
+      .get(`/api/packages/${activePackageId}/history`)
+      .set("Authorization", `Bearer ${driver1Token}`);
+    expect(assignedRes.status).toBe(200);
+    expect(Array.isArray(assignedRes.body)).toBe(true);
+    expect(assignedRes.body.length).toBeGreaterThan(0);
+
+    const adminRes = await request(app)
+      .get(`/api/packages/${activePackageId}/history`)
+      .set("Authorization", `Bearer ${tokenA}`);
+    expect(adminRes.status).toBe(200);
+    expect(Array.isArray(adminRes.body)).toBe(true);
+  });
+});
