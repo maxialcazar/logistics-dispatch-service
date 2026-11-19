@@ -1,15 +1,23 @@
 import { Response } from "express";
 import { DriverService } from "../services/driver.service";
 import { AuthRequest } from "../middlewares/auth.middleware";
+import logger from "../utils/logger";
+import { sanitizePagination } from "../utils/pagination";
 
 export async function getDrivers(req: AuthRequest, res: Response) {
-  const { name, page, limit } = req.query;
-  const drivers = await DriverService.getAllDrivers(req.user!.companyId, {
-    name: name as string,
-    page: page ? parseInt(page as string) : undefined,
-    limit: limit ? parseInt(limit as string) : undefined,
-  });
-  res.json(drivers);
+  try {
+    const { name } = req.query;
+    const { page, limit } = sanitizePagination(req.query);
+    const drivers = await DriverService.getAllDrivers(req.user!.companyId, {
+      name: typeof name === "string" ? name : undefined,
+      page,
+      limit,
+    });
+    res.json(drivers);
+  } catch (error) {
+    logger.error("Error in getDrivers:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 }
 
 export async function createDriver(req: AuthRequest, res: Response) {

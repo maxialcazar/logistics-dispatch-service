@@ -2,21 +2,25 @@ import { Response } from "express";
 import { PackageService } from "../services/package.service";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { PackageStatus } from "@prisma/client";
+import logger from "../utils/logger";
+import { sanitizePagination } from "../utils/pagination";
 
 export async function getPackages(req: AuthRequest, res: Response) {
-  const { status, zoneId, trackingCode, page, limit, isArchived } = req.query;
-
   try {
+    const { status, zoneId, trackingCode, isArchived } = req.query;
+    const { page, limit } = sanitizePagination(req.query);
+
     const result = await PackageService.getAllPackages(req.user!.companyId, {
-      status: status as PackageStatus,
-      zoneId: zoneId as string,
-      trackingCode: trackingCode as string,
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-      isArchived: isArchived === 'true',
+      status: typeof status === "string" ? (status as PackageStatus) : undefined,
+      zoneId: typeof zoneId === "string" ? zoneId : undefined,
+      trackingCode: typeof trackingCode === "string" ? trackingCode : undefined,
+      page,
+      limit,
+      isArchived: isArchived === "true",
     });
     res.json(result);
   } catch (error) {
+    logger.error("Error in getPackages:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }

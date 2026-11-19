@@ -1,18 +1,24 @@
 import { Response } from "express";
 import { ZoneService } from "../services/zone.service";
 import { AuthRequest } from "../middlewares/auth.middleware";
+import logger from "../utils/logger";
+import { sanitizePagination } from "../utils/pagination";
 
 export async function getZones(req: AuthRequest, res: Response) {
-  const name = req.query.name ? String(req.query.name) : undefined;
-  const page = req.query.page ? Number(req.query.page) : undefined;
-  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+  try {
+    const name = typeof req.query.name === "string" ? req.query.name : undefined;
+    const { page, limit } = sanitizePagination(req.query);
 
-  const result = await ZoneService.getAllZones(req.user!.companyId, { 
-    name,
-    page,
-    limit,
-  });
-  res.json(result);
+    const result = await ZoneService.getAllZones(req.user!.companyId, {
+      name,
+      page,
+      limit,
+    });
+    res.json(result);
+  } catch (error) {
+    logger.error("Error in getZones:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 }
 
 export async function createZone(req: AuthRequest, res: Response) {
