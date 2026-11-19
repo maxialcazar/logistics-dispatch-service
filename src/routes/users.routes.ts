@@ -3,7 +3,7 @@ import { createUser, changePassword } from "../controllers/users.controller";
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createUserSchema } from "../schemas/user.schema";
+import { createUserSchema, changePasswordSchema } from "../schemas/user.schema";
 
 const router = Router();
 
@@ -26,6 +26,6 @@ const router = Router();
  *         description: Created
  */
 router.post("/", auth, requireRole("admin", "dispatcher"), validate(createUserSchema), createUser);
-router.put("/password", auth, changePassword);
+router.put("/password", auth, validate(changePasswordSchema), changePassword);
 
 export default router;

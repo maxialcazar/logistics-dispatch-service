@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { login, registerCompany } from "../controllers/auth.controller";
 import { validate } from "../middlewares/validate.middleware";
-import { loginSchema } from "../schemas/auth.schema";
+import { loginSchema, registerCompanySchema } from "../schemas/auth.schema";
 
 const router = Router();
 
@@ -37,7 +37,7 @@ const router = Router();
  *       409:
  *         description: Username or Slug already taken
  */
-router.post("/register-company", registerCompany);
+router.post("/register-company", validate(registerCompanySchema), registerCompany);
 
 /**
  * @openapi

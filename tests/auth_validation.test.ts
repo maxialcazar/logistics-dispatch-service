@@ -102,4 +102,77 @@ describe("POST /api/auth/register-company", () => {
     });
     expect(res.status).toBe(409);
   });
+
+  it("should return 400 when companySlug has invalid format", async () => {
+    const res = await request(app).post("/api/auth/register-company").send({
+      companyName: "Invalid Slug Co",
+      companySlug: "Invalid Slug!",
+      username: `valid_user_${Date.now()}`,
+      password: "securepassword123",
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Validation failed");
+  });
+
+  it("should return 400 when password is too short", async () => {
+    const res = await request(app).post("/api/auth/register-company").send({
+      companyName: "Short Pass Co",
+      companySlug: `short-pass-${Date.now()}`,
+      username: `valid_user2_${Date.now()}`,
+      password: "123",
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Validation failed");
+  });
+});
+
+// ─── PUT /api/users/password ──────────────────────────────────────────────────
+describe("PUT /api/users/password", () => {
+  let token: string;
+
+  beforeAll(async () => {
+    const loginRes = await request(app).post("/api/auth/login").send(ADMIN_USER);
+    token = loginRes.body.token;
+  });
+
+  it("should return 400 if currentPassword is missing", async () => {
+    const res = await request(app)
+      .put("/api/users/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ newPassword: "StrongPassword1" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Validation failed");
+  });
+
+  it("should return 400 if newPassword is weak", async () => {
+    const res = await request(app)
+      .put("/api/users/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: ADMIN_USER.password, newPassword: "weak" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Validation failed");
+  });
+
+  it("should return 401 if currentPassword is incorrect", async () => {
+    const res = await request(app)
+      .put("/api/users/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: "wrongCurrentPassword", newPassword: "StrongPassword1" });
+    expect(res.status).toBe(401);
+  });
+
+  it("should return 200 and update password when currentPassword is valid and newPassword is strong", async () => {
+    const newPassword = "StrongPassword1";
+    const res = await request(app)
+      .put("/api/users/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: ADMIN_USER.password, newPassword });
+    expect(res.status).toBe(200);
+
+    const loginRes = await request(app).post("/api/auth/login").send({
+      username: ADMIN_USER.username,
+      password: newPassword,
+    });
+    expect(loginRes.status).toBe(200);
+  });
 });
