@@ -26,7 +26,8 @@ export function DriverLayout() {
         </div>
         <button 
           onClick={logout}
-          className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          aria-label="Cerrar sesión"
+          className="min-h-[48px] min-w-[48px] p-2 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
         >
           <LogOut className="h-5 w-5" />
         </button>
