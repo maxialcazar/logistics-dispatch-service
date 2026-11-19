@@ -21,6 +21,27 @@ if (redisEnabled) {
 	});
 }
 
+const SCAN_COUNT = 100;
+const UNLINK_BATCH_SIZE = 500;
+
+async function scanEachPage(
+	pattern: string,
+	onKeys: (keys: string[]) => Promise<void>
+): Promise<void> {
+	let cursor = "0";
+	do {
+		if (!client.isOpen) break;
+		const { cursor: nextCursor, keys } = await client.scan(cursor, {
+			MATCH: pattern,
+			COUNT: SCAN_COUNT,
+		});
+		cursor = String(nextCursor);
+		if (keys.length > 0) {
+			await onKeys(keys);
+		}
+	} while (cursor !== "0" && client.isOpen);
+}
+
 export const redis = {
 	async ping(): Promise<string> {
 		if (!redisEnabled || !client.isOpen) {
@@ -46,23 +67,25 @@ export const redis = {
 	},
 	async scanKeys(pattern: string): Promise<string[]> {
 		if (!redisEnabled || !client.isOpen) return [];
-		const found: string[] = [];
-		for await (const keyOrKeys of client.scanIterator({ MATCH: pattern, COUNT: 100 })) {
-			if (Array.isArray(keyOrKeys)) {
-				found.push(...keyOrKeys);
-			} else if (typeof keyOrKeys === "string") {
-				found.push(keyOrKeys);
+		const found = new Set<string>();
+		await scanEachPage(pattern, async (keys) => {
+			for (const key of keys) {
+				found.add(key);
 			}
-		}
-		return found;
+		});
+		return Array.from(found);
 	},
 	async delPrefix(prefix: string) {
 		try {
 			if (!redisEnabled || !client.isOpen) return;
-			const keys = await this.scanKeys(`${prefix}*`);
-			if (keys.length > 0) {
-				await client.unlink(keys);
-			}
+			await scanEachPage(`${prefix}*`, async (keys) => {
+				for (let i = 0; i < keys.length; i += UNLINK_BATCH_SIZE) {
+					const batch = keys.slice(i, i + UNLINK_BATCH_SIZE);
+					if (batch.length > 0) {
+						await client.unlink(batch);
+					}
+				}
+			});
 		} catch (error) {
 			console.error(`Error deleting prefix ${prefix} in Redis:`, error);
 		}
