@@ -11,14 +11,14 @@ router.use(auth);
  * @openapi
  * /api/admin/metrics:
  *   get:
- *     summary: Get system health and metrics (Dispatchers only)
+ *     summary: Get tenant-scoped operational metrics (Admin and Dispatchers; global metrics require system scope)
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: System metrics
+ *         description: Tenant operational metrics (plus global server metrics when system-scoped)
  */
-router.get("/metrics", requireRole("dispatcher"), getSystemMetrics);
+router.get("/metrics", requireRole("admin", "dispatcher", "system", "superadmin"), getSystemMetrics);
 
 export default router;

@@ -87,6 +87,19 @@ export function emitToRoom(room: string, event: string, data: any) {
 	}
 }
 
-export function getConnectedClientCount() {
+export function getTenantConnectedClientCount(companyId: string): number {
+	if (!io || typeof companyId !== "string" || !companyId.trim()) return 0;
+	const rooms = io.sockets?.adapter?.rooms;
+	return rooms?.get(`company-${companyId.trim()}`)?.size ?? 0;
+}
+
+export function getGlobalConnectedClientCount(): number {
 	return io ? io.engine.clientsCount : 0;
+}
+
+export function getConnectedClientCount(companyId?: string): number {
+	if (companyId !== undefined) {
+		return getTenantConnectedClientCount(companyId);
+	}
+	return getGlobalConnectedClientCount();
 }

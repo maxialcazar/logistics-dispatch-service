@@ -22,6 +22,12 @@ if (redisEnabled) {
 }
 
 export const redis = {
+	async ping(): Promise<string> {
+		if (!redisEnabled || !client.isOpen) {
+			throw new Error("redis_not_connected");
+		}
+		return client.ping();
+	},
 	async get(key: string) {
 		if (!redisEnabled || !client.isOpen) return null;
 		return client.get(key);
