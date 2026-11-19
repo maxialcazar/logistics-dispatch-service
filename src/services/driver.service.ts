@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import bcrypt from "bcrypt";
 import { redis } from "../redis";
 import { emitToRoom } from "../websocket";
 import logger from "../utils/logger";
+import { ZoneService } from "./zone.service";
 
 const LOCATION_BUFFER_KEY = "drivers:locations:buffer";
 const LOCATION_SYNC_KEY = "drivers:locations:buffer:sync";
@@ -174,36 +176,102 @@ export class DriverService {
     return driver;
   }
 
-  static async assignZones(companyId: string, driverId: string, zoneIds: string[]) {
-    // Verify driver belongs to company
-    const driver = await prisma.driver.findFirst({ where: { id: driverId, companyId } });
-    if (!driver) throw new Error("driver_not_found");
+  static async assignZones(companyId: string, driverId: string, zoneIds: string[], userId?: string) {
+    if (!companyId) throw new Error("company_id_required");
 
-    // Verify all zones belong to company
-    const count = await prisma.zone.count({ 
-      where: { 
-        id: { in: zoneIds },
-        companyId 
-      } 
-    });
-    if (count !== zoneIds.length) {
-      throw new Error("zones_not_founded_or_access_denied");
-    }
+    const uniqueZoneIds = [...new Set(zoneIds)];
 
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Liberar zonas previas de este driver
-      await tx.zone.updateMany({
-        where: { driverId, companyId },
-        data: { driverId: null, isActive: false },
-      });
+    const { revertedPackages, activatedPackages, driverName } = await prisma.$transaction(async (tx) => {
+      // Lock driver row (FOR NO KEY UPDATE) so concurrent zone assignments for the same driver serialize cleanly
+      const driverRows = await tx.$queryRaw<{ id: string; name: string }[]>`
+        SELECT "id", "name"
+        FROM "Driver"
+        WHERE "id" = ${driverId} AND "companyId" = ${companyId}
+        FOR NO KEY UPDATE
+      `;
+      if (driverRows.length === 0) throw new Error("driver_not_found");
+      const driver = driverRows[0];
+
+      // Lock all affected zones (currently owned by driver or targeted for assignment) in deterministic order
+      const lockedZones = uniqueZoneIds.length > 0
+        ? await tx.$queryRaw<{ id: string; name: string; driverId: string | null; isActive: boolean }[]>`
+            SELECT "id", "name", "driverId", "isActive"
+            FROM "Zone"
+            WHERE "companyId" = ${companyId}
+              AND ("driverId" = ${driverId} OR "id" IN (${Prisma.join(uniqueZoneIds)}))
+            ORDER BY "id" ASC
+            FOR UPDATE
+          `
+        : await tx.$queryRaw<{ id: string; name: string; driverId: string | null; isActive: boolean }[]>`
+            SELECT "id", "name", "driverId", "isActive"
+            FROM "Zone"
+            WHERE "companyId" = ${companyId}
+              AND "driverId" = ${driverId}
+            ORDER BY "id" ASC
+            FOR UPDATE
+          `;
+
+      const lockedZoneIds = new Set(lockedZones.map((z) => z.id));
+      if (uniqueZoneIds.some((id) => !lockedZoneIds.has(id))) {
+        throw new Error("zones_not_founded_or_access_denied");
+      }
+
+      const targetZoneIdSet = new Set(uniqueZoneIds);
+      const removedZoneIds = lockedZones
+        .filter((z) => z.driverId === driverId && !targetZoneIdSet.has(z.id))
+        .map((z) => z.id);
+      const assignedZones = lockedZones.filter((z) => targetZoneIdSet.has(z.id));
+
+      // 1. Liberar zonas previas de este driver que no permanecen asignadas
+      if (removedZoneIds.length > 0) {
+        await tx.zone.updateMany({
+          where: { id: { in: removedZoneIds }, companyId },
+          data: { driverId: null, isActive: false },
+        });
+      }
 
       // 2. Asignar nuevas zonas
-      await tx.zone.updateMany({
-        where: { id: { in: zoneIds }, companyId },
-        data: { driverId },
+      if (uniqueZoneIds.length > 0) {
+        await tx.zone.updateMany({
+          where: { id: { in: uniqueZoneIds }, companyId },
+          data: { driverId },
+        });
+      }
+
+      const actorUserId = await ZoneService.resolveActorUserIdTx(tx, companyId, userId);
+
+      // 3. Revertir a pending paquetes assigned en zonas removidas o reasignadas a otro conductor estando inactivas
+      const zonesToRevert = [
+        ...removedZoneIds,
+        ...assignedZones
+          .filter((z) => z.driverId !== driverId && !z.isActive)
+          .map((z) => z.id),
+      ];
+      const reverted = await ZoneService.transitionPackagesInZonesTx(tx, {
+        companyId,
+        zoneIds: zonesToRevert,
+        fromStatus: "assigned",
+        toStatus: "pending",
+        actorUserId,
+        notes: "Reverted to pending: zone unassigned or inactive",
       });
 
-      return { ok: true };
+      // 4. Asignar paquetes pending en zonas activas asignadas al conductor
+      const zonesToActivate = assignedZones.filter((z) => z.isActive).map((z) => z.id);
+      const activated = await ZoneService.transitionPackagesInZonesTx(tx, {
+        companyId,
+        zoneIds: zonesToActivate,
+        fromStatus: "pending",
+        toStatus: "assigned",
+        actorUserId,
+        notes: `Assigned automatically via active zone assigned to driver ${driver.name}`,
+      });
+
+      return {
+        revertedPackages: reverted,
+        activatedPackages: activated,
+        driverName: driver.name,
+      };
     });
 
     // Invalidate caches
@@ -212,9 +280,25 @@ export class DriverService {
       redis.delPrefix(`zones:${companyId}:`),
     ]);
 
-    emitToRoom(`company-${companyId}`, "zones-reassigned", { driverId, zoneIds });
+    emitToRoom(`company-${companyId}`, "zones-reassigned", { driverId, zoneIds: uniqueZoneIds });
 
-    return result;
+    ZoneService.emitPackageTransitionEvents(
+      companyId,
+      revertedPackages,
+      "pending",
+      "Zonas Desasignadas",
+      `${revertedPackages.length} paquete(s) revertido(s) a pendiente al desvincular zonas de ${driverName}`
+    );
+
+    ZoneService.emitPackageTransitionEvents(
+      companyId,
+      activatedPackages,
+      "assigned",
+      "Zonas Reasignadas",
+      `${activatedPackages.length} paquete(s) asignado(s) automáticamente a ${driverName}`
+    );
+
+    return { ok: true };
   }
 
   static async getDriverZones(companyId: string, driverId: string) {

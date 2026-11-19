@@ -1,6 +1,6 @@
 import { prisma } from "../prisma";
 // Force recompile after prisma generate
-import { PackageStatus } from "@prisma/client";
+import { PackageStatus, Prisma } from "@prisma/client";
 import { emitToRoom } from "../websocket";
 import { geocodeAddress } from "../utils/geocoder";
 import { saveBase64Image, deleteUploadedFile } from "../utils/fileUpload";
@@ -260,6 +260,53 @@ export class PackageService {
 
 // ... 
 
+  private static async lockPackageWithZoneTx(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    packageId: string
+  ) {
+    const initialPkg = await tx.package.findFirst({
+      where: { id: packageId, companyId },
+      select: { id: true, zoneId: true },
+    });
+    if (!initialPkg) throw new Error("package_not_found");
+
+    let lockedZone: { id: string; driverId: string | null; isActive: boolean } | null = null;
+    if (initialPkg.zoneId) {
+      const zoneRows = await tx.$queryRaw<
+        { id: string; driverId: string | null; isActive: boolean }[]
+      >`
+        SELECT "id", "driverId", "isActive"
+        FROM "Zone"
+        WHERE "id" = ${initialPkg.zoneId} AND "companyId" = ${companyId}
+        FOR SHARE
+      `;
+      lockedZone = zoneRows[0] ?? null;
+    }
+
+    const pkgRows = await tx.$queryRaw<
+      { id: string; trackingCode: string; status: PackageStatus; zoneId: string | null }[]
+    >`
+      SELECT "id", "trackingCode", "status", "zoneId"
+      FROM "Package"
+      WHERE "id" = ${packageId} AND "companyId" = ${companyId}
+      FOR UPDATE
+    `;
+    if (pkgRows.length === 0) throw new Error("package_not_found");
+    const lockedPkg = pkgRows[0];
+
+    if (lockedPkg.zoneId !== initialPkg.zoneId) {
+      lockedZone = lockedPkg.zoneId
+        ? await tx.zone.findFirst({
+            where: { id: lockedPkg.zoneId, companyId },
+            select: { id: true, driverId: true, isActive: true },
+          })
+        : null;
+    }
+
+    return { lockedPkg, lockedZone };
+  }
+
   static async updateStatus(companyId: string, params: {
     packageId: string;
     status: PackageStatus;
@@ -274,7 +321,7 @@ export class PackageService {
   }) {
     const { packageId, status, userId, userRole, userDriverId, lat, lng, estimatedDeliveryAt, signature, photo } = params;
     
-    // Scoped find
+    // Initial check before processing Proof of Delivery uploads
     const pkg = await prisma.package.findFirst({ 
       where: { id: packageId, companyId },
       include: { zone: true }
@@ -282,7 +329,6 @@ export class PackageService {
     
     if (!pkg) throw new Error("package_not_found");
 
-    // Business Logic: Driver restricted to their zone
     if (userRole === "driver") {
         if (!pkg.zone || pkg.zone.driverId !== userDriverId) {
              throw new Error("not_authorized_for_zone");
@@ -297,8 +343,8 @@ export class PackageService {
       cancelled: [],
     };
 
-    const allowed = allowedTransitions[pkg.status as PackageStatus];
-    if (!allowed.includes(status)) {
+    const initialAllowed = allowedTransitions[pkg.status as PackageStatus];
+    if (!initialAllowed.includes(status)) {
       throw new Error(`invalid_transition:${pkg.status}:${status}`);
     }
 
@@ -327,85 +373,99 @@ export class PackageService {
     }
     // --------------------------------
 
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.package.update({
-        where: { id: packageId },
-        data: { 
-          status,
-          lat,
-          lng,
-          estimatedDeliveryAt,
-          ...(signatureUrl && { signatureUrl }),
-          ...(photoUrl && { photoUrl }),
+    let txResult: { updated: any; trackingCode: string };
+    try {
+      txResult = await prisma.$transaction(async (tx) => {
+        const { lockedPkg, lockedZone } = await PackageService.lockPackageWithZoneTx(tx, companyId, packageId);
+
+        if (userRole === "driver") {
+          if (!lockedZone || lockedZone.driverId !== userDriverId) {
+            throw new Error("not_authorized_for_zone");
+          }
         }
-      });
 
-      await tx.packageHistory.create({
-        data: {
-          packageId,
-          status,
-          userId,
-          notes: status === 'delivered'
-            ? `Entregado con evidencia: firma=${!!signatureUrl}, foto=${!!photoUrl}`
-            : `Status updated to ${status}`
+        const allowed = allowedTransitions[lockedPkg.status as PackageStatus];
+        if (!allowed.includes(status)) {
+          throw new Error(`invalid_transition:${lockedPkg.status}:${status}`);
         }
-      });
 
-      emitToRoom(`company-${companyId}`, "package-status-updated", { 
-        packageId, 
-        status, 
-        lat, 
-        lng, 
-        estimatedDeliveryAt,
-        signatureUrl,
-        photoUrl,
-      });
+        const updated = await tx.package.update({
+          where: { id: packageId },
+          data: { 
+            status,
+            lat,
+            lng,
+            estimatedDeliveryAt,
+            ...(signatureUrl && { signatureUrl }),
+            ...(photoUrl && { photoUrl }),
+          }
+        });
 
-      // Emit Business Event
-      let eventType = 'SYSTEM';
-      let title = 'Estado Actualizado';
-      
-      if (status === 'delivered') {
-          eventType = 'DELIVERY';
-          title = 'Paquete Entregado';
-      } else if (status === 'cancelled') {
-          eventType = 'ISSUE';
-          title = 'Entrega Fallida/Cancelada';
-      } else if (status === 'in_transit') {
-          eventType = 'LOCATION';
-          title = 'En Camino';
+        await tx.packageHistory.create({
+          data: {
+            packageId,
+            status,
+            userId,
+            notes: status === 'delivered'
+              ? `Entregado con evidencia: firma=${!!signatureUrl}, foto=${!!photoUrl}`
+              : `Status updated to ${status}`
+          }
+        });
+
+        return { updated, trackingCode: lockedPkg.trackingCode };
+      });
+    } catch (error) {
+      const uploadedFiles = [signatureUrl, photoUrl].filter((url): url is string => Boolean(url));
+      if (uploadedFiles.length > 0) {
+        await Promise.allSettled(uploadedFiles.map((url) => deleteUploadedFile(url)));
       }
+      throw error;
+    }
 
-      emitToRoom(`company-${companyId}`, "business-event", {
-        id: `evt-${Date.now()}`,
-        type: eventType,
-        title: title,
-        description: `El paquete #${pkg.trackingCode} ha cambiado a estado: ${status.replace('_', ' ')}`,
-        timestamp: Date.now()
-      });
+    const { updated, trackingCode } = txResult;
 
-      return updated;
+    emitToRoom(`company-${companyId}`, "package-status-updated", { 
+      packageId, 
+      status, 
+      lat, 
+      lng, 
+      estimatedDeliveryAt,
+      signatureUrl,
+      photoUrl,
     });
+
+    // Emit Business Event
+    let eventType = 'SYSTEM';
+    let title = 'Estado Actualizado';
+    
+    if (status === 'delivered') {
+        eventType = 'DELIVERY';
+        title = 'Paquete Entregado';
+    } else if (status === 'cancelled') {
+        eventType = 'ISSUE';
+        title = 'Entrega Fallida/Cancelada';
+    } else if (status === 'in_transit') {
+        eventType = 'LOCATION';
+        title = 'En Camino';
+    }
+
+    emitToRoom(`company-${companyId}`, "business-event", {
+      id: `evt-${Date.now()}`,
+      type: eventType,
+      title: title,
+      description: `El paquete #${trackingCode} ha cambiado a estado: ${status.replace('_', ' ')}`,
+      timestamp: Date.now()
+    });
+
+    return updated;
   }
 
   static async assignToDriver(companyId: string, packageId: string, driverId: string, userId: string) {
     const { updated, driverName, trackingCode } = await prisma.$transaction(async (tx) => {
-      const lockedRows = await tx.$queryRaw<{ id: string }[]>`
-        SELECT "id"
-        FROM "Package"
-        WHERE "id" = ${packageId} AND "companyId" = ${companyId}
-        FOR UPDATE
-      `;
-      if (lockedRows.length === 0) throw new Error("package_not_found");
+      const { lockedPkg, lockedZone } = await PackageService.lockPackageWithZoneTx(tx, companyId, packageId);
 
-      const currentPkg = await tx.package.findFirst({
-        where: { id: packageId, companyId },
-        include: { zone: true },
-      });
-      if (!currentPkg) throw new Error("package_not_found");
-
-      if (currentPkg.status !== "pending" && currentPkg.status !== "assigned") {
-        throw new Error(`invalid_transition:${currentPkg.status}:assigned`);
+      if (lockedPkg.status !== "pending" && lockedPkg.status !== "assigned") {
+        throw new Error(`invalid_transition:${lockedPkg.status}:assigned`);
       }
 
       const driver = await tx.driver.findFirst({
@@ -413,7 +473,7 @@ export class PackageService {
       });
       if (!driver) throw new Error("driver_not_found");
 
-      if (!currentPkg.zone || currentPkg.zone.driverId !== driverId) {
+      if (!lockedZone || lockedZone.driverId !== driverId) {
         throw new Error("driver_not_in_zone");
       }
 
@@ -436,7 +496,7 @@ export class PackageService {
         }
       });
 
-      return { updated: saved, driverName: driver.name, trackingCode: currentPkg.trackingCode };
+      return { updated: saved, driverName: driver.name, trackingCode: lockedPkg.trackingCode };
     });
 
     emitToRoom(`company-${companyId}`, "package-assigned", { packageId, driverId, driverName });

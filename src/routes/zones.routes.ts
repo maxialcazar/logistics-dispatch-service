@@ -3,7 +3,7 @@ import { getZones, createZone, updateZone, setAllZonesStatus } from "../controll
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createZoneSchema, updateZoneSchema } from "../schemas/zone.schema";
+import { bulkZoneStatusSchema, createZoneSchema, updateZoneSchema } from "../schemas/zone.schema";
 
 const router = Router();
 
@@ -60,7 +60,7 @@ router.use(auth);
  *                       type: integer
  */
 // allow admin to create zones too
-router.post("/bulk-status", requireRole("dispatcher", "admin"), setAllZonesStatus);
+router.post("/bulk-status", requireRole("dispatcher", "admin"), validate(bulkZoneStatusSchema), setAllZonesStatus);
 router.get("/", requireRole("dispatcher", "admin"), getZones);
 
 /**

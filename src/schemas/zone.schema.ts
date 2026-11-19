@@ -25,3 +25,9 @@ export const updateZoneSchema = z.object({
     polygon: z.array(coordSchema).min(3).nullable().optional(),
   }),
 });
+
+export const bulkZoneStatusSchema = z.object({
+  body: z.object({
+    isActive: z.boolean(),
+  }),
+});

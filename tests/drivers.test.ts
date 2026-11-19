@@ -4,6 +4,7 @@ import app from "../src/app";
 import { prisma } from "../src/prisma";
 import { redis } from "../src/redis";
 import { DriverService } from "../src/services/driver.service";
+import * as websocket from "../src/websocket";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const SLUG = `company-drivers-${Date.now()}`;
@@ -41,6 +42,8 @@ beforeAll(async () => {
 
 // ─── Teardown ─────────────────────────────────────────────────────────────────
 afterAll(async () => {
+  await prisma.packageHistory.deleteMany({ where: { package: { companyId } } });
+  await prisma.package.deleteMany({ where: { companyId } });
   await prisma.zone.updateMany({ where: { companyId }, data: { driverId: null } });
   await prisma.user.deleteMany({ where: { companyId } });
   await prisma.driver.deleteMany({ where: { companyId } });
@@ -360,5 +363,213 @@ describe("DriverService.syncLocationBuffer — GPS Buffer", () => {
       hGetAllSpy.mockRestore();
       await redis.delPrefix(`drivers:${companyId}:`);
     }
+  });
+});
+
+// ─── Task 1.2.4 — Transactional Zone & Package Synchronization ────────────────
+describe("Task 1.2.4 — Transactional Zone & Package Synchronization", () => {
+  let syncDriverId: string;
+  let syncZoneAId: string;
+  let syncZoneBId: string;
+
+  beforeAll(async () => {
+    const drv = await prisma.driver.create({
+      data: { name: "Zone Sync Driver", companyId },
+    });
+    syncDriverId = drv.id;
+
+    const [zA, zB] = await Promise.all([
+      prisma.zone.create({
+        data: { name: "Sync Zone A", companyId, driverId: syncDriverId, isActive: false },
+      }),
+      prisma.zone.create({
+        data: { name: "Sync Zone B", companyId, driverId: syncDriverId, isActive: true },
+      }),
+    ]);
+    syncZoneAId = zA.id;
+    syncZoneBId = zB.id;
+  });
+
+  it("PATCH /api/zones/:id activates zone, promotes pending packages, writes history, and emits Socket.IO", async () => {
+    const pkg = await prisma.package.create({
+      data: {
+        trackingCode: `SYNC-ACT-${Date.now()}`,
+        recipientName: "Zone Activate Pkg",
+        recipientAddress: "Av. Colon 500",
+        recipientPhone: "3511112222",
+        status: "pending",
+        zoneId: syncZoneAId,
+        companyId,
+      },
+    });
+
+    const emitSpy = jest.spyOn(websocket, "emitToRoom");
+    try {
+      const res = await request(app)
+        .patch(`/api/zones/${syncZoneAId}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ isActive: true });
+
+      expect(res.status).toBe(200);
+      expect(res.body.isActive).toBe(true);
+
+      const updatedPkg = await prisma.package.findUnique({ where: { id: pkg.id } });
+      expect(updatedPkg?.status).toBe("assigned");
+
+      const history = await prisma.packageHistory.findMany({ where: { packageId: pkg.id } });
+      expect(history).toHaveLength(1);
+      expect(history[0].status).toBe("assigned");
+
+      expect(emitSpy).toHaveBeenCalledWith(
+        `company-${companyId}`,
+        "package-status-updated",
+        expect.objectContaining({ packageId: pkg.id, status: "assigned", zoneId: syncZoneAId })
+      );
+      expect(emitSpy).toHaveBeenCalledWith(
+        `company-${companyId}`,
+        "business-event",
+        expect.objectContaining({ type: "SYSTEM", title: "Zona Activada" })
+      );
+    } finally {
+      emitSpy.mockRestore();
+    }
+  });
+
+  it("PATCH /api/zones/:id reverts assigned packages to pending on deactivation and on driverId=null", async () => {
+    const pkgDeactivate = await prisma.package.create({
+      data: {
+        trackingCode: `SYNC-DEACT-${Date.now()}`,
+        recipientName: "Zone Deactivate Pkg",
+        recipientAddress: "Av. Colon 501",
+        recipientPhone: "3511112223",
+        status: "assigned",
+        zoneId: syncZoneAId,
+        companyId,
+      },
+    });
+
+    const resDeact = await request(app)
+      .patch(`/api/zones/${syncZoneAId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isActive: false });
+
+    expect(resDeact.status).toBe(200);
+    expect(resDeact.body.isActive).toBe(false);
+
+    const dbDeact = await prisma.package.findUnique({ where: { id: pkgDeactivate.id } });
+    expect(dbDeact?.status).toBe("pending");
+    const histDeact = await prisma.packageHistory.findMany({ where: { packageId: pkgDeactivate.id } });
+    expect(histDeact.some((h) => h.status === "pending")).toBe(true);
+
+    // Now test removing driverId (driverId: null) from active syncZoneBId
+    const pkgUnassign = await prisma.package.create({
+      data: {
+        trackingCode: `SYNC-UNDRV-${Date.now()}`,
+        recipientName: "Zone Unassign Driver Pkg",
+        recipientAddress: "Av. Colon 502",
+        recipientPhone: "3511112224",
+        status: "assigned",
+        zoneId: syncZoneBId,
+        companyId,
+      },
+    });
+
+    const resUnassign = await request(app)
+      .patch(`/api/zones/${syncZoneBId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ driverId: null });
+
+    expect(resUnassign.status).toBe(200);
+    expect(resUnassign.body.driverId).toBeNull();
+    expect(resUnassign.body.isActive).toBe(false);
+
+    const dbUnassign = await prisma.package.findUnique({ where: { id: pkgUnassign.id } });
+    expect(dbUnassign?.status).toBe("pending");
+    const histUnassign = await prisma.packageHistory.findMany({ where: { packageId: pkgUnassign.id } });
+    expect(histUnassign.some((h) => h.status === "pending")).toBe(true);
+  });
+
+  it("POST /api/zones/bulk-status transitions pending <-> assigned transactionally with history", async () => {
+    await prisma.zone.update({
+      where: { id: syncZoneBId },
+      data: { driverId: syncDriverId, isActive: false },
+    });
+
+    const pkgBulk = await prisma.package.create({
+      data: {
+        trackingCode: `SYNC-BULK-${Date.now()}`,
+        recipientName: "Bulk Sync Pkg",
+        recipientAddress: "Av. General Paz 100",
+        recipientPhone: "3511112225",
+        status: "pending",
+        zoneId: syncZoneBId,
+        companyId,
+      },
+    });
+
+    const resMissingBody = await request(app)
+      .post("/api/zones/bulk-status")
+      .set("Authorization", `Bearer ${token}`);
+    expect(resMissingBody.status).toBe(400);
+
+    const resOn = await request(app)
+      .post("/api/zones/bulk-status")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isActive: true });
+
+    expect(resOn.status).toBe(200);
+    const dbAfterOn = await prisma.package.findUnique({ where: { id: pkgBulk.id } });
+    expect(dbAfterOn?.status).toBe("assigned");
+
+    const resOff = await request(app)
+      .post("/api/zones/bulk-status")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isActive: false });
+
+    expect(resOff.status).toBe(200);
+    const dbAfterOff = await prisma.package.findUnique({ where: { id: pkgBulk.id } });
+    expect(dbAfterOff?.status).toBe("pending");
+
+    const history = await prisma.packageHistory.findMany({
+      where: { packageId: pkgBulk.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(history.map((h) => h.status)).toEqual(["assigned", "pending"]);
+  });
+
+  it("POST /api/drivers/:driverId/zones reverts assigned packages and records history when removing a zone", async () => {
+    await prisma.zone.update({
+      where: { id: syncZoneAId },
+      data: { driverId: syncDriverId, isActive: true },
+    });
+
+    const pkgRemoved = await prisma.package.create({
+      data: {
+        trackingCode: `SYNC-DRVRM-${Date.now()}`,
+        recipientName: "Driver Remove Zone Pkg",
+        recipientAddress: "Av. Velez Sarsfield 300",
+        recipientPhone: "3511112226",
+        status: "assigned",
+        zoneId: syncZoneAId,
+        companyId,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/api/drivers/${syncDriverId}/zones`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ zoneIds: [syncZoneBId] });
+
+    expect(res.status).toBe(200);
+
+    const updatedZoneA = await prisma.zone.findUnique({ where: { id: syncZoneAId } });
+    expect(updatedZoneA?.driverId).toBeNull();
+    expect(updatedZoneA?.isActive).toBe(false);
+
+    const dbPkg = await prisma.package.findUnique({ where: { id: pkgRemoved.id } });
+    expect(dbPkg?.status).toBe("pending");
+
+    const history = await prisma.packageHistory.findMany({ where: { packageId: pkgRemoved.id } });
+    expect(history.some((h) => h.status === "pending")).toBe(true);
   });
 });

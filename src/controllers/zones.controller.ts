@@ -29,13 +29,18 @@ export async function updateZone(req: AuthRequest, res: Response) {
   const { isActive, description, driverId, name, polygon } = req.body ?? {};
 
   try {
-      const zone = await ZoneService.updateZone(id, req.user!.companyId, {
-        isActive,
-        description,
-        driverId,
-        name,
-        polygon,
-      });
+      const zone = await ZoneService.updateZone(
+        id,
+        req.user!.companyId,
+        {
+          isActive,
+          description,
+          driverId,
+          name,
+          polygon,
+        },
+        req.user!.id
+      );
       res.json(zone);
   } catch (error: any) {
       if (error.message && error.message.includes('Cannot activate')) {
@@ -50,13 +55,13 @@ export async function updateZone(req: AuthRequest, res: Response) {
 }
 
 export async function setAllZonesStatus(req: AuthRequest, res: Response) {
-    const isActive = req.body.isActive as boolean;
+    const isActive = req.body?.isActive as boolean;
     if (typeof isActive !== 'boolean') {
         return res.status(400).json({ error: 'isActive boolean is required' });
     }
 
     try {
-        const result = await ZoneService.setAllZonesStatus(req.user!.companyId, isActive);
+        const result = await ZoneService.setAllZonesStatus(req.user!.companyId, isActive, req.user!.id);
         res.json(result);
     } catch (error) {
         console.error("Bulk Zone Update Error:", error);

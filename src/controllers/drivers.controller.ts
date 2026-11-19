@@ -29,9 +29,20 @@ export async function assignZonesToDriver(req: AuthRequest, res: Response) {
   const { zoneIds } = req.body;
 
   try {
-    const result = await DriverService.assignZones(req.user!.companyId, driverId as string, zoneIds);
+    const result = await DriverService.assignZones(
+      req.user!.companyId,
+      driverId as string,
+      zoneIds,
+      req.user!.id
+    );
     res.json(result);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === "driver_not_found") {
+      return res.status(404).json({ error: "driver not found" });
+    }
+    if (error?.message === "zones_not_founded_or_access_denied") {
+      return res.status(404).json({ error: "zones not found or access denied" });
+    }
     console.error("Error in assignZonesToDriver:", error);
     res.status(500).json({ error: "Failed to assign zones" });
   }
