@@ -35,6 +35,8 @@ export function MonitorPage() {
     const [selectedZones, setSelectedZones] = useState<string[]>([]);
     const [selectedDrivers, setSelectedDrivers] = useState<string[]>([]);
     const [packageSearch, setPackageSearch] = useState('');
+    const [isZoneDropdownOpen, setIsZoneDropdownOpen] = useState(false);
+    const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
 
     const { isConnected } = useSocket();
 
@@ -159,53 +161,73 @@ export function MonitorPage() {
                 <div className="flex flex-wrap gap-3 flex-1 justify-end w-full lg:w-auto">
                     
                     {/* Zone Filter Dropdown (Custom implementation for multi-select) */}
-                    <div className="relative group">
-                        <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white hover:border-purple-500 transition-colors">
+                    <div className="relative">
+                        <button
+                            type="button"
+                            aria-expanded={isZoneDropdownOpen}
+                            onClick={() => {
+                                setIsZoneDropdownOpen(prev => !prev);
+                                setIsDriverDropdownOpen(false);
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white hover:border-purple-500 transition-colors"
+                        >
                             <MapPin className="h-4 w-4 text-purple-400" />
                             {selectedZones.length > 0 ? `${selectedZones.length} Zonas` : 'Filtrar Zonas'}
                         </button>
                         {/* Dropdown Content */}
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-2 hidden group-hover:block z-[1000]">
-                            <div className="text-xs font-semibold text-slate-500 mb-2 px-2 uppercase">Seleccionar Zonas</div>
-                            <div className="max-h-60 overflow-y-auto space-y-1">
-                                {zones.map(z => (
-                                    <div 
-                                        key={z.id} 
-                                        onClick={() => toggleZone(z.id)}
-                                        className="flex items-center justify-between p-2 hover:bg-slate-800 rounded cursor-pointer"
-                                    >
-                                        <span className="text-sm text-slate-300">{z.name}</span>
-                                        {selectedZones.includes(z.id) && <Check className="h-4 w-4 text-purple-500" />}
-                                    </div>
-                                ))}
+                        {isZoneDropdownOpen && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-2 z-[1000]">
+                                <div className="text-xs font-semibold text-slate-500 mb-2 px-2 uppercase">Seleccionar Zonas</div>
+                                <div className="max-h-60 overflow-y-auto space-y-1">
+                                    {zones.map(z => (
+                                        <div 
+                                            key={z.id} 
+                                            onClick={() => toggleZone(z.id)}
+                                            className="flex items-center justify-between p-2 hover:bg-slate-800 rounded cursor-pointer"
+                                        >
+                                            <span className="text-sm text-slate-300">{z.name}</span>
+                                            {selectedZones.includes(z.id) && <Check className="h-4 w-4 text-purple-500" />}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Driver Filter Dropdown */}
-                    <div className="relative group">
-                        <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white hover:border-blue-500 transition-colors">
+                    <div className="relative">
+                        <button
+                            type="button"
+                            aria-expanded={isDriverDropdownOpen}
+                            onClick={() => {
+                                setIsDriverDropdownOpen(prev => !prev);
+                                setIsZoneDropdownOpen(false);
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white hover:border-blue-500 transition-colors"
+                        >
                             <Truck className="h-4 w-4 text-blue-400" />
                             {selectedDrivers.length > 0 ? `${selectedDrivers.length} Conductores` : 'Filtrar Conductores'}
                         </button>
-                         <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-2 hidden group-hover:block z-[1000]">
-                            <div className="text-xs font-semibold text-slate-500 mb-2 px-2 uppercase">Seleccionar Conductores</div>
-                            <div className="max-h-60 overflow-y-auto space-y-1">
-                                {drivers.map(d => (
-                                    <div 
-                                        key={d.id} 
-                                        onClick={() => toggleDriver(d.id)}
-                                        className="flex items-center justify-between p-2 hover:bg-slate-800 rounded cursor-pointer"
-                                    >
-                                        <div className="flex flex-col">
-                                            <span className="text-sm text-slate-300">{d.name}</span>
-                                            <span className="text-[10px] text-slate-500">@{d.user?.username}</span>
+                        {isDriverDropdownOpen && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-2 z-[1000]">
+                                <div className="text-xs font-semibold text-slate-500 mb-2 px-2 uppercase">Seleccionar Conductores</div>
+                                <div className="max-h-60 overflow-y-auto space-y-1">
+                                    {drivers.map(d => (
+                                        <div 
+                                            key={d.id} 
+                                            onClick={() => toggleDriver(d.id)}
+                                            className="flex items-center justify-between p-2 hover:bg-slate-800 rounded cursor-pointer"
+                                        >
+                                            <div className="flex flex-col">
+                                                <span className="text-sm text-slate-300">{d.name}</span>
+                                                <span className="text-[10px] text-slate-500">@{d.user?.username}</span>
+                                            </div>
+                                            {selectedDrivers.includes(d.id) && <Check className="h-4 w-4 text-blue-500" />}
                                         </div>
-                                        {selectedDrivers.includes(d.id) && <Check className="h-4 w-4 text-blue-500" />}
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Package Search */}
@@ -223,7 +245,8 @@ export function MonitorPage() {
                     {/* Clear Filters */}
                     {(selectedZones.length > 0 || selectedDrivers.length > 0 || packageSearch) && (
                         <button 
-                            onClick={() => { setSelectedZones([]); setSelectedDrivers([]); setPackageSearch(''); }}
+                            type="button"
+                            onClick={() => { setSelectedZones([]); setSelectedDrivers([]); setPackageSearch(''); setIsZoneDropdownOpen(false); setIsDriverDropdownOpen(false); }}
                             className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
                             title="Limpiar Filtros"
                         >
