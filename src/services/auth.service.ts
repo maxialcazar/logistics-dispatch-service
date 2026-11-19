@@ -28,6 +28,12 @@ export class AuthService {
           role: "admin",
           companyId: company.id,
         },
+        select: {
+          id: true,
+          username: true,
+          role: true,
+          companyId: true,
+        },
       });
 
       return { company, user };
