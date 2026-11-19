@@ -7,68 +7,105 @@ import jwt from "jsonwebtoken";
 
 let io: Server;
 
+function resolveSocketCorsOrigin(): string | string[] {
+	const rawCorsOrigin = process.env.CORS_ORIGIN?.trim();
+	if (!rawCorsOrigin) {
+		return ["http://localhost:5173", "http://localhost:8080"];
+	}
+	if (rawCorsOrigin === "*") {
+		return "*";
+	}
+	const origins = rawCorsOrigin
+		.split(",")
+		.map((origin) => origin.trim())
+		.filter(Boolean);
+	return origins.length > 0 ? origins : ["http://localhost:5173", "http://localhost:8080"];
+}
+
+function handleDriverLocationUpdated(data: any) {
+	if (io && data?.companyId) {
+		// Re-broadcast ONLY to Company Room (Data Privacy Enforcement)
+		io.to(`company-${data.companyId}`).emit("driver-location-updated", data);
+	}
+}
+
 export function initSocket(server: HttpServer) {
+	const corsOrigin = resolveSocketCorsOrigin();
+
 	io = new Server(server, {
 		cors: {
-			origin: "*", 
+			origin: corsOrigin,
 			methods: ["GET", "POST"],
+			...(corsOrigin !== "*" ? { credentials: true } : {}),
 		},
 	});
 
-	// Use the Singleton EventBus instead of opening a new Redis connection
-	eventBus.on("driver.location.updated", (data: any) => {
-			if (data.companyId) {
-				// Re-broadcast ONLY to Company Room (Data Privacy Enforcement)
-				io.to(`company-${data.companyId}`).emit("driver-location-updated", data);
-			}
-	});
+	// Use the Singleton EventBus instead of opening a new Redis connection (deduplicated)
+	eventBus.off("driver.location.updated", handleDriverLocationUpdated);
+	eventBus.on("driver.location.updated", handleDriverLocationUpdated);
 
 	io.on("connection", (socket) => {
 		logger.info(`🔌 Client connected: ${socket.id}`);
 
-        // Secure Room Joining via JWT
-        const token = socket.handshake.auth.token;
-        if (token) {
-            try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-                if (decoded.companyId) {
-                    const room = `company-${decoded.companyId}`;
-                    socket.join(room);
-                    logger.info(`🔐 Client ${socket.id} joined secure room: ${room}`);
+		const rawToken = socket.handshake.auth?.token;
+		const token = typeof rawToken === "string" ? rawToken.trim() : "";
+		const jwtSecret = process.env.JWT_SECRET;
 
-                    if (decoded.role === 'driver') {
-                         // Notify company that driver is online
-                         io.to(room).emit('driver-status-updated', { 
-                             driverId: decoded.driverId || decoded.userId || decoded.id, // JWT usually has id/userId
-                             status: 'online',
-                             name: decoded.username 
-                         });
-                    }
+		if (!token || !jwtSecret) {
+			logger.warn(`⚠️ Client ${socket.id} missing auth token or server secret, disconnecting.`);
+			socket.disconnect(true);
+			return;
+		}
 
-                    socket.on("disconnect", () => {
-			            logger.info(`🔌 Client disconnected: ${socket.id}`);
-                        if (decoded.role === 'driver') {
-                             io.to(room).emit('driver-status-updated', { 
-                                 driverId: decoded.driverId || decoded.userId || decoded.id, 
-                                 status: 'offline',
-                                 name: decoded.username 
-                             });
-                        }
-		            });
-                }
-            } catch (error) {
-                logger.warn(`⚠️ Client ${socket.id} provided invalid token, denied room access.`);
-                socket.on("disconnect", () => {
-			        logger.info(`🔌 Client disconnected: ${socket.id}`);
-		        });
-            }
-        } else {
-             socket.on("disconnect", () => {
-			    logger.info(`🔌 Client disconnected: ${socket.id}`);
-		    });
-        }
-		
-		// socket.on("join-room", ... ) // Removed/Legacy
+		try {
+			const decoded = jwt.verify(token, jwtSecret) as any;
+			if (
+				typeof decoded?.companyId !== "string" ||
+				!decoded.companyId.trim() ||
+				typeof decoded?.userId !== "string" ||
+				!decoded.userId.trim() ||
+				typeof decoded?.role !== "string" ||
+				!decoded.role.trim()
+			) {
+				logger.warn(`⚠️ Client ${socket.id} token missing required claims, disconnecting.`);
+				socket.disconnect(true);
+				return;
+			}
+
+			const companyId = decoded.companyId.trim();
+			const room = `company-${companyId}`;
+			socket.join(room);
+			logger.info(`🔐 Client ${socket.id} joined secure room: ${room}`);
+
+			const driverName =
+				typeof decoded.username === "string" && decoded.username.trim()
+					? decoded.username.trim()
+					: undefined;
+			const driverIdentifier = decoded.driverId || decoded.userId || decoded.id;
+
+			if (decoded.role === "driver") {
+				// Notify company that driver is online
+				io.to(room).emit("driver-status-updated", {
+					driverId: driverIdentifier,
+					status: "online",
+					name: driverName,
+				});
+			}
+
+			socket.on("disconnect", () => {
+				logger.info(`🔌 Client disconnected: ${socket.id}`);
+				if (decoded.role === "driver") {
+					io.to(room).emit("driver-status-updated", {
+						driverId: driverIdentifier,
+						status: "offline",
+						name: driverName,
+					});
+				}
+			});
+		} catch {
+			logger.warn(`⚠️ Client ${socket.id} provided invalid token, disconnecting.`);
+			socket.disconnect(true);
+		}
 	});
 
 	return io;
