@@ -131,7 +131,7 @@ export function DriverMap() {
                                  <p className="text-xs text-slate-600 mb-2">{pkg.recipientAddress}</p>
                                  <button 
                                     onClick={() => openNav(pkg.lat!, pkg.lng!)}
-                                    className="w-full bg-blue-600 text-white text-xs font-bold py-2 rounded flex items-center justify-center gap-2"
+                                    className="w-full min-h-[48px] bg-blue-600 text-white text-xs font-bold py-2 rounded flex items-center justify-center gap-2"
                                  >
                                      <Navigation size={12} /> Navegar Aquí
                                  </button>
@@ -158,7 +158,7 @@ export function DriverMap() {
                  {packages.length > 0 && packages[0].lat && packages[0].lng && (
                      <button 
                         onClick={() => openNav(packages[0].lat!, packages[0].lng!)}
-                        className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-purple-900/20 text-sm flex items-center gap-2 animate-pulse"
+                        className="min-h-[48px] bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-purple-900/20 text-sm flex items-center gap-2 animate-pulse"
                      >
                          <Navigation className="h-4 w-4" />
                          Ir al #1
