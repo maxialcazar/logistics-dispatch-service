@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+const GEOCODE_TIMEOUT_MS = 5000;
+
 interface GeoResult {
   lat: number;
   lng: number;
@@ -17,7 +19,8 @@ export async function geocodeAddress(address: string): Promise<GeoResult | null>
       },
       headers: {
         'User-Agent': 'LogisticsDispatchService/1.0'
-      }
+      },
+      timeout: GEOCODE_TIMEOUT_MS
     });
 
     if (response.data && response.data.length > 0) {
@@ -40,7 +43,8 @@ export async function geocodeAddress(address: string): Promise<GeoResult | null>
         params: {
           address,
           key: googleKey
-        }
+        },
+        timeout: GEOCODE_TIMEOUT_MS
       });
 
       if (response.data && response.data.status === 'OK' && response.data.results.length > 0) {
@@ -66,7 +70,8 @@ export async function geocodeAddress(address: string): Promise<GeoResult | null>
         params: {
           access_token: mapboxKey,
           limit: 1
-        }
+        },
+        timeout: GEOCODE_TIMEOUT_MS
       });
 
       if (response.data && response.data.features && response.data.features.length > 0) {

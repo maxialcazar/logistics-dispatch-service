@@ -1,8 +1,11 @@
 import "dotenv/config";
 import request from "supertest";
+import axios from "axios";
 import app from "../src/app";
 import { prisma } from "../src/prisma";
 import { redis } from "../src/redis";
+import { detectZone } from "../src/utils/geofencing";
+import { geocodeAddress } from "../src/utils/geocoder";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const SLUG_A = `company-a-${Date.now()}`;
@@ -460,5 +463,174 @@ describe("Task 1.2.5 — getMyPackages archive filter & getPackageHistory zone a
       .set("Authorization", `Bearer ${tokenA}`);
     expect(adminRes.status).toBe(200);
     expect(Array.isArray(adminRes.body)).toBe(true);
+  });
+});
+
+// ─── Task 1.2.6 — detectZone active filter, geocoder timeout & locality ───────
+describe("Task 1.2.6 — detectZone active filter, geocoder timeout & explicit locality", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("detectZone ignores inactive zones and matches only isActive: true zones", async () => {
+    const polygon = [
+      [-58.40, -34.62],
+      [-58.36, -34.62],
+      [-58.36, -34.59],
+      [-58.40, -34.59],
+    ];
+
+    const zone = await prisma.zone.create({
+      data: {
+        name: `Toggle Geo Zone ${Date.now()}`,
+        companyId: companyAId,
+        isActive: false,
+        polygon,
+      },
+    });
+
+    const inactiveMatch = await detectZone(companyAId, -34.605, -58.38);
+    expect(inactiveMatch).toBeNull();
+
+    await prisma.zone.update({
+      where: { id: zone.id },
+      data: { isActive: true },
+    });
+
+    const activeMatch = await detectZone(companyAId, -34.605, -58.38);
+    expect(activeMatch).toEqual({ id: zone.id, name: zone.name });
+  });
+
+  it("geocodeAddress passes a 5000ms timeout to axios.get", async () => {
+    const axiosSpy = jest.spyOn(axios, "get").mockResolvedValueOnce({
+      data: [{ lat: "-34.6037", lon: "-58.3816" }],
+    } as any);
+
+    const result = await geocodeAddress("Av. Corrientes 1234, CABA, Argentina");
+
+    expect(result).toEqual({ lat: -34.6037, lng: -58.3816 });
+    expect(axiosSpy).toHaveBeenCalledWith(
+      "https://nominatim.openstreetmap.org/search",
+      expect.objectContaining({
+        timeout: 5000,
+        params: expect.objectContaining({ q: "Av. Corrientes 1234, CABA, Argentina" }),
+      })
+    );
+  });
+
+  it("does not append Cordoba, Argentina when payload includes explicit city/country", async () => {
+    const axiosSpy = jest.spyOn(axios, "get").mockResolvedValue({
+      data: [{ lat: "-34.6037", lon: "-58.3816" }],
+    } as any);
+
+    const suffix = Date.now();
+
+    const resInline = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-GEO-INLINE-${suffix}`,
+        recipientName: "Carla CABA",
+        recipientAddress: "Av. Corrientes 1234, CABA, Argentina",
+        recipientPhone: "1155550001",
+        addressStreet: "Av. Corrientes",
+        addressNumber: "1234",
+      });
+
+    expect(resInline.status).toBe(201);
+    expect(axiosSpy).toHaveBeenNthCalledWith(
+      1,
+      "https://nominatim.openstreetmap.org/search",
+      expect.objectContaining({
+        params: expect.objectContaining({ q: "Av. Corrientes 1234, CABA, Argentina" }),
+      })
+    );
+
+    const resFields = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-GEO-FIELDS-${suffix}`,
+        recipientName: "Pedro Rosario",
+        recipientAddress: "Bv. Orono 500",
+        recipientPhone: "3415550002",
+        addressCity: "Rosario",
+        addressCountry: "Argentina",
+      });
+
+    expect(resFields.status).toBe(201);
+    expect(resFields.body.addressCity).toBe("Rosario");
+    expect(axiosSpy).toHaveBeenNthCalledWith(
+      2,
+      "https://nominatim.openstreetmap.org/search",
+      expect.objectContaining({
+        params: expect.objectContaining({ q: "Bv. Orono 500, Rosario, Argentina" }),
+      })
+    );
+
+    const resDefault = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-GEO-DEF-${suffix}`,
+        recipientName: "Luis Default",
+        recipientAddress: "Av. Colon 500",
+        recipientPhone: "3515550003",
+        addressStreet: "Av. Colon",
+        addressNumber: "500",
+      });
+
+    expect(resDefault.status).toBe(201);
+    expect(axiosSpy).toHaveBeenNthCalledWith(
+      3,
+      "https://nominatim.openstreetmap.org/search",
+      expect.objectContaining({
+        params: expect.objectContaining({ q: "Av. Colon 500, Cordoba, Argentina" }),
+      })
+    );
+
+    const resNoDup = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-GEO-NODUP-${suffix}`,
+        recipientName: "Ana CABA",
+        recipientAddress: "Av. Corrientes 1234, CABA, Argentina",
+        recipientPhone: "1155550004",
+        addressStreet: "   ",
+        addressNumber: "   ",
+        addressCity: "CABA",
+        addressCountry: "Argentina",
+        lat: null,
+        lng: null,
+      });
+
+    expect(resNoDup.status).toBe(201);
+    expect(axiosSpy).toHaveBeenNthCalledWith(
+      4,
+      "https://nominatim.openstreetmap.org/search",
+      expect.objectContaining({
+        params: expect.objectContaining({ q: "Av. Corrientes 1234, CABA, Argentina" }),
+      })
+    );
+
+    const resDiacritic = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-GEO-PERU-${suffix}`,
+        recipientName: "Carlos Lima",
+        recipientAddress: "Av. Arequipa 1200 Perú",
+        recipientPhone: "5155550005",
+      });
+
+    expect(resDiacritic.status).toBe(201);
+    expect(axiosSpy).toHaveBeenNthCalledWith(
+      5,
+      "https://nominatim.openstreetmap.org/search",
+      expect.objectContaining({
+        params: expect.objectContaining({ q: "Av. Arequipa 1200 Perú" }),
+      })
+    );
   });
 });

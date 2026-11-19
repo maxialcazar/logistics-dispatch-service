@@ -116,6 +116,8 @@ export class PackageService {
     recipientEmail?: string;
     addressStreet?: string;
     addressNumber?: string;
+    addressCity?: string;
+    addressCountry?: string;
     addressReferences?: string;
     senderName?: string;
     senderAddress?: string;
@@ -124,15 +126,15 @@ export class PackageService {
     volume?: number;
     zoneId?: string; // Optional now? No, kept required for logic
     userId: string;
-    lat?: number;
-    lng?: number;
+    lat?: number | null;
+    lng?: number | null;
     estimatedDeliveryAt?: Date;
   }) {
     // ... logic ...
     const { 
       trackingCode, 
       recipientName, recipientAddress, recipientPhone, recipientEmail,
-      addressStreet, addressNumber, addressReferences,
+      addressStreet, addressNumber, addressCity, addressCountry, addressReferences,
       senderName, senderAddress, senderPhone,
       weight, volume,
       zoneId, userId, lat, lng, estimatedDeliveryAt 
@@ -151,27 +153,63 @@ export class PackageService {
     let finalLat = lat;
     let finalLng = lng;
 
-    if ((!finalLat || !finalLng) && recipientAddress) {
-        let queryAddr = recipientAddress;
+    const trimmedRecipient = recipientAddress?.trim();
+    if ((finalLat == null || finalLng == null) && trimmedRecipient) {
+        const street = addressStreet?.trim();
+        const number = addressNumber?.trim();
+        const hasStreetAndNumber = Boolean(street && number);
+        const baseStreet = hasStreetAndNumber ? `${street} ${number}` : trimmedRecipient;
 
-        if (addressStreet && addressNumber) {
-             queryAddr = `${addressStreet} ${addressNumber}, Cordoba, Argentina`;
-        } else if (!recipientAddress.toLowerCase().includes("argentina")) {
-             queryAddr = `${recipientAddress}, Cordoba, Argentina`;
+        const normalizeText = (value: string) =>
+          value
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+        const normalizedRecipient = normalizeText(trimmedRecipient);
+
+        const recipientParts = trimmedRecipient
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean);
+        const localityTerms = [addressCity?.trim(), addressCountry?.trim()].filter(
+          (term): term is string => Boolean(term)
+        );
+        const missingLocalityTerms = hasStreetAndNumber
+          ? localityTerms
+          : localityTerms.filter((term) => !normalizedRecipient.includes(normalizeText(term)));
+        const explicitLocalityFromField = missingLocalityTerms.join(", ");
+        const explicitLocalityFromAddress =
+          recipientParts.length >= 2 ? recipientParts.slice(1).join(", ") : "";
+        const hasInlineCountryOrCity =
+          /\b(argentina|cordoba|buenos aires|caba|rosario|mendoza|chile|uruguay|brasil|brazil|mexico|colombia|peru|espana|spain|usa)\b/i.test(
+            normalizedRecipient
+          );
+
+        let queryAddr: string;
+        if (explicitLocalityFromField) {
+          queryAddr = `${baseStreet}, ${explicitLocalityFromField}`;
+        } else if (localityTerms.length > 0) {
+          queryAddr = trimmedRecipient;
+        } else if (explicitLocalityFromAddress) {
+          queryAddr = hasStreetAndNumber
+            ? `${baseStreet}, ${explicitLocalityFromAddress}`
+            : trimmedRecipient;
+        } else if (hasInlineCountryOrCity) {
+          queryAddr = trimmedRecipient;
+        } else {
+          queryAddr = `${baseStreet}, Cordoba, Argentina`;
         }
 
         const geo = await geocodeAddress(queryAddr);
         if (geo) {
             finalLat = geo.lat;
             finalLng = geo.lng;
-        } else {
-            // Geocoding failed
         }
     }
     // -----------------------
 
     // --- Auto Geofencing: detect zone if not provided ---
-    if (!resolvedZoneId && finalLat && finalLng) {
+    if (!resolvedZoneId && finalLat != null && finalLng != null) {
         try {
             const detected = await ZoneService.detectZone(companyId, finalLat, finalLng);
             if (detected) {
@@ -214,6 +252,7 @@ export class PackageService {
           recipientEmail,
           addressStreet,
           addressNumber,
+          addressCity: addressCity?.trim() || undefined,
           addressReferences,
           senderName,
           senderAddress,

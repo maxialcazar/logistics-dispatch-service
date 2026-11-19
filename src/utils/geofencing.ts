@@ -56,6 +56,7 @@ export async function detectZone(
   const zones = await prisma.zone.findMany({
     where: {
       companyId,
+      isActive: true,
       polygon: { not: Prisma.DbNull },
     },
     select: {

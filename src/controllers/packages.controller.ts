@@ -25,7 +25,7 @@ export async function createPackage(req: AuthRequest, res: Response) {
   const { 
     trackingCode, 
     recipientName, recipientAddress, recipientPhone, recipientEmail,
-    addressStreet, addressNumber, addressReferences,
+    addressStreet, addressNumber, addressCity, addressCountry, addressReferences,
     senderName, senderAddress, senderPhone,
     weight, volume,
     zoneId, lat, lng, estimatedDeliveryAt 
@@ -40,6 +40,8 @@ export async function createPackage(req: AuthRequest, res: Response) {
       recipientEmail,
       addressStreet,
       addressNumber,
+      addressCity,
+      addressCountry,
       addressReferences,
       senderName,
       senderAddress,

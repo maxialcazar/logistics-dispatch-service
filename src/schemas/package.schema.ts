@@ -14,6 +14,8 @@ export const createPackageSchema = z.object({
     addressReferences: z.string().optional(),
     addressStreet: z.string().optional(),
     addressNumber: z.string().optional(),
+    addressCity: z.string().optional(),
+    addressCountry: z.string().optional(),
 
     // Sender Info (Optional)
     senderName: z.string().optional().or(z.literal("")),
