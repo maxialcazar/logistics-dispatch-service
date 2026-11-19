@@ -94,16 +94,16 @@ export async function updatePackageStatus(req: AuthRequest, res: Response) {
     });
     res.json(updated);
   } catch (error: any) {
-    if (error.message === "package_not_found") {
+    if (error?.message === "package_not_found") {
       return res.status(404).json({ error: "package not found" });
       
     }
-    if (error.message === "not_authorized_for_zone") {
+    if (error?.message === "not_authorized_for_zone") {
       return res.status(403).json({ error: "not authorized for this zone" });
     }
-    if (error.message.startsWith("invalid_transition")) {
+    if (typeof error?.message === "string" && error.message.startsWith("invalid_transition")) {
       const [, from, to] = error.message.split(":");
-      return res.status(400).json({
+      return res.status(422).json({
         error: "invalid status transition",
         from,
         to,
@@ -121,14 +121,22 @@ export async function assignPackageToDriver(req: AuthRequest, res: Response) {
     const updated = await PackageService.assignToDriver(req.user!.companyId, packageId, driverId, req.user!.id);
     res.json(updated);
   } catch (error: any) {
-    if (error.message === "package_not_found") {
+    if (error?.message === "package_not_found") {
       return res.status(404).json({ error: "package not found" });
     }
-    if (error.message === "driver_not_found") {
+    if (error?.message === "driver_not_found") {
       return res.status(404).json({ error: "driver not found" });
     }
-    if (error.message === "driver_not_in_zone") {
+    if (error?.message === "driver_not_in_zone") {
       return res.status(400).json({ error: "driver is not assigned to this package's zone" });
+    }
+    if (typeof error?.message === "string" && error.message.startsWith("invalid_transition")) {
+      const [, from, to] = error.message.split(":");
+      return res.status(422).json({
+        error: "invalid status transition",
+        from,
+        to,
+      });
     }
     res.status(500).json({ error: "Internal Server Error" });
   }

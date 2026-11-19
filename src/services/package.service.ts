@@ -184,8 +184,28 @@ export class PackageService {
     }
     // ----------------------------------------------------
 
-    return prisma.$transaction(async (tx) => {
-      const pkg = await tx.package.create({
+    const pkg = await prisma.$transaction(async (tx) => {
+      let initialStatus: PackageStatus = "pending";
+      let targetZoneId = resolvedZoneId;
+
+      if (targetZoneId) {
+        const zoneRows = await tx.$queryRaw<{ isActive: boolean; driverId: string | null }[]>`
+          SELECT "isActive", "driverId"
+          FROM "Zone"
+          WHERE "id" = ${targetZoneId} AND "companyId" = ${companyId}
+          FOR SHARE
+        `;
+        if (zoneRows.length === 0) {
+          if (zoneId) {
+            throw new Error("zone_not_found");
+          }
+          targetZoneId = undefined;
+        } else if (zoneRows[0].isActive && zoneRows[0].driverId) {
+          initialStatus = "assigned";
+        }
+      }
+
+      return tx.package.create({
         data: { 
           trackingCode, 
           recipientName,
@@ -203,14 +223,16 @@ export class PackageService {
           lat: finalLat,
           lng: finalLng,
           estimatedDeliveryAt,
-          zoneId: resolvedZoneId,
+          zoneId: targetZoneId,
           companyId,
-          status: "pending",
+          status: initialStatus,
           history: {
             create: {
-              status: "pending",
+              status: initialStatus,
               userId,
-              notes: `Package created for ${recipientName} at ${recipientAddress}`
+              notes: initialStatus === "assigned"
+                ? `Package created for ${recipientName} at ${recipientAddress} (auto-assigned to active zone)`
+                : `Package created for ${recipientName} at ${recipientAddress}`
             }
           }
         },
@@ -220,20 +242,20 @@ export class PackageService {
           }
         },
       });
-      
-      emitToRoom(`company-${companyId}`, "package-created", pkg);
-      
-      // Emit Business Event
-      emitToRoom(`company-${companyId}`, "business-event", {
-        id: `evt-${Date.now()}`,
-        type: 'SYSTEM',
-        title: 'Nuevo Paquete',
-        description: `Se ha creado el paquete #${trackingCode} para ${recipientName}`,
-        timestamp: Date.now()
-      });
-
-      return pkg;
     });
+
+    emitToRoom(`company-${companyId}`, "package-created", pkg);
+
+    // Emit Business Event
+    emitToRoom(`company-${companyId}`, "business-event", {
+      id: `evt-${Date.now()}`,
+      type: 'SYSTEM',
+      title: 'Nuevo Paquete',
+      description: `Se ha creado el paquete #${trackingCode} para ${recipientName}`,
+      timestamp: Date.now()
+    });
+
+    return pkg;
   }
 
 // ... 
@@ -367,24 +389,35 @@ export class PackageService {
   }
 
   static async assignToDriver(companyId: string, packageId: string, driverId: string, userId: string) {
-    const pkg = await prisma.package.findFirst({ 
-      where: { id: packageId, companyId },
-      include: { zone: true } 
-    });
-    if (!pkg) throw new Error("package_not_found");
+    const { updated, driverName, trackingCode } = await prisma.$transaction(async (tx) => {
+      const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id"
+        FROM "Package"
+        WHERE "id" = ${packageId} AND "companyId" = ${companyId}
+        FOR UPDATE
+      `;
+      if (lockedRows.length === 0) throw new Error("package_not_found");
 
-    const driver = await prisma.driver.findFirst({
-      where: { id: driverId, companyId },
-      include: { zones: true },
-    });
-    if (!driver) throw new Error("driver_not_found");
+      const currentPkg = await tx.package.findFirst({
+        where: { id: packageId, companyId },
+        include: { zone: true },
+      });
+      if (!currentPkg) throw new Error("package_not_found");
 
-    if (!pkg.zone || pkg.zone.driverId !== driverId) {
-      throw new Error("driver_not_in_zone");
-    }
+      if (currentPkg.status !== "pending" && currentPkg.status !== "assigned") {
+        throw new Error(`invalid_transition:${currentPkg.status}:assigned`);
+      }
 
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.package.update({
+      const driver = await tx.driver.findFirst({
+        where: { id: driverId, companyId },
+      });
+      if (!driver) throw new Error("driver_not_found");
+
+      if (!currentPkg.zone || currentPkg.zone.driverId !== driverId) {
+        throw new Error("driver_not_in_zone");
+      }
+
+      const saved = await tx.package.update({
         where: { id: packageId },
         data: { status: "assigned" },
         include: { 
@@ -403,19 +436,21 @@ export class PackageService {
         }
       });
 
-      emitToRoom(`company-${companyId}`, "package-assigned", { packageId, driverId, driverName: driver.name });
-      
-      // Emit Business Event
-      emitToRoom(`company-${companyId}`, "business-event", {
-        id: `evt-${Date.now()}`,
-        type: 'SYSTEM',
-        title: 'Asignación Manual',
-        description: `Paquete #${pkg.trackingCode} asignado a conductor ${driver.name}`,
-        timestamp: Date.now()
-      });
-
-      return updated;
+      return { updated: saved, driverName: driver.name, trackingCode: currentPkg.trackingCode };
     });
+
+    emitToRoom(`company-${companyId}`, "package-assigned", { packageId, driverId, driverName });
+    
+    // Emit Business Event
+    emitToRoom(`company-${companyId}`, "business-event", {
+      id: `evt-${Date.now()}`,
+      type: 'SYSTEM',
+      title: 'Asignación Manual',
+      description: `Paquete #${trackingCode} asignado a conductor ${driverName}`,
+      timestamp: Date.now()
+    });
+
+    return updated;
   }
 
   static async getPackagesByDriver(companyId: string, driverId: string) {

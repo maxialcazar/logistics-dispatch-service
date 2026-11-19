@@ -66,6 +66,9 @@ afterAll(async () => {
   await prisma.user.deleteMany({
     where: { companyId: { in: [companyAId, companyBId] } },
   });
+  await prisma.driver.deleteMany({
+    where: { companyId: { in: [companyAId, companyBId] } },
+  });
   await prisma.company.deleteMany({
     where: { id: { in: [companyAId, companyBId] } },
   });
@@ -173,5 +176,169 @@ describe("Multi-Tenant Isolation", () => {
 
     // Must be 404 (package not found in Company B's scope) or 403
     expect([403, 404, 422]).toContain(res.status);
+  });
+});
+
+// ─── Task 1.2.3 — Auto-assign on active zone & assignToDriver state guard ─────
+describe("Task 1.2.3 — Auto-assign on active zone & assignToDriver state guard", () => {
+  let taskDriverId: string;
+  let activeGeoZoneId: string;
+  let inactiveAssignedZoneId: string;
+
+  beforeAll(async () => {
+    const driver = await prisma.driver.create({
+      data: { name: "Task 1.2.3 Driver", companyId: companyAId },
+    });
+    taskDriverId = driver.id;
+
+    const activeZone = await prisma.zone.create({
+      data: {
+        name: "Active Geo Zone",
+        companyId: companyAId,
+        driverId: taskDriverId,
+        isActive: true,
+        polygon: [
+          [-64.20, -31.43],
+          [-64.16, -31.43],
+          [-64.16, -31.40],
+          [-64.20, -31.40],
+        ],
+      },
+    });
+    activeGeoZoneId = activeZone.id;
+
+    const inactiveZone = await prisma.zone.create({
+      data: {
+        name: "Inactive Zone With Driver",
+        companyId: companyAId,
+        driverId: taskDriverId,
+        isActive: false,
+      },
+    });
+    inactiveAssignedZoneId = inactiveZone.id;
+  });
+
+  it("should auto-assign package when geofenced zone is active and has a driver", async () => {
+    const res = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-AUTO-${Date.now()}`,
+        recipientName: "Laura Auto",
+        recipientAddress: "Av. Hipolito Yrigoyen 100, Cordoba",
+        recipientPhone: "3515551234",
+        lat: -31.415,
+        lng: -64.18,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.zoneId).toBe(activeGeoZoneId);
+    expect(res.body.status).toBe("assigned");
+  });
+
+  it("should keep status pending when zone is inactive even if it has a driver", async () => {
+    const res = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({
+        trackingCode: `PKG-INACTIVE-${Date.now()}`,
+        recipientName: "Mario Pending",
+        recipientAddress: "Av. Colon 200, Cordoba",
+        recipientPhone: "3515559876",
+        lat: -31.50,
+        lng: -64.50,
+        zoneId: inactiveAssignedZoneId,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.zoneId).toBe(inactiveAssignedZoneId);
+    expect(res.body.status).toBe("pending");
+  });
+
+  it("should reject assignToDriver with 422 when package is in_transit, delivered, or cancelled", async () => {
+    const inTransitPkg = await prisma.package.create({
+      data: {
+        trackingCode: `PKG-TRANSIT-${Date.now()}`,
+        recipientName: "Transit User",
+        recipientAddress: "Calle Falsa 000",
+        recipientPhone: "3510000000",
+        status: "in_transit",
+        zoneId: activeGeoZoneId,
+        companyId: companyAId,
+      },
+    });
+
+    const resInTransit = await request(app)
+      .post(`/api/packages/${inTransitPkg.id}/assign`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ driverId: taskDriverId });
+
+    expect(resInTransit.status).toBe(422);
+    const dbInTransit = await prisma.package.findUnique({ where: { id: inTransitPkg.id } });
+    expect(dbInTransit?.status).toBe("in_transit");
+
+    const deliveredPkg = await prisma.package.create({
+      data: {
+        trackingCode: `PKG-DELIV-${Date.now()}`,
+        recipientName: "Delivered User",
+        recipientAddress: "Calle Falsa 123",
+        recipientPhone: "3510001111",
+        status: "delivered",
+        zoneId: activeGeoZoneId,
+        companyId: companyAId,
+      },
+    });
+
+    const cancelledPkg = await prisma.package.create({
+      data: {
+        trackingCode: `PKG-CANCEL-${Date.now()}`,
+        recipientName: "Cancelled User",
+        recipientAddress: "Calle Falsa 456",
+        recipientPhone: "3510002222",
+        status: "cancelled",
+        zoneId: activeGeoZoneId,
+        companyId: companyAId,
+      },
+    });
+
+    const resDelivered = await request(app)
+      .post(`/api/packages/${deliveredPkg.id}/assign`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ driverId: taskDriverId });
+
+    expect(resDelivered.status).toBe(422);
+    const dbDelivered = await prisma.package.findUnique({ where: { id: deliveredPkg.id } });
+    expect(dbDelivered?.status).toBe("delivered");
+
+    const resCancelled = await request(app)
+      .post(`/api/packages/${cancelledPkg.id}/assign`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ driverId: taskDriverId });
+
+    expect(resCancelled.status).toBe(422);
+    const dbCancelled = await prisma.package.findUnique({ where: { id: cancelledPkg.id } });
+    expect(dbCancelled?.status).toBe("cancelled");
+  });
+
+  it("should assign pending package to driver via POST /api/packages/:id/assign", async () => {
+    const pendingPkg = await prisma.package.create({
+      data: {
+        trackingCode: `PKG-PEND-${Date.now()}`,
+        recipientName: "Pending User",
+        recipientAddress: "Calle Real 789",
+        recipientPhone: "3510003333",
+        status: "pending",
+        zoneId: inactiveAssignedZoneId,
+        companyId: companyAId,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/api/packages/${pendingPkg.id}/assign`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ driverId: taskDriverId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("assigned");
   });
 });
