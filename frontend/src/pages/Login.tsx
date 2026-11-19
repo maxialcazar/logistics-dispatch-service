@@ -71,7 +71,7 @@ export function Login() {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-700 bg-slate-950 pl-10 p-2.5 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none transition-colors"
+                  className="block w-full min-h-[48px] rounded-lg border border-slate-700 bg-slate-950 pl-10 p-2.5 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none transition-colors"
                 />
               </div>
             </div>
@@ -87,7 +87,7 @@ export function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-700 bg-slate-950 pl-10 p-2.5 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none transition-colors"
+                  className="block w-full min-h-[48px] rounded-lg border border-slate-700 bg-slate-950 pl-10 p-2.5 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-blue-500 focus:outline-none transition-colors"
                 />
               </div>
             </div>
@@ -96,13 +96,13 @@ export function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full min-h-[48px] rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {loading ? 'Autenticando...' : 'Ingresar'}
           </button>
         </form>
 
-        <div className="text-center text-xs text-slate-500">
+        <div className="text-center text-xs text-slate-400">
           <p>Credenciales Demo: adminA / 123456</p>
         </div>
       </div>
