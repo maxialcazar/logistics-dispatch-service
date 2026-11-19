@@ -7,9 +7,10 @@ import { toast } from 'sonner';
 import { useDriverLocation } from '../hooks/useDriverLocation';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { enqueueStatusUpdate } from '../services/offlineQueue';
+import { Skeleton } from '../components/Skeleton';
 
 // ---------- Canvas Signature Pad Hook ----------
-function useSignaturePad(canvasRef: React.RefObject<HTMLCanvasElement>) {
+function useSignaturePad(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const isDrawing = useRef(false);
 
   const getPos = (e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement) => {
@@ -130,7 +131,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
               <p className="text-xs text-slate-500 font-mono">#{pkg.trackingCode}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 transition-colors">
+          <button onClick={onClose} className="min-h-[48px] min-w-[48px] p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 transition-colors flex items-center justify-center">
             <X size={18} />
           </button>
         </div>
@@ -154,7 +155,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
               </label>
               <button
                 onClick={clearCanvas}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-400 transition-colors"
+                className="min-h-[48px] px-2 flex items-center gap-1 text-xs text-slate-500 hover:text-red-400 transition-colors"
               >
                 <Trash2 size={11} />
                 Borrar
@@ -196,7 +197,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
                 />
                 <button
                   onClick={() => setPhotoDataUrl(null)}
-                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white hover:bg-red-600 transition-colors"
+                  className="min-h-[48px] min-w-[48px] absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white hover:bg-red-600 transition-colors flex items-center justify-center"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -204,7 +205,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 hover:border-blue-500/50 hover:bg-slate-900 transition-all flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-blue-400"
+                className="w-full min-h-[48px] h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 hover:border-blue-500/50 hover:bg-slate-900 transition-all flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-blue-400"
               >
                 <Camera size={24} />
                 <span className="text-xs font-medium">Tomar foto del paquete</span>
@@ -226,7 +227,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
         <div className="px-5 py-4 border-t border-slate-800 grid grid-cols-2 gap-3">
           <button
             onClick={onClose}
-            className="py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 font-medium transition-all text-sm"
+            className="min-h-[48px] py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 font-medium transition-all text-sm"
           >
             Cancelar
           </button>
@@ -234,7 +235,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
             onClick={handleConfirm}
             disabled={submitting}
             className={clsx(
-              "py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
+              "min-h-[48px] py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
               submitting
                 ? "bg-green-700/50 text-green-300 cursor-not-allowed"
                 : "bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30 active:scale-95"
@@ -422,16 +423,98 @@ export function DriverDashboard() {
 
   // ---------- Render States ----------
   if (loading) {
-    return <div className="p-8 text-center text-slate-500 animate-pulse">Cargando tareas...</div>;
+    return (
+      <div className="p-4 space-y-4 pb-24">
+        <div className="flex justify-between items-center mb-2">
+          <Skeleton className="h-7 w-40" />
+          <div className="flex gap-2">
+            <Skeleton className="h-12 w-24 rounded-lg" />
+            <Skeleton className="h-12 w-24 rounded-lg" />
+          </div>
+        </div>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex justify-between">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-64" />
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <Skeleton className="col-span-2 h-12 rounded-lg" />
+              <Skeleton className="col-span-2 h-12 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
-  if (packages.length === 0) {
-    return (
-      <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full gap-4">
-        <div className="h-20 w-20 bg-slate-800 rounded-full flex items-center justify-center">
-          <Check className="h-10 w-10 text-green-500" />
+  return (
+    <>
+      {/* POD Modal */}
+      {podPackage && (
+        <PODModal
+          pkg={podPackage}
+          onConfirm={handleDeliveryConfirm}
+          onClose={() => setPodPackage(null)}
+        />
+      )}
+
+      {/* Offline / Pending Sync Banner */}
+      {(!isOnline || pendingCount > 0) && (
+        <div className="sticky top-0 z-40 flex items-center justify-between gap-3 bg-amber-500/10 border-b border-amber-500/30 px-4 py-2.5 backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-amber-400">
+            <WifiOff size={15} className="flex-shrink-0" />
+            <span className="text-xs font-semibold">
+              {!isOnline
+                ? `Sin conexión${pendingCount > 0 ? ` — ${pendingCount} entrega(s) en cola` : ''}`
+                : `${pendingCount} entrega(s) pendiente(s) de sincronizar`}
+            </span>
+          </div>
+          <button
+            onClick={syncNow}
+            className="min-h-[48px] px-3 flex items-center gap-1 text-xs text-amber-300 hover:text-amber-100 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Sincronizar
+          </button>
         </div>
-        <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
+      )}
+
+      {packages.length === 0 ? (
+        <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full gap-4">
+          <div className="h-20 w-20 bg-slate-800 rounded-full flex items-center justify-center">
+            <Check className="h-10 w-10 text-green-500" />
+          </div>
+          <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
+          <p>No tienes paquetes pendientes asignados.</p>
+          <button
+            onClick={fetchMyPackages}
+            className="min-h-[48px] px-4 text-blue-500 underline text-sm flex items-center justify-center"
+          >
+            Actualizar
+          </button>
+        </div>
+      ) : (
+        <div className="p-4 space-y-4 pb-24 relative">
+          <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
+            <span>Mis Entregas ({packages.length})</span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleOptimizeRoute}
+                className="min-h-[48px] text-xs text-purple-400 bg-purple-900/20 px-3 py-2 rounded-lg border border-purple-500/20 flex items-center gap-1.5 hover:bg-purple-900/40 transition-colors"
+              >
+                <Route size={12} /> Optimizar
+              </button>
+              <button
+                onClick={fetchMyPackages}
+                className="min-h-[48px] text-xs text-blue-400 bg-blue-900/20 px-3 py-2 rounded-lg flex items-center justify-center hover:bg-blue-900/40 transition-colors"
+              >
+                Refrescar
+              </button>
+            </div>
+          </h2>
         <p>No tienes paquetes pendientes asignados.</p>
         <button onClick={fetchMyPackages} className="text-blue-500 underline text-sm">Actualizar</button>
       </div>
@@ -529,7 +612,7 @@ export function DriverDashboard() {
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <button
                   onClick={() => openNavigation(pkg)}
-                  className="col-span-2 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                  className="col-span-2 min-h-[48px] bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-700 transition-all"
                 >
                   <Navigation className="h-4 w-4 text-blue-400" />
                   Navegar a Destino
@@ -539,7 +622,7 @@ export function DriverDashboard() {
                   <button
                     onClick={() => handleStatusUpdate(pkg, 'in_transit')}
                     disabled={!!updating}
-                    className="col-span-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                    className="col-span-2 min-h-[48px] bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
                   >
                     <Truck className="h-5 w-5" />
                     Iniciar Viaje
@@ -550,7 +633,7 @@ export function DriverDashboard() {
                     <button
                       onClick={() => setPodPackage(pkg)}
                       disabled={!!updating}
-                      className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                      className="min-h-[48px] bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
                     >
                       <ShieldCheck className="h-5 w-5" />
                       Entregado
@@ -558,7 +641,7 @@ export function DriverDashboard() {
                     <button
                       onClick={() => handleStatusUpdate(pkg, 'cancelled')}
                       disabled={!!updating}
-                      className="bg-red-600/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-500 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                      className="min-h-[48px] bg-red-600/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-500 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
                     >
                       <X className="h-5 w-5" />
                       Fallido
@@ -569,7 +652,8 @@ export function DriverDashboard() {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </>
   );
 }
