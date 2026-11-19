@@ -19,21 +19,42 @@ import { DriverService } from "./services/driver.service";
 // Init Event Bus
 eventBus.init();
 
+let syncTimer: NodeJS.Timeout | null = null;
+let isShuttingDown = false;
+
+function scheduleNextSync() {
+    if (isShuttingDown) return;
+    syncTimer = setTimeout(async () => {
+        try {
+            await DriverService.syncLocationBuffer();
+        } catch (e) {
+            console.error("Sync Error:", e);
+        } finally {
+            scheduleNextSync();
+        }
+    }, 5000);
+}
+
 const server = httpServer.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    
+
     // Start Background Workers
     console.log("🛠️  Starting Background Sync Worker (Redis -> DB)...");
-    setInterval(() => {
-        DriverService.syncLocationBuffer().catch(e => console.error("Sync Error:", e));
-    }, 5000);
+    scheduleNextSync();
 });
 
 async function gracefulShutdown(signal: string) {
 	console.log(`\n${signal} signal received: closing HTTP server`);
+	isShuttingDown = true;
+	if (syncTimer) {
+		clearTimeout(syncTimer);
+		syncTimer = null;
+	}
 	server.close(async () => {
 		console.log('HTTP server closed');
 		try {
+			await DriverService.waitForActiveSync();
+			await DriverService.syncLocationBuffer().catch(e => console.error("Final Sync Error:", e));
 			await prisma.$disconnect();
 			console.log('📦 Prisma disconnected');
 			await redis.disconnect();

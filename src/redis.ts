@@ -38,16 +38,59 @@ export const redis = {
 		if (!redisEnabled || !client.isOpen) return;
 		await client.del(key);
 	},
+	async scanKeys(pattern: string): Promise<string[]> {
+		if (!redisEnabled || !client.isOpen) return [];
+		const found: string[] = [];
+		for await (const keyOrKeys of client.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+			if (Array.isArray(keyOrKeys)) {
+				found.push(...keyOrKeys);
+			} else if (typeof keyOrKeys === "string") {
+				found.push(keyOrKeys);
+			}
+		}
+		return found;
+	},
 	async delPrefix(prefix: string) {
 		try {
 			if (!redisEnabled || !client.isOpen) return;
-			const keys = await client.keys(`${prefix}*`);
+			const keys = await this.scanKeys(`${prefix}*`);
 			if (keys.length > 0) {
-				await client.del(keys);
+				await client.unlink(keys);
 			}
 		} catch (error) {
 			console.error(`Error deleting prefix ${prefix} in Redis:`, error);
 		}
+	},
+	async requeueLocationIfNewer(
+		bufferKey: string,
+		driverId: string,
+		rawPayload: string,
+		entryTs: number
+	): Promise<boolean> {
+		if (!redisEnabled || !client.isOpen) return false;
+		const luaScript = `
+			local current = redis.call('HGET', KEYS[1], ARGV[1])
+			if not current then
+				redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+				return 1
+			end
+			local ok, parsed = pcall(cjson.decode, current)
+			if not ok or type(parsed) ~= 'table' then
+				return 0
+			end
+			local currentTs = tonumber(parsed.ts)
+			local entryTs = tonumber(ARGV[3])
+			if currentTs and entryTs and entryTs > currentTs then
+				redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+				return 1
+			end
+			return 0
+		`;
+		const res = await client.eval(luaScript, {
+			keys: [bufferKey],
+			arguments: [driverId, rawPayload, String(entryTs)],
+		});
+		return res === 1 || res === "1";
 	},
 	async disconnect() {
 		if (client.isOpen) {
@@ -75,9 +118,82 @@ export const redis = {
         if (!redisEnabled || !client.isOpen) return {};
         return client.hGetAll(key);
     },
+    async hmGet(key: string, fields: string[]): Promise<Array<string | null>> {
+        if (!redisEnabled || !client.isOpen || fields.length === 0) return [];
+        return client.hmGet(key, fields);
+    },
     async hDel(key: string, ...fields: string[]) {
-        if (!redisEnabled || !client.isOpen) return;
+        if (!redisEnabled || !client.isOpen || fields.length === 0) return;
         await client.hDel(key, fields);
+    },
+    async claimLocationSyncBuffer(
+        bufferKey: string,
+        syncKey: string,
+        lockKey: string,
+        lockToken: string,
+        lockTtlMs: number
+    ): Promise<boolean> {
+        if (!redisEnabled || !client.isOpen) return false;
+        const luaScript = `
+            local acquired = redis.call('SET', KEYS[3], ARGV[1], 'NX', 'PX', ARGV[2])
+            if not acquired then
+                return 0
+            end
+            local hasSync = redis.call('EXISTS', KEYS[2])
+            local hasBuf = redis.call('EXISTS', KEYS[1])
+            if hasSync == 0 and hasBuf == 0 then
+                if redis.call('GET', KEYS[3]) == ARGV[1] then
+                    redis.call('DEL', KEYS[3])
+                end
+                return 0
+            end
+            if hasSync == 0 and hasBuf == 1 then
+                redis.call('RENAME', KEYS[1], KEYS[2])
+                return 1
+            end
+            if hasSync == 1 and hasBuf == 1 then
+                local bufEntries = redis.call('HGETALL', KEYS[1])
+                for i = 1, #bufEntries, 2 do
+                    local field = bufEntries[i]
+                    local bufVal = bufEntries[i + 1]
+                    local syncVal = redis.call('HGET', KEYS[2], field)
+                    if not syncVal then
+                        redis.call('HSET', KEYS[2], field, bufVal)
+                    else
+                        local okB, parsedB = pcall(cjson.decode, bufVal)
+                        local okS, parsedS = pcall(cjson.decode, syncVal)
+                        local validB = okB and type(parsedB) == 'table'
+                        local validS = okS and type(parsedS) == 'table'
+                        local tsB = validB and tonumber(parsedB.ts) or nil
+                        local tsS = validS and tonumber(parsedS.ts) or nil
+                        if (tsB and tsS and tsB >= tsS) or (tsB and not tsS) or (validB and not validS) or (validB and not tsB and not tsS) then
+                            redis.call('HSET', KEYS[2], field, bufVal)
+                        end
+                    end
+                end
+                redis.call('DEL', KEYS[1])
+                return 1
+            end
+            return 1
+        `;
+        const res = await client.eval(luaScript, {
+            keys: [bufferKey, syncKey, lockKey],
+            arguments: [lockToken, String(lockTtlMs)],
+        });
+        return res === 1 || res === "1";
+    },
+    async releaseLocationSyncLock(lockKey: string, lockToken: string): Promise<void> {
+        if (!redisEnabled || !client.isOpen) return;
+        const luaScript = `
+            if redis.call('GET', KEYS[1]) == ARGV[1] then
+                return redis.call('DEL', KEYS[1])
+            end
+            return 0
+        `;
+        await client.eval(luaScript, {
+            keys: [lockKey],
+            arguments: [lockToken],
+        });
     },
     async rename(oldKey: string, newKey: string): Promise<boolean> {
         if (!redisEnabled || !client.isOpen) return false;

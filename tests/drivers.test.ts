@@ -127,6 +127,27 @@ describe("PUT /api/drivers/:id/zones — Zone Assignment", () => {
 
 // ─── syncLocationBuffer — Race Condition Test ─────────────────────────────────
 describe("DriverService.syncLocationBuffer — GPS Buffer", () => {
+  beforeAll(async () => {
+    if (!driverId) {
+      const drv = await prisma.driver.create({
+        data: { name: "Buffer Sync Driver", companyId },
+      });
+      driverId = drv.id;
+    }
+  });
+
+  beforeEach(async () => {
+    await redis.del("drivers:locations:buffer");
+    await redis.del("drivers:locations:buffer:sync");
+    await redis.del("drivers:locations:sync:lock");
+  });
+
+  afterEach(async () => {
+    await redis.del("drivers:locations:buffer");
+    await redis.del("drivers:locations:buffer:sync");
+    await redis.del("drivers:locations:sync:lock");
+  });
+
   it("should flush buffered GPS coordinates to PostgreSQL without data loss", async () => {
     const testDriverId = driverId;
 
@@ -172,5 +193,172 @@ describe("DriverService.syncLocationBuffer — GPS Buffer", () => {
 
     // Clean up
     await redis.hDel("drivers:locations:buffer", driverId);
+  });
+
+  it("should process valid updates when buffer contains deleted driver (P2025), out-of-range coords, and malformed JSON", async () => {
+    const deletedDriverId = "00000000-0000-4000-8000-000000000000";
+    const malformedDriverId = "malformed-driver-entry";
+    const outOfRangeDriverId = "out-of-range-driver-entry";
+
+    await redis.hSet("drivers:locations:buffer", deletedDriverId, JSON.stringify({
+      lat: -31.1,
+      lng: -64.1,
+      ts: Date.now(),
+      companyId,
+    }));
+    await redis.hSet("drivers:locations:buffer", malformedDriverId, "{not-valid-json");
+    await redis.hSet("drivers:locations:buffer", outOfRangeDriverId, JSON.stringify({
+      lat: 95,
+      lng: -200,
+      ts: Date.now(),
+      companyId,
+    }));
+    await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({
+      lat: -31.55,
+      lng: -64.25,
+      ts: Date.now(),
+      companyId,
+    }));
+
+    await expect(DriverService.syncLocationBuffer()).resolves.toBeUndefined();
+
+    const updated = await prisma.driver.findUnique({ where: { id: driverId } });
+    expect(updated?.lat).toBeCloseTo(-31.55, 3);
+    expect(updated?.lng).toBeCloseTo(-64.25, 3);
+
+    const remainingSyncKeys = await redis.scanKeys("drivers:locations:buffer:sync*");
+    expect(remainingSyncKeys).toHaveLength(0);
+
+    const deletedRequeued = await redis.hGet("drivers:locations:buffer", deletedDriverId);
+    expect(deletedRequeued).toBeNull();
+    const outOfRangeRequeued = await redis.hGet("drivers:locations:buffer", outOfRangeDriverId);
+    expect(outOfRangeRequeued).toBeNull();
+  });
+
+  it("should buffer companyId without premature delPrefix in updateLocation and invalidate cache after syncLocationBuffer flush", async () => {
+    const delPrefixSpy = jest.spyOn(redis, "delPrefix");
+
+    try {
+      await DriverService.updateLocation(driverId, companyId, -31.6, -64.3);
+      expect(delPrefixSpy).not.toHaveBeenCalled();
+
+      const bufferedRaw = await redis.hGet("drivers:locations:buffer", driverId);
+      expect(bufferedRaw).not.toBeNull();
+      expect(JSON.parse(bufferedRaw!).companyId).toBe(companyId);
+
+      await DriverService.syncLocationBuffer();
+      expect(delPrefixSpy).toHaveBeenCalledWith(`drivers:${companyId}:`);
+    } finally {
+      delPrefixSpy.mockRestore();
+    }
+  });
+
+  it("should re-queue transient DB failures when no newer update exists in buffer", async () => {
+    const tsOld = Date.now() - 1000;
+    await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({
+      lat: -31.7,
+      lng: -64.4,
+      ts: tsOld,
+      companyId,
+    }));
+
+    const updateSpy = jest
+      .spyOn(prisma.driver, "update")
+      .mockRejectedValueOnce(new Error("Transient DB error"));
+
+    try {
+      await DriverService.syncLocationBuffer();
+      const requeuedRaw = await redis.hGet("drivers:locations:buffer", driverId);
+      expect(requeuedRaw).not.toBeNull();
+      const requeued = JSON.parse(requeuedRaw!);
+      expect(requeued.lat).toBeCloseTo(-31.7, 3);
+      expect(requeued.lng).toBeCloseTo(-64.4, 3);
+      expect(requeued.ts).toBe(tsOld);
+    } finally {
+      updateSpy.mockRestore();
+    }
+  });
+
+  it("should preserve newer concurrent buffer write when transient DB failure occurs", async () => {
+    const tsOld = Date.now() - 2000;
+    const tsNew = Date.now();
+    await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({
+      lat: -31.7,
+      lng: -64.4,
+      ts: tsOld,
+      companyId,
+    }));
+
+    const updateSpy = jest.spyOn(prisma.driver, "update").mockImplementation((() => {
+      return (async () => {
+        await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({
+          lat: -31.9,
+          lng: -64.9,
+          ts: tsNew,
+          companyId,
+        }));
+        throw new Error("Transient DB error during concurrent update");
+      })() as any;
+    }) as any);
+
+    try {
+      await DriverService.syncLocationBuffer();
+      const bufferedRaw = await redis.hGet("drivers:locations:buffer", driverId);
+      expect(bufferedRaw).not.toBeNull();
+      const buffered = JSON.parse(bufferedRaw!);
+      expect(buffered.lat).toBeCloseTo(-31.9, 3);
+      expect(buffered.lng).toBeCloseTo(-64.9, 3);
+      expect(buffered.ts).toBe(tsNew);
+    } finally {
+      updateSpy.mockRestore();
+    }
+  });
+
+  it("should deduplicate orphan syncKey against newer buffer entry by highest ts and release lock", async () => {
+    const tsOld = Date.now() - 5000;
+    const tsNew = Date.now();
+
+    await redis.hSet("drivers:locations:buffer:sync", driverId, JSON.stringify({
+      lat: -30.1,
+      lng: -60.1,
+      ts: tsOld,
+      companyId,
+    }));
+    await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({
+      lat: -31.88,
+      lng: -64.88,
+      ts: tsNew,
+      companyId,
+    }));
+
+    await DriverService.syncLocationBuffer();
+
+    const updated = await prisma.driver.findUnique({ where: { id: driverId } });
+    expect(updated?.lat).toBeCloseTo(-31.88, 3);
+    expect(updated?.lng).toBeCloseTo(-64.88, 3);
+
+    const remainingSync = await redis.hGetAll("drivers:locations:buffer:sync");
+    expect(Object.keys(remainingSync)).toHaveLength(0);
+    const lockRemaining = await redis.get("drivers:locations:sync:lock");
+    expect(lockRemaining).toBeNull();
+  });
+
+  it("should overlay live locations in getAllDrivers using bounded hmGet instead of global hGetAll", async () => {
+    const hmGetSpy = jest.spyOn(redis, "hmGet");
+    const hGetAllSpy = jest.spyOn(redis, "hGetAll");
+
+    try {
+      await DriverService.updateLocation(driverId, companyId, -31.42, -64.19);
+      const res = await DriverService.getAllDrivers(companyId, { page: 1, limit: 10 });
+      const found = res.items.find((d: any) => d.id === driverId);
+      expect(found?.lat).toBeCloseTo(-31.42, 3);
+      expect(found?.lng).toBeCloseTo(-64.19, 3);
+      expect(hmGetSpy).toHaveBeenCalled();
+      expect(hGetAllSpy).not.toHaveBeenCalled();
+    } finally {
+      hmGetSpy.mockRestore();
+      hGetAllSpy.mockRestore();
+      await redis.delPrefix(`drivers:${companyId}:`);
+    }
   });
 });

@@ -1,15 +1,97 @@
+import { randomUUID } from "crypto";
 import { prisma } from "../prisma";
 import bcrypt from "bcrypt";
 import { redis } from "../redis";
 import { emitToRoom } from "../websocket";
+import logger from "../utils/logger";
+
+const LOCATION_BUFFER_KEY = "drivers:locations:buffer";
+const LOCATION_SYNC_KEY = "drivers:locations:buffer:sync";
+const LOCATION_SYNC_LOCK_KEY = "drivers:locations:sync:lock";
+const SYNC_BATCH_SIZE = 10;
+const NON_TRANSIENT_PRISMA_CODES = new Set([
+  "P2000",
+  "P2002",
+  "P2003",
+  "P2005",
+  "P2006",
+  "P2007",
+  "P2011",
+  "P2012",
+  "P2023",
+  "P2025",
+]);
+
+interface BufferedLocation {
+  lat: number;
+  lng: number;
+  ts?: number;
+  companyId?: string;
+}
+
+function isValidCoordinatePayload(parsed: unknown): parsed is BufferedLocation {
+  if (!parsed || typeof parsed !== "object") return false;
+  const candidate = parsed as Record<string, unknown>;
+  return (
+    typeof candidate.lat === "number" &&
+    Number.isFinite(candidate.lat) &&
+    candidate.lat >= -90 &&
+    candidate.lat <= 90 &&
+    typeof candidate.lng === "number" &&
+    Number.isFinite(candidate.lng) &&
+    candidate.lng >= -180 &&
+    candidate.lng <= 180
+  );
+}
 
 export class DriverService {
+  private static activeSyncPromise: Promise<void> | null = null;
+
+  static async waitForActiveSync(): Promise<void> {
+    if (this.activeSyncPromise) {
+      await this.activeSyncPromise.catch(() => {});
+    }
+  }
+
+  private static async overlayLiveLocations<T extends { id: string; lat?: number | null; lng?: number | null }>(
+    items: T[]
+  ): Promise<T[]> {
+    if (!Array.isArray(items) || items.length === 0) return items;
+    try {
+      const values = await redis.hmGet(
+        LOCATION_BUFFER_KEY,
+        items.map((item) => item.id)
+      );
+      if (!values || values.length === 0) return items;
+
+      return items.map((item, index) => {
+        const raw = values[index];
+        if (!raw) return item;
+        try {
+          const parsed = JSON.parse(raw);
+          if (isValidCoordinatePayload(parsed)) {
+            return { ...item, lat: parsed.lat, lng: parsed.lng };
+          }
+        } catch {
+          // Ignore malformed buffer entry
+        }
+        return item;
+      });
+    } catch {
+      return items;
+    }
+  }
+
   static async getAllDrivers(companyId: string, filters: { name?: string; page?: number; limit?: number } = {}) {
     const cacheKey = `drivers:${companyId}:${JSON.stringify(filters)}`;
     const cached = await redis.get(cacheKey);
 
     if (cached) {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      return {
+        ...parsed,
+        items: await this.overlayLiveLocations(parsed.items),
+      };
     }
 
     const { name, page = 1, limit = 10 } = filters;
@@ -44,7 +126,10 @@ export class DriverService {
     };
 
     await redis.set(cacheKey, JSON.stringify(result), 1800); // 30 min cache
-    return result;
+    return {
+      ...result,
+      items: await this.overlayLiveLocations(result.items),
+    };
   }
 
   static async createDriver(companyId: string, data: any) {
@@ -151,57 +236,181 @@ export class DriverService {
   }
 
   static async updateLocation(driverId: string, companyId: string, lat: number, lng: number) {
-      const ts = Date.now();
-      
-      // 1. Buffer in Redis (Write-Back)
-      // Note: Buffer key is global or per-company? Global is simpler for worker.
-      await redis.hSet("drivers:locations:buffer", driverId, JSON.stringify({ lat, lng, ts }));
+    const ts = Date.now();
 
-      // 2. Publish Real-Time
-      const payload = JSON.stringify({ 
-        driverId, 
-        companyId,
-        lat, 
-        lng,
-        timestamp: ts 
-      });
-      
-      await redis.publish("driver.location.updated", payload);
+    // 1. Buffer in Redis (Write-Back)
+    await redis.hSet(
+      LOCATION_BUFFER_KEY,
+      driverId,
+      JSON.stringify({ lat, lng, ts, companyId })
+    );
 
-      return { id: driverId, lat, lng, updatedAt: new Date() };
+    // 2. Publish Real-Time
+    const payload = JSON.stringify({
+      driverId,
+      companyId,
+      lat,
+      lng,
+      timestamp: ts,
+    });
+
+    await redis.publish("driver.location.updated", payload);
+
+    return { id: driverId, lat, lng, updatedAt: new Date() };
   }
 
   // Background Worker to flush Redis buffer to Postgres
-  static async syncLocationBuffer() {
-      const bufferKey = "drivers:locations:buffer";
-      const syncKey = "drivers:locations:buffer:sync";
+  static async syncLocationBuffer(): Promise<void> {
+    if (this.activeSyncPromise) {
+      return this.activeSyncPromise;
+    }
 
-      // Atomically move buffer to a sync key to prevent race conditions
-      const hasData = await redis.rename(bufferKey, syncKey);
-      if (!hasData) return;
-
-      try {
-          const all = await redis.hGetAll(syncKey);
-          if (!all || Object.keys(all).length === 0) return;
-
-          const driverIds = Object.keys(all);
-
-          const ops = driverIds.map(id => {
-              try {
-                const data = JSON.parse(all[id]);
-                return prisma.driver.update({
-                    where: { id },
-                    data: { lat: data.lat, lng: data.lng }
-                });
-              } catch (e) { return null; } // Skip malformed
-          }).filter(op => op !== null) as any[];
-
-          if (ops.length > 0) {
-              await prisma.$transaction(ops);
-          }
-      } finally {
-          // Always clean up the temp sync key
-          await redis.del(syncKey);
+    const run = this.runSyncLocationBuffer().finally(() => {
+      if (this.activeSyncPromise === run) {
+        this.activeSyncPromise = null;
       }
+    });
+
+    this.activeSyncPromise = run;
+    return run;
+  }
+
+  private static async runSyncLocationBuffer(): Promise<void> {
+    const syncKey = LOCATION_SYNC_KEY;
+    const lockKey = LOCATION_SYNC_LOCK_KEY;
+    const lockToken = randomUUID();
+
+    // Atomically acquire distributed lock and claim/merge buffer into syncKey as first step
+    const claimed = await redis.claimLocationSyncBuffer(
+      LOCATION_BUFFER_KEY,
+      syncKey,
+      lockKey,
+      lockToken,
+      30000
+    );
+    if (!claimed) return;
+
+    const affectedCompanyIds = new Set<string>();
+    try {
+      await this.processSyncKey(syncKey, affectedCompanyIds);
+
+      if (affectedCompanyIds.size > 0) {
+        await Promise.allSettled(
+          Array.from(affectedCompanyIds).map((cId) => redis.delPrefix(`drivers:${cId}:`))
+        );
+      }
+    } finally {
+      await redis.releaseLocationSyncLock(lockKey, lockToken).catch((err) => {
+        logger.error("Failed to release location sync lock", { lockKey, error: err });
+      });
+    }
+  }
+
+  private static async processSyncKey(syncKey: string, affectedCompanyIds: Set<string>) {
+    let all: Record<string, string>;
+    try {
+      all = await redis.hGetAll(syncKey);
+    } catch (err) {
+      logger.error("Failed to read sync buffer key from Redis", { syncKey, error: err });
+      return;
+    }
+
+    const entries = Object.entries(all || {});
+    if (entries.length === 0) {
+      await redis.del(syncKey).catch(() => {});
+      return;
+    }
+
+    const validEntries: Array<{ id: string; raw: string; data: BufferedLocation }> = [];
+    const handledIds: string[] = [];
+    let hasUnrecoveredFailure = false;
+
+    for (const [id, raw] of entries) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (isValidCoordinatePayload(parsed)) {
+          validEntries.push({ id, raw, data: parsed });
+        } else {
+          logger.warn("Discarding out-of-range or invalid buffered driver location", { driverId: id });
+          handledIds.push(id);
+        }
+      } catch {
+        logger.warn("Discarding malformed JSON in buffered driver location", { driverId: id });
+        handledIds.push(id);
+      }
+    }
+
+    for (let offset = 0; offset < validEntries.length; offset += SYNC_BATCH_SIZE) {
+      const chunk = validEntries.slice(offset, offset + SYNC_BATCH_SIZE);
+      const results = await Promise.allSettled(
+        chunk.map(async (entry) => {
+          const updated = await prisma.driver.update({
+            where: { id: entry.id },
+            data: { lat: entry.data.lat, lng: entry.data.lng },
+            select: { id: true, companyId: true },
+          });
+          return { entry, companyId: updated.companyId };
+        })
+      );
+
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        const entry = chunk[i];
+
+        if (result.status === "fulfilled") {
+          if (result.value.companyId) {
+            affectedCompanyIds.add(result.value.companyId);
+          }
+          if (typeof entry.data.companyId === "string" && entry.data.companyId) {
+            affectedCompanyIds.add(entry.data.companyId);
+          }
+          handledIds.push(entry.id);
+          continue;
+        }
+
+        const err = result.reason as any;
+        const isNonTransient =
+          (typeof err?.code === "string" && NON_TRANSIENT_PRISMA_CODES.has(err.code)) ||
+          err?.name === "PrismaClientValidationError";
+
+        if (isNonTransient) {
+          if (err?.code !== "P2025") {
+            logger.warn("Discarding non-transient driver location update failure", {
+              driverId: entry.id,
+              code: err?.code,
+              message: err?.message,
+            });
+          }
+          if (typeof entry.data.companyId === "string" && entry.data.companyId) {
+            affectedCompanyIds.add(entry.data.companyId);
+          }
+          handledIds.push(entry.id);
+          continue;
+        }
+
+        try {
+          const entryTs = typeof entry.data.ts === "number" ? entry.data.ts : -1;
+          await redis.requeueLocationIfNewer(LOCATION_BUFFER_KEY, entry.id, entry.raw, entryTs);
+          handledIds.push(entry.id);
+        } catch (requeueErr) {
+          hasUnrecoveredFailure = true;
+          logger.error("Failed to re-queue driver location after transient DB error", {
+            driverId: entry.id,
+            syncKey,
+            error: requeueErr,
+          });
+        }
+      }
+    }
+
+    try {
+      if (!hasUnrecoveredFailure) {
+        await redis.del(syncKey);
+      } else if (handledIds.length > 0) {
+        await redis.hDel(syncKey, ...handledIds);
+      }
+    } catch (cleanupErr) {
+      logger.error("Failed to clean up sync buffer key", { syncKey, error: cleanupErr });
+    }
   }
 }
