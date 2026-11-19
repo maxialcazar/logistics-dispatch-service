@@ -17,6 +17,7 @@ import { DriverDashboard } from "./pages/DriverDashboard";
 import { DriverMap } from "./pages/DriverMap";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { TrackingPage } from "./pages/TrackingPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { token } = useAuth();
@@ -80,6 +81,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/tracking" element={<TrackingPage />} />
+      <Route path="/tracking/:trackingCode" element={<TrackingPage />} />
       
       {/* Driver Routes */}
       <Route path="/driver" element={<ProtectedRoute><DriverLayout /></ProtectedRoute>}>

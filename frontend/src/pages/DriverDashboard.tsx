@@ -515,60 +515,6 @@ export function DriverDashboard() {
               </button>
             </div>
           </h2>
-        <p>No tienes paquetes pendientes asignados.</p>
-        <button onClick={fetchMyPackages} className="text-blue-500 underline text-sm">Actualizar</button>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {/* POD Modal */}
-      {podPackage && (
-        <PODModal
-          pkg={podPackage}
-          onConfirm={handleDeliveryConfirm}
-          onClose={() => setPodPackage(null)}
-        />
-      )}
-
-      {/* Offline Banner */}
-      {!isOnline && (
-        <div className="sticky top-0 z-40 flex items-center justify-between gap-3 bg-amber-500/10 border-b border-amber-500/30 px-4 py-2.5 backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-amber-400">
-            <WifiOff size={15} className="flex-shrink-0" />
-            <span className="text-xs font-semibold">
-              Sin conexión{pendingCount > 0 ? ` — ${pendingCount} entrega(s) en cola` : ''}
-            </span>
-          </div>
-          <button
-            onClick={syncNow}
-            className="flex items-center gap-1 text-xs text-amber-300 hover:text-amber-100 transition-colors"
-          >
-            <RefreshCw size={12} />
-            Sincronizar
-          </button>
-        </div>
-      )}
-
-      <div className="p-4 space-y-4 pb-24 relative">
-        <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
-          <span>Mis Entregas ({packages.length})</span>
-          <div className="flex gap-2">
-            <button
-              onClick={handleOptimizeRoute}
-              className="text-xs text-purple-400 bg-purple-900/20 px-2 py-1 rounded border border-purple-500/20 flex items-center gap-1 hover:bg-purple-900/40 transition-colors"
-            >
-              <Route size={12} /> Optimizar
-            </button>
-            <button
-              onClick={fetchMyPackages}
-              className="text-xs text-blue-400 bg-blue-900/20 px-2 py-1 rounded hover:bg-blue-900/40 transition-colors"
-            >
-              Refrescar
-            </button>
-          </div>
-        </h2>
 
         {packages.map(pkg => (
           <div key={pkg.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg relative">
