@@ -6,8 +6,8 @@ const URL = import.meta.env.VITE_API_URL || undefined;
 class SocketService {
   public socket: Socket | null = null;
 
-  connect(token: string) {
-    if (this.socket) return;
+  connect(token: string): Socket {
+    if (this.socket) return this.socket;
 
     this.socket = io(URL, {
       path: '/socket.io', // Explicitly set path often helps with Nginx
@@ -27,6 +27,8 @@ class SocketService {
     this.socket.on('disconnect', (reason) => {
         console.warn('⚠️ WebSocket Disconnected:', reason);
     });
+
+    return this.socket;
   }
 
   disconnect() {
