@@ -1,10 +1,9 @@
-
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { X, UserPlus, Lock, User } from 'lucide-react';
+import { useId, useState } from 'react';
+import { UserPlus, Lock, User, Shield, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
+import { Modal } from './Modal';
 
 interface Props {
   isOpen: boolean;
@@ -17,21 +16,19 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose]);
+  const formId = useId();
+  const usernameId = useId();
+  const passwordId = useId();
 
-  if (!isOpen) return null;
+  const handleClose = () => {
+    if (loading) return;
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    
+
     setLoading(true);
     const toastId = toast.loading('Creando despachador...');
 
@@ -43,110 +40,93 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
       setPassword('');
     } catch (err: unknown) {
       if (err instanceof Error) {
-          toast.error(err.message, { id: toastId });
+        toast.error(err.message, { id: toastId });
       } else {
-          toast.error('Error al crear despachador', { id: toastId });
+        toast.error('Error al crear despachador', { id: toastId });
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const modalContent = (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-dispatcher-modal-title"
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-
-      <div className="relative flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col bg-slate-900 border border-slate-800/80 rounded-xl shadow-2xl overflow-hidden">
-        
-        {/* Header */}
-        <div className="shrink-0 bg-slate-950/50 p-4 border-b border-slate-800/80 flex justify-between items-center">
-          <h2
-            id="create-dispatcher-modal-title"
-            className="text-lg font-bold text-white flex items-center gap-2"
-          >
-            <UserPlus className="h-5 w-5 text-brand-400" />
-            Nuevo Despachador
-          </h2>
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      closeOnBackdropClick={!loading}
+      closeOnEscape={!loading}
+      title="Nuevo Despachador"
+      icon={<UserPlus className="h-4 w-4" />}
+      footer={
+        <>
           <button
             type="button"
-            onClick={onClose}
-            aria-label="Cerrar modal"
-            className="text-slate-400 hover:text-white transition-colors"
+            onClick={handleClose}
+            disabled={loading}
+            className="px-4 py-2 min-h-[40px] text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <X size={20} />
+            Cancelar
           </button>
+          <button
+            type="submit"
+            form={formId}
+            disabled={loading}
+            className="px-4 py-2 min-h-[40px] text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-lg shadow-lg shadow-brand-950/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {loading ? 'Creando...' : 'Crear Cuenta'}
+          </button>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor={usernameId} className="block text-xs font-medium text-slate-300">
+            Usuario
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <input
+              id={usernameId}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              autoFocus
+              disabled={loading}
+              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none disabled:opacity-50"
+              placeholder="ej. despachador1"
+            />
+          </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-400">Usuario</label>
-            <div className="relative">
-              <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input 
-                type="text" 
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                required
-                className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none"
-                placeholder="ej. despachador1"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-400">Contraseña</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input 
-                type="password" 
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none"
-                placeholder="******"
-              />
-            </div>
-          </div>
-
-          <div className="bg-brand-500/10 border border-brand-500/20 rounded-lg p-3">
-              <p className="text-xs text-brand-300">
-                  ⚠️ Esta cuenta tendrá permisos para gestionar despachos y conductores, pero no podrá crear más usuarios.
-              </p>
-          </div>
-
-          <div className="pt-2 flex gap-3">
-            <button 
-              type="button" 
-              onClick={onClose}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-lg transition-colors"
-            >
-              Cancelar
-            </button>
-            <button 
-              type="submit" 
+        <div className="space-y-1.5">
+          <label htmlFor={passwordId} className="block text-xs font-medium text-slate-300">
+            Contraseña
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <input
+              id={passwordId}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
               disabled={loading}
-              className="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-bold py-2 rounded-lg shadow-lg shadow-brand-950/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {loading ? 'Creando...' : 'Crear Cuenta'}
-            </button>
+              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none disabled:opacity-50"
+              placeholder="Mínimo 6 caracteres"
+            />
           </div>
-        </form>
-      </div>
-    </div>
-  );
+        </div>
 
-  return typeof document !== 'undefined'
-    ? createPortal(modalContent, document.body)
-    : modalContent;
+        <div className="bg-brand-500/10 border border-brand-500/20 rounded-lg p-3 flex items-start gap-2.5">
+          <Shield className="h-4 w-4 text-brand-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-brand-200 leading-relaxed">
+            Esta cuenta tendrá permisos para gestionar despachos y conductores, pero no podrá crear más usuarios.
+          </p>
+        </div>
+      </form>
+    </Modal>
+  );
 }

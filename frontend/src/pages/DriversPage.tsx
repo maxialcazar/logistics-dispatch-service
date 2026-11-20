@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Users, UserPlus, X, Loader2, AlertCircle, Shield } from 'lucide-react';
+import { useState, useEffect, useId } from 'react';
+import { Users, UserPlus, Loader2, AlertCircle, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { driverService, type AppDriver } from '../services/driverService';
+import { Modal } from '../components/Modal';
 
 export function DriversPage() {
   const { token } = useAuth();
@@ -18,6 +19,17 @@ export function DriversPage() {
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
+
+  const formId = useId();
+  const nameId = useId();
+  const usernameId = useId();
+  const passwordId = useId();
+
+  const handleCloseModal = () => {
+    if (createLoading) return;
+    setShowModal(false);
+    setCreateError('');
+  };
 
   useEffect(() => {
     fetchDrivers();
@@ -130,87 +142,97 @@ export function DriversPage() {
       )}
 
       {/* Create Driver Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800/80 rounded-xl w-full max-w-md p-6 shadow-2xl relative">
-             <button 
-               onClick={() => setShowModal(false)}
-               className="absolute top-4 right-4 text-slate-400 hover:text-white"
-             >
-               <X className="h-5 w-5" />
-             </button>
-             
-             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                 <UserPlus className="h-5 w-5 text-brand-400" />
-                 Registrar Conductor
-             </h2>
-             
-             <form onSubmit={handleCreateDriver} className="space-y-4">
-               {createError && (
-                 <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
-                   <AlertCircle className="h-4 w-4" /> {createError}
-                 </div>
-               )}
-               
-               <div>
-                 <label className="block text-sm font-medium text-slate-300 mb-1">Nombre Completo</label>
-                 <input 
-                   type="text" 
-                   value={formData.name}
-                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                   className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none placeholder:text-slate-500"
-                   placeholder="ej. Juan Perez"
-                   autoFocus
-                   disabled={createLoading}
-                 />
-               </div>
+      <Modal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        closeOnBackdropClick={!createLoading}
+        closeOnEscape={!createLoading}
+        title="Registrar Conductor"
+        icon={<UserPlus className="h-4 w-4" />}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              disabled={createLoading}
+              className="px-4 py-2 min-h-[40px] text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form={formId}
+              disabled={createLoading || !formData.name || !formData.username || !formData.password}
+              className="px-4 py-2 min-h-[40px] text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 rounded-lg shadow-lg shadow-brand-950/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center justify-center gap-2"
+            >
+              {createLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Crear Conductor
+            </button>
+          </>
+        }
+      >
+        <form id={formId} onSubmit={handleCreateDriver} className="space-y-4">
+          {createError && (
+            <div
+              role="alert"
+              className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{createError}</span>
+            </div>
+          )}
 
-               <div>
-                 <label className="block text-sm font-medium text-slate-300 mb-1">Usuario de Acceso</label>
-                 <input 
-                   type="text" 
-                   value={formData.username}
-                   onChange={(e) => setFormData({...formData, username: e.target.value})}
-                   className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none placeholder:text-slate-500"
-                   placeholder="ej. jperez"
-                   disabled={createLoading}
-                 />
-               </div>
-
-               <div>
-                 <label className="block text-sm font-medium text-slate-300 mb-1">Contraseña Inicial</label>
-                 <input 
-                   type="password" 
-                   value={formData.password}
-                   onChange={(e) => setFormData({...formData, password: e.target.value})}
-                   className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none placeholder:text-slate-500"
-                   placeholder="Mínimo 6 caracteres"
-                   disabled={createLoading}
-                 />
-               </div>
-
-               <div className="flex justify-end gap-3 pt-4">
-                 <button
-                   type="button"
-                   onClick={() => setShowModal(false)}
-                   className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
-                   disabled={createLoading}
-                 >
-                   Cancelar
-                 </button>
-                 <button
-                   type="submit"
-                   disabled={createLoading || !formData.name || !formData.username || !formData.password}
-                   className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-medium shadow-lg shadow-brand-950/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                 >
-                   {createLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                   Crear Conductor
-                 </button>
-               </div>
-             </form>
+          <div className="space-y-1.5">
+            <label htmlFor={nameId} className="block text-xs font-medium text-slate-300">
+              Nombre Completo
+            </label>
+            <input
+              id={nameId}
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none disabled:opacity-50"
+              placeholder="ej. Juan Perez"
+              autoFocus
+              disabled={createLoading}
+            />
           </div>
-        </div>
-      )}
+
+          <div className="space-y-1.5">
+            <label htmlFor={usernameId} className="block text-xs font-medium text-slate-300">
+              Usuario de Acceso
+            </label>
+            <input
+              id={usernameId}
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              required
+              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none disabled:opacity-50"
+              placeholder="ej. jperez"
+              disabled={createLoading}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor={passwordId} className="block text-xs font-medium text-slate-300">
+              Contraseña Inicial
+            </label>
+            <input
+              id={passwordId}
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+              minLength={6}
+              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none disabled:opacity-50"
+              placeholder="Mínimo 6 caracteres"
+              disabled={createLoading}
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
