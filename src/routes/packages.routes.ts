@@ -1,7 +1,9 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import {
   getPackages,
+  exportPackages,
   createPackage,
+  createPackagesBulk,
   getPackageById,
   updatePackage,
   getPackagesByDriver,
@@ -19,8 +21,10 @@ import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   getPackagesSchema,
+  exportPackagesSchema,
   getDashboardStatsSchema,
   createPackageSchema,
+  bulkCreatePackagesSchema,
   getPackageByIdSchema,
   updatePackageSchema,
   unarchivePackagesSchema,
@@ -228,6 +232,77 @@ router.get("/", requireRole("dispatcher", "admin"), validate(getPackagesSchema),
  */
 router.post("/", requireRole("dispatcher", "admin"), validate(createPackageSchema), createPackage);
 
+/**
+ * @openapi
+ * /api/packages/bulk:
+ *   post:
+ *     summary: Bulk import packages from JSON (array or { packages }) or CSV ({ csv } or text/csv)
+ *     tags: [Packages]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             oneOf:
+ *               - type: object
+ *                 required: [packages]
+ *                 properties:
+ *                   packages:
+ *                     type: array
+ *                     minItems: 1
+ *                     maxItems: 500
+ *                     items:
+ *                       type: object
+ *               - type: array
+ *                 minItems: 1
+ *                 maxItems: 500
+ *                 items:
+ *                   type: object
+ *               - type: object
+ *                 required: [csv]
+ *                 properties:
+ *                   csv:
+ *                     type: string
+ *         text/csv:
+ *           schema:
+ *             type: string
+ *     responses:
+ *       201:
+ *         description: Bulk packages created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                 assignedCount:
+ *                   type: integer
+ *                 pendingCount:
+ *                   type: integer
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: Validation failed, malformed CSV, batch limit exceeded, or zone not found
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Duplicate tracking codes already exist for this tenant
+ */
+router.post(
+  "/bulk",
+  requireRole("dispatcher", "admin"),
+  express.text({ type: ["text/csv", "text/plain", "application/csv"], limit: "5mb" }),
+  validate(bulkCreatePackagesSchema),
+  createPackagesBulk
+);
+
 // Archive Packages
 router.post("/archive", requireRole("dispatcher", "admin"), archivePackages);
 
@@ -352,6 +427,77 @@ router.post("/delete", requireRole("dispatcher", "admin"), deletePackages);
  *         description: Forbidden
  */
 router.get("/stats", requireRole("dispatcher", "admin"), validate(getDashboardStatsSchema), getDashboardStats);
+
+/**
+ * @openapi
+ * /api/packages/export:
+ *   get:
+ *     summary: Export filtered tenant packages as RFC-4180 CSV with formula injection protection
+ *     tags: [Packages]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial search across trackingCode, recipientName, recipientAddress, and recipientPhone
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by package status (single value or comma-separated list)
+ *       - in: query
+ *         name: zoneId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by zone ID
+ *       - in: query
+ *         name: driverId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by assigned driver ID
+ *       - in: query
+ *         name: trackingCode
+ *         schema:
+ *           type: string
+ *         description: Search by tracking code (partial match, case-insensitive)
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter packages created on or after this date/time (YYYY-MM-DD or ISO 8601 datetime)
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter packages created on or before this date/time (YYYY-MM-DD or ISO 8601 datetime)
+ *       - in: query
+ *         name: isArchived
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false"]
+ *           default: "false"
+ *         description: Filter archived packages
+ *     responses:
+ *       200:
+ *         description: CSV export generated successfully
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *       400:
+ *         description: Validation failed for query parameters
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
+router.get("/export", requireRole("dispatcher", "admin"), validate(exportPackagesSchema), exportPackages);
 
 /**
  * @openapi

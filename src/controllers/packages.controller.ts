@@ -1,14 +1,29 @@
 import { Response } from "express";
-import { PackageService } from "../services/package.service";
+import { PackageBulkError, PackageService } from "../services/package.service";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { PackageStatus } from "@prisma/client";
 import logger from "../utils/logger";
 import { sanitizePagination } from "../utils/pagination";
+import { parseBulkPackagesBody } from "../schemas/package.schema";
 
 function normalizeOptionalQueryString(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function extractPackageFilterParams(query: AuthRequest["query"]) {
+  const { search, status, zoneId, driverId, trackingCode, dateFrom, dateTo, isArchived } = query;
+  return {
+    search: normalizeOptionalQueryString(search),
+    status: normalizeOptionalQueryString(status) as PackageStatus | string | undefined,
+    zoneId: normalizeOptionalQueryString(zoneId),
+    driverId: normalizeOptionalQueryString(driverId),
+    trackingCode: normalizeOptionalQueryString(trackingCode),
+    dateFrom: normalizeOptionalQueryString(dateFrom),
+    dateTo: normalizeOptionalQueryString(dateTo),
+    isArchived: normalizeOptionalQueryString(isArchived) === "true",
+  };
 }
 
 function handlePackageDateError(res: Response, error: any): boolean {
@@ -26,25 +41,33 @@ function handlePackageDateError(res: Response, error: any): boolean {
 
 export async function getPackages(req: AuthRequest, res: Response) {
   try {
-    const { search, status, zoneId, driverId, trackingCode, dateFrom, dateTo, isArchived } = req.query;
     const { page, limit } = sanitizePagination(req.query);
 
     const result = await PackageService.getAllPackages(req.user!.companyId, {
-      search: normalizeOptionalQueryString(search),
-      status: normalizeOptionalQueryString(status) as PackageStatus | string | undefined,
-      zoneId: normalizeOptionalQueryString(zoneId),
-      driverId: normalizeOptionalQueryString(driverId),
-      trackingCode: normalizeOptionalQueryString(trackingCode),
-      dateFrom: normalizeOptionalQueryString(dateFrom),
-      dateTo: normalizeOptionalQueryString(dateTo),
+      ...extractPackageFilterParams(req.query),
       page,
       limit,
-      isArchived: normalizeOptionalQueryString(isArchived) === "true",
     });
     res.json(result);
   } catch (error: any) {
     if (handlePackageDateError(res, error)) return;
     logger.error("Error in getPackages:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+export async function exportPackages(req: AuthRequest, res: Response) {
+  try {
+    const csv = await PackageService.exportPackagesCsv(
+      req.user!.companyId,
+      extractPackageFilterParams(req.query)
+    );
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="packages.csv"');
+    res.status(200).send(csv);
+  } catch (error: any) {
+    if (handlePackageDateError(res, error)) return;
+    logger.error("Error in exportPackages:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
@@ -105,19 +128,62 @@ export async function createPackage(req: AuthRequest, res: Response) {
     });
     res.status(201).json(pkg);
   } catch (error: any) {
-    console.error(error);
-    if (error.message === "zone_not_found") {
-      return res.status(400).json({ error: "zone not found" });
-    }
-    if (error?.message === "invalid_delivery_window" || error?.message === "invalid_date_filter") {
-      return res.status(400).json({
-        error:
-          error.message === "invalid_date_filter"
-            ? "Invalid date filter"
-            : "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
-      });
-    }
+    if (handleCreateOrBulkError(res, error)) return;
+    logger.error("Error in createPackage:", error);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+}
+
+function handleCreateOrBulkError(res: Response, error: any): boolean {
+  if (error instanceof PackageBulkError) {
+    if (error.code === "zone_not_found") {
+      res.status(400).json({ error: "zone not found", details: error.details });
+      return true;
+    }
+    if (error.code === "duplicate_tracking_codes") {
+      res.status(409).json({
+        error: "Duplicate tracking codes already exist",
+        duplicates: error.details,
+      });
+      return true;
+    }
+  }
+  if (error?.message === "zone_not_found") {
+    res.status(400).json({ error: "zone not found" });
+    return true;
+  }
+  if (error?.message === "invalid_delivery_window" || error?.message === "invalid_date_filter") {
+    res.status(400).json({
+      error:
+        error.message === "invalid_date_filter"
+          ? "Invalid date filter"
+          : "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
+    });
+    return true;
+  }
+  return false;
+}
+
+export async function createPackagesBulk(req: AuthRequest, res: Response) {
+  try {
+    const parsedRows = parseBulkPackagesBody(req.body);
+    const items = parsedRows.map((row) => ({
+      ...row,
+      estimatedDeliveryAt: parseOptionalNullableDate(row.estimatedDeliveryAt),
+      deliveryWindowStart: parseOptionalNullableDate(row.deliveryWindowStart),
+      deliveryWindowEnd: parseOptionalNullableDate(row.deliveryWindowEnd),
+    }));
+
+    const result = await PackageService.createPackagesBulk(
+      req.user!.companyId,
+      req.user!.id,
+      items
+    );
+    res.status(201).json(result);
+  } catch (error: any) {
+    if (handleCreateOrBulkError(res, error)) return;
+    logger.error("Error in createPackagesBulk:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
 

@@ -5,6 +5,8 @@ import { PackageStatus, Prisma } from "@prisma/client";
 import { emitToRoom } from "../websocket";
 import { geocodeAddress } from "../utils/geocoder";
 import { saveBase64Image, deleteUploadedFile } from "../utils/fileUpload";
+import { pointInPolygon } from "../utils/geofencing";
+import { serializeCsv } from "../utils/csv";
 import { ZoneService } from "./zone.service";
 import { parseDateBoundary } from "../schemas/package.schema";
 import { redis } from "../redis";
@@ -27,13 +29,42 @@ export interface CreatePackageInput {
   senderPhone?: string | null;
   weight?: number | null;
   volume?: number | null;
-  zoneId?: string;
+  zoneId?: string | null;
   userId: string;
   lat?: number | null;
   lng?: number | null;
   estimatedDeliveryAt?: Date | null;
   deliveryWindowStart?: Date | null;
   deliveryWindowEnd?: Date | null;
+}
+
+export type BulkCreatePackageItemInput = Omit<CreatePackageInput, "userId">;
+
+export interface PackageFilterInput {
+  search?: string;
+  status?: PackageStatus | string;
+  zoneId?: string;
+  driverId?: string;
+  trackingCode?: string;
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
+  isArchived?: boolean;
+}
+
+export class PackageBulkError extends Error {
+  readonly code: "zone_not_found" | "duplicate_tracking_codes";
+  readonly details: string[];
+
+  constructor(
+    code: "zone_not_found" | "duplicate_tracking_codes",
+    message: string,
+    details: string[] = []
+  ) {
+    super(message);
+    this.name = "PackageBulkError";
+    this.code = code;
+    this.details = details;
+  }
 }
 
 export interface UpdatePackageInput {
@@ -68,6 +99,41 @@ export interface DashboardStatsFilters {
 const MAX_DENSE_WEEKLY_DAYS = 366;
 const STATS_CACHE_TTL_SECONDS = 60;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MAX_EXPORT_PACKAGES = 10000;
+const GEOCODE_BATCH_CONCURRENCY = 5;
+
+const PACKAGE_EXPORT_HEADERS = [
+  "id",
+  "trackingCode",
+  "status",
+  "recipientName",
+  "recipientAddress",
+  "recipientPhone",
+  "recipientEmail",
+  "addressStreet",
+  "addressNumber",
+  "addressFloor",
+  "addressCity",
+  "addressZip",
+  "addressReferences",
+  "senderName",
+  "senderAddress",
+  "senderPhone",
+  "weight",
+  "volume",
+  "lat",
+  "lng",
+  "zoneId",
+  "zoneName",
+  "driverId",
+  "driverName",
+  "estimatedDeliveryAt",
+  "deliveryWindowStart",
+  "deliveryWindowEnd",
+  "isArchived",
+  "createdAt",
+  "updatedAt",
+] as const;
 
 export class PackageService {
   private static async invalidatePackageCache(companyId: string): Promise<void> {
@@ -212,18 +278,10 @@ export class PackageService {
     return parsed;
   }
 
-  static async getAllPackages(companyId: string, filters: {
-    search?: string;
-    status?: PackageStatus | string;
-    zoneId?: string;
-    driverId?: string;
-    trackingCode?: string;
-    dateFrom?: Date | string;
-    dateTo?: Date | string;
-    page?: number;
-    limit?: number;
-    isArchived?: boolean; 
-  }) {
+  private static buildPackageWhere(
+    companyId: string,
+    filters: PackageFilterInput
+  ): Prisma.PackageWhereInput {
     const {
       search,
       status,
@@ -232,11 +290,8 @@ export class PackageService {
       trackingCode,
       dateFrom,
       dateTo,
-      page = 1,
-      limit = 10,
       isArchived = false,
     } = filters;
-    const skip = (page - 1) * limit;
 
     const where: Prisma.PackageWhereInput = { companyId, isArchived };
     const andConditions: Prisma.PackageWhereInput[] = [];
@@ -320,6 +375,17 @@ export class PackageService {
       where.AND = andConditions;
     }
 
+    return where;
+  }
+
+  static async getAllPackages(
+    companyId: string,
+    filters: PackageFilterInput & { page?: number; limit?: number }
+  ) {
+    const { page = 1, limit = 10 } = filters;
+    const skip = (page - 1) * limit;
+    const where = PackageService.buildPackageWhere(companyId, filters);
+
     const [items, total] = await Promise.all([
       prisma.package.findMany({
         where,
@@ -345,6 +411,63 @@ export class PackageService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  static async exportPackagesCsv(
+    companyId: string,
+    filters: PackageFilterInput
+  ): Promise<string> {
+    const where = PackageService.buildPackageWhere(companyId, filters);
+
+    const packages = await prisma.package.findMany({
+      where,
+      include: {
+        zone: {
+          include: { driver: true },
+        },
+        driver: true,
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: MAX_EXPORT_PACKAGES,
+    });
+
+    const rows = packages.map((pkg) => {
+      const effectiveDriver = pkg.driver ?? pkg.zone?.driver ?? null;
+      return {
+        id: pkg.id,
+        trackingCode: pkg.trackingCode,
+        status: pkg.status,
+        recipientName: pkg.recipientName,
+        recipientAddress: pkg.recipientAddress,
+        recipientPhone: pkg.recipientPhone,
+        recipientEmail: pkg.recipientEmail ?? "",
+        addressStreet: pkg.addressStreet ?? "",
+        addressNumber: pkg.addressNumber ?? "",
+        addressFloor: pkg.addressFloor ?? "",
+        addressCity: pkg.addressCity ?? "",
+        addressZip: pkg.addressZip ?? "",
+        addressReferences: pkg.addressReferences ?? "",
+        senderName: pkg.senderName ?? "",
+        senderAddress: pkg.senderAddress ?? "",
+        senderPhone: pkg.senderPhone ?? "",
+        weight: pkg.weight ?? "",
+        volume: pkg.volume ?? "",
+        lat: pkg.lat ?? "",
+        lng: pkg.lng ?? "",
+        zoneId: pkg.zoneId ?? "",
+        zoneName: pkg.zone?.name ?? "",
+        driverId: pkg.driverId ?? pkg.zone?.driverId ?? "",
+        driverName: effectiveDriver?.name ?? "",
+        estimatedDeliveryAt: pkg.estimatedDeliveryAt ?? "",
+        deliveryWindowStart: pkg.deliveryWindowStart ?? "",
+        deliveryWindowEnd: pkg.deliveryWindowEnd ?? "",
+        isArchived: pkg.isArchived,
+        createdAt: pkg.createdAt,
+        updatedAt: pkg.updatedAt,
+      };
+    });
+
+    return serializeCsv(PACKAGE_EXPORT_HEADERS, rows);
   }
 
   static async archivePackages(companyId: string, packageIds: string[]) {
@@ -424,6 +547,61 @@ export class PackageService {
     return result;
   }
 // ...
+  private static async resolveGeocodeCoordinates(
+    input: {
+      lat?: number | null;
+      lng?: number | null;
+      recipientAddress?: string | null;
+      addressStreet?: string | null;
+      addressNumber?: string | null;
+      addressCity?: string | null;
+      addressCountry?: string | null;
+    },
+    memo?: Map<string, Promise<{ lat: number; lng: number } | null>>
+  ): Promise<{ lat: number | null | undefined; lng: number | null | undefined }> {
+    if (input.lat != null && input.lng != null) {
+      return { lat: input.lat, lng: input.lng };
+    }
+
+    const queryAddr = PackageService.buildGeocodeQuery(input);
+    if (!queryAddr) {
+      return { lat: input.lat, lng: input.lng };
+    }
+
+    let geoPromise: Promise<{ lat: number; lng: number } | null>;
+    if (memo) {
+      let cached = memo.get(queryAddr);
+      if (!cached) {
+        cached = geocodeAddress(queryAddr);
+        memo.set(queryAddr, cached);
+      }
+      geoPromise = cached;
+    } else {
+      geoPromise = geocodeAddress(queryAddr);
+    }
+
+    const geo = await geoPromise;
+    if (geo) {
+      return { lat: geo.lat, lng: geo.lng };
+    }
+    return { lat: input.lat, lng: input.lng };
+  }
+
+  private static buildInitialHistoryNote(
+    recipientName: string,
+    recipientAddress: string,
+    status: PackageStatus,
+    isBulk = false
+  ): string {
+    const base = `Package created for ${recipientName} at ${recipientAddress}`;
+    if (status === "assigned") {
+      return isBulk
+        ? `${base} (bulk import, auto-assigned to active zone)`
+        : `${base} (auto-assigned to active zone)`;
+    }
+    return isBulk ? `${base} (bulk import)` : base;
+  }
+
   static async createPackage(companyId: string, data: CreatePackageInput) {
     const {
       trackingCode,
@@ -458,7 +636,7 @@ export class PackageService {
     PackageService.validateDeliveryWindow(deliveryWindowStart, deliveryWindowEnd);
 
     // Validate Zone (if provided manually)
-    let resolvedZoneId = zoneId;
+    let resolvedZoneId = zoneId ?? undefined;
     if (resolvedZoneId) {
         const zone = await prisma.zone.findFirst({ where: { id: resolvedZoneId, companyId } });
         if (!zone) {
@@ -467,25 +645,15 @@ export class PackageService {
     }
 
     // --- Geocoding Logic ---
-    let finalLat = lat;
-    let finalLng = lng;
-
-    if (finalLat == null || finalLng == null) {
-      const queryAddr = PackageService.buildGeocodeQuery({
-        recipientAddress,
-        addressStreet,
-        addressNumber,
-        addressCity,
-        addressCountry,
-      });
-      if (queryAddr) {
-        const geo = await geocodeAddress(queryAddr);
-        if (geo) {
-          finalLat = geo.lat;
-          finalLng = geo.lng;
-        }
-      }
-    }
+    const { lat: finalLat, lng: finalLng } = await PackageService.resolveGeocodeCoordinates({
+      lat,
+      lng,
+      recipientAddress,
+      addressStreet,
+      addressNumber,
+      addressCity,
+      addressCountry,
+    });
     // -----------------------
 
     // --- Auto Geofencing: detect zone if not provided ---
@@ -560,9 +728,11 @@ export class PackageService {
             create: {
               status: initialStatus,
               userId,
-              notes: initialStatus === "assigned"
-                ? `Package created for ${recipientName} at ${recipientAddress} (auto-assigned to active zone)`
-                : `Package created for ${recipientName} at ${recipientAddress}`
+              notes: PackageService.buildInitialHistoryNote(
+                recipientName,
+                recipientAddress,
+                initialStatus
+              ),
             }
           }
         },
@@ -589,6 +759,234 @@ export class PackageService {
     });
 
     return pkg;
+  }
+
+  static async createPackagesBulk(
+    companyId: string,
+    userId: string,
+    items: BulkCreatePackageItemInput[]
+  ) {
+    for (const item of items) {
+      PackageService.assertValidOptionalDate(item.estimatedDeliveryAt);
+      PackageService.assertValidOptionalDate(item.deliveryWindowStart);
+      PackageService.assertValidOptionalDate(item.deliveryWindowEnd);
+      PackageService.validateDeliveryWindow(item.deliveryWindowStart, item.deliveryWindowEnd);
+    }
+
+    const explicitZoneIds = Array.from(
+      new Set(items.map((item) => item.zoneId).filter((id): id is string => Boolean(id)))
+    );
+    if (explicitZoneIds.length > 0) {
+      const validZones = await prisma.zone.findMany({
+        where: { companyId, id: { in: explicitZoneIds } },
+        select: { id: true },
+      });
+      const validZoneSet = new Set(validZones.map((z) => z.id));
+      const missingZoneIds = explicitZoneIds.filter((id) => !validZoneSet.has(id));
+      if (missingZoneIds.length > 0) {
+        throw new PackageBulkError("zone_not_found", "zone not found", missingZoneIds);
+      }
+    }
+
+    const geocodeMemo = new Map<string, Promise<{ lat: number; lng: number } | null>>();
+    const resolvedItems: Array<
+      BulkCreatePackageItemInput & { finalLat?: number | null; finalLng?: number | null }
+    > = new Array(items.length);
+
+    for (let offset = 0; offset < items.length; offset += GEOCODE_BATCH_CONCURRENCY) {
+      const chunk = items.slice(offset, offset + GEOCODE_BATCH_CONCURRENCY);
+      const chunkResults = await Promise.all(
+        chunk.map(async (item) => {
+          const coords = await PackageService.resolveGeocodeCoordinates(item, geocodeMemo);
+          return { ...item, finalLat: coords.lat, finalLng: coords.lng };
+        })
+      );
+      chunkResults.forEach((entry, idx) => {
+        resolvedItems[offset + idx] = entry;
+      });
+    }
+
+    let createdPackages;
+    try {
+      createdPackages = await prisma.$transaction(async (tx) => {
+        const lockedZones = await tx.$queryRaw<
+          { id: string; isActive: boolean; driverId: string | null }[]
+        >`
+          SELECT "id", "isActive", "driverId"
+          FROM "Zone"
+          WHERE "companyId" = ${companyId}
+          FOR SHARE
+        `;
+        const zoneStateById = new Map(lockedZones.map((z) => [z.id, z]));
+
+        const needsAutoDetect = resolvedItems.some(
+          (item) => !item.zoneId && item.finalLat != null && item.finalLng != null
+        );
+        const activePolygonZones = needsAutoDetect
+          ? await tx.zone.findMany({
+              where: {
+                companyId,
+                isActive: true,
+                polygon: { not: Prisma.DbNull },
+              },
+              select: { id: true, polygon: true },
+            })
+          : [];
+
+        const trackingCodes = resolvedItems.map((item) => item.trackingCode);
+        const existingPackages = await tx.package.findMany({
+          where: {
+            companyId,
+            trackingCode: { in: trackingCodes },
+          },
+          select: { trackingCode: true },
+        });
+        if (existingPackages.length > 0) {
+          throw new PackageBulkError(
+            "duplicate_tracking_codes",
+            "Duplicate tracking codes already exist",
+            existingPackages.map((p) => p.trackingCode)
+          );
+        }
+
+        const createdIds: string[] = [];
+        const packageRows: Prisma.PackageCreateManyInput[] = [];
+        const historyRows: Prisma.PackageHistoryCreateManyInput[] = [];
+
+        for (const item of resolvedItems) {
+          let targetZoneId: string | null = null;
+
+          if (item.zoneId) {
+            const explicitZone = zoneStateById.get(item.zoneId);
+            if (!explicitZone) {
+              throw new PackageBulkError("zone_not_found", "zone not found", [item.zoneId]);
+            }
+            targetZoneId = explicitZone.id;
+          } else if (item.finalLat != null && item.finalLng != null) {
+            for (const zone of activePolygonZones) {
+              const poly = zone.polygon as [number, number][] | null;
+              if (Array.isArray(poly) && poly.length >= 3 && pointInPolygon(item.finalLat, item.finalLng, poly)) {
+                targetZoneId = zone.id;
+                break;
+              }
+            }
+          }
+
+          let initialStatus: PackageStatus = "pending";
+          let initialDriverId: string | null = null;
+          if (targetZoneId) {
+            const zoneState = zoneStateById.get(targetZoneId);
+            if (!zoneState) {
+              targetZoneId = null;
+            } else if (zoneState.isActive && zoneState.driverId) {
+              initialStatus = "assigned";
+              initialDriverId = zoneState.driverId;
+            }
+          }
+
+          const packageId = randomUUID();
+          createdIds.push(packageId);
+
+          packageRows.push({
+            id: packageId,
+            trackingCode: item.trackingCode,
+            recipientName: item.recipientName,
+            recipientAddress: item.recipientAddress,
+            recipientPhone: item.recipientPhone,
+            recipientEmail: PackageService.normalizeNullableText(item.recipientEmail) ?? null,
+            addressStreet: PackageService.normalizeNullableText(item.addressStreet) ?? null,
+            addressNumber: PackageService.normalizeNullableText(item.addressNumber) ?? null,
+            addressFloor: PackageService.normalizeNullableText(item.addressFloor) ?? null,
+            addressCity: PackageService.normalizeNullableText(item.addressCity) ?? null,
+            addressZip: PackageService.normalizeNullableText(item.addressZip) ?? null,
+            addressReferences: PackageService.normalizeNullableText(item.addressReferences) ?? null,
+            senderName: PackageService.normalizeNullableText(item.senderName) ?? null,
+            senderAddress: PackageService.normalizeNullableText(item.senderAddress) ?? null,
+            senderPhone: PackageService.normalizeNullableText(item.senderPhone) ?? null,
+            weight: item.weight ?? null,
+            volume: item.volume ?? null,
+            lat: item.finalLat ?? null,
+            lng: item.finalLng ?? null,
+            estimatedDeliveryAt: item.estimatedDeliveryAt ?? null,
+            deliveryWindowStart: item.deliveryWindowStart ?? null,
+            deliveryWindowEnd: item.deliveryWindowEnd ?? null,
+            zoneId: targetZoneId,
+            driverId: initialDriverId,
+            companyId,
+            status: initialStatus,
+          });
+
+          historyRows.push({
+            id: randomUUID(),
+            packageId,
+            status: initialStatus,
+            userId,
+            notes: PackageService.buildInitialHistoryNote(
+              item.recipientName,
+              item.recipientAddress,
+              initialStatus,
+              true
+            ),
+          });
+        }
+
+        await tx.package.createMany({ data: packageRows });
+        await tx.packageHistory.createMany({ data: historyRows });
+
+        const fetched = await tx.package.findMany({
+          where: { companyId, id: { in: createdIds } },
+          include: {
+            zone: {
+              include: { driver: true },
+            },
+            driver: true,
+          },
+        });
+
+        const byId = new Map(fetched.map((pkg) => [pkg.id, pkg]));
+        return createdIds
+          .map((id) => byId.get(id))
+          .filter((pkg): pkg is NonNullable<typeof pkg> => Boolean(pkg));
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new PackageBulkError(
+          "duplicate_tracking_codes",
+          "Duplicate tracking codes already exist",
+          []
+        );
+      }
+      throw error;
+    }
+
+    await PackageService.invalidatePackageCache(companyId);
+
+    for (const pkg of createdPackages) {
+      emitToRoom(`company-${companyId}`, "package-created", pkg);
+    }
+
+    emitToRoom(`company-${companyId}`, "packages-bulk-created", {
+      count: createdPackages.length,
+      packageIds: createdPackages.map((pkg) => pkg.id),
+    });
+
+    emitToRoom(`company-${companyId}`, "business-event", {
+      id: `evt-${Date.now()}-${randomUUID()}`,
+      type: "SYSTEM",
+      title: "Carga Masiva de Paquetes",
+      description: `Se importaron ${createdPackages.length} paquetes`,
+      timestamp: Date.now(),
+    });
+
+    const assignedCount = createdPackages.filter((pkg) => pkg.status === "assigned").length;
+    const pendingCount = createdPackages.length - assignedCount;
+
+    return {
+      count: createdPackages.length,
+      assignedCount,
+      pendingCount,
+      items: createdPackages,
+    };
   }
 
 // ... 
