@@ -2,7 +2,7 @@ import "dotenv/config";
 import request from "supertest";
 import axios from "axios";
 import app from "../src/app";
-import { prisma } from "../src/prisma";
+import { closeDatabase, prisma } from "../src/prisma";
 import { redis } from "../src/redis";
 import { detectZone } from "../src/utils/geofencing";
 import { geocodeAddress } from "../src/utils/geocoder";
@@ -75,7 +75,7 @@ afterAll(async () => {
   await prisma.company.deleteMany({
     where: { id: { in: [companyAId, companyBId] } },
   });
-  await prisma.$disconnect();
+  await closeDatabase();
   await redis.disconnect();
 });
 

@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "crypto";
 import request from "supertest";
 import app from "../src/app";
-import { prisma } from "../src/prisma";
+import { closeDatabase, prisma } from "../src/prisma";
 import { redis } from "../src/redis";
 
 describe("GET /api/public/track/:trackingCode", () => {
@@ -59,7 +59,7 @@ describe("GET /api/public/track/:trackingCode", () => {
       await prisma.company.delete({ where: { id: createdCompanyId } }).catch(() => {});
     }
 
-    await prisma.$disconnect();
+    await closeDatabase();
     await redis.disconnect();
   });
 

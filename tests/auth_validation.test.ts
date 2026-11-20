@@ -4,7 +4,7 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 import { io as ioClient, Socket as ClientSocket } from "socket.io-client";
 import app from "../src/app";
-import { prisma } from "../src/prisma";
+import { closeDatabase, prisma } from "../src/prisma";
 import { z } from "zod";
 import { redis } from "../src/redis";
 import { initSocket, getGlobalConnectedClientCount } from "../src/websocket";
@@ -38,7 +38,7 @@ afterAll(async () => {
     await prisma.driver.deleteMany({ where: { companyId: createdCompanyId } });
     await prisma.company.delete({ where: { id: createdCompanyId } }).catch(() => {});
   }
-  await prisma.$disconnect();
+  await closeDatabase();
   await redis.disconnect();
 });
 

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import request from "supertest";
 import app from "../src/app";
-import { prisma } from "../src/prisma";
+import { closeDatabase, prisma } from "../src/prisma";
 import { redis } from "../src/redis";
 import { DriverService } from "../src/services/driver.service";
 import * as websocket from "../src/websocket";
@@ -49,7 +49,7 @@ afterAll(async () => {
   await prisma.driver.deleteMany({ where: { companyId } });
   await prisma.zone.deleteMany({ where: { companyId } });
   await prisma.company.delete({ where: { id: companyId } }).catch(() => {});
-  await prisma.$disconnect();
+  await closeDatabase();
   await redis.disconnect();
 });
 
