@@ -261,24 +261,51 @@ export function DriverDashboard() {
   // Enable Real-Time GPS Tracking
   useDriverLocation();
 
-  // Offline sync — drains IndexedDB queue when connectivity is restored
-  const { isOnline, pendingCount, syncNow } = useOfflineSync({ token });
+  const fetchSeqRef = useRef(0);
+  const isMountedRef = useRef(true);
 
-  const fetchMyPackages = useCallback(async () => {
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchMyPackages = useCallback(async (options?: { silent?: boolean }) => {
     if (!token) return;
-    setLoading(true);
+    const silent = options?.silent ?? false;
+    const seq = ++fetchSeqRef.current;
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const data = await packageService.getMyPackages(token);
+      if (!isMountedRef.current || seq !== fetchSeqRef.current) return;
       // Filter out completed packages from the active list
       const active = data.filter(p => !['delivered', 'cancelled'].includes(p.status));
       setPackages(active);
     } catch (err) {
+      if (!isMountedRef.current || seq !== fetchSeqRef.current) return;
       console.error(err);
-      toast.error('Error al cargar paquetes');
+      if (!silent) {
+        toast.error('Error al cargar paquetes');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && seq === fetchSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, [token]);
+
+  const handleSyncComplete = useCallback(() => {
+    return fetchMyPackages({ silent: true });
+  }, [fetchMyPackages]);
+
+  // Offline sync — drains IndexedDB queue when connectivity is restored
+  const { isOnline, pendingCount, isSyncing, syncNow, refreshPendingCount } = useOfflineSync({
+    token,
+    onSyncComplete: handleSyncComplete,
+  });
 
   useEffect(() => {
     fetchMyPackages();
@@ -292,9 +319,14 @@ export function DriverDashboard() {
     // OFFLINE PATH — queue for later sync
     if (!isOnline) {
       try {
-        await enqueueStatusUpdate({ packageId: pkg.id, status: newStatus });
+        await enqueueStatusUpdate({
+          packageId: pkg.id,
+          trackingCode: pkg.trackingCode,
+          status: newStatus,
+        });
+        const updatedCount = (await refreshPendingCount()) ?? pendingCount + 1;
         toast.warning('Sin conexión — actualización guardada localmente', {
-          description: `Se enviará cuando vuelva la red (${pendingCount + 1} pendiente/s)`,
+          description: `Se enviará cuando vuelva la red (${updatedCount} pendiente/s)`,
           duration: 5000,
         });
         // Optimistically update local list so the driver sees the change
@@ -302,6 +334,7 @@ export function DriverDashboard() {
           p.id === pkg.id ? { ...p, status: newStatus as Package['status'] } : p
         ));
       } catch (err) {
+        console.error('Error al guardar actualización offline:', err);
         toast.error('No se pudo guardar la actualización offline');
       } finally {
         setUpdating(null);
@@ -337,16 +370,19 @@ export function DriverDashboard() {
       try {
         await enqueueStatusUpdate({
           packageId: pkg.id,
+          trackingCode: pkg.trackingCode,
           status: 'delivered',
           signature: signature ?? undefined,
           photo: photo ?? undefined,
         });
+        const updatedCount = (await refreshPendingCount()) ?? pendingCount + 1;
         toast.warning('Sin conexión — entrega guardada localmente', {
-          description: `Se sincronizará cuando vuelva la red (${pendingCount + 1} pendiente/s)`,
+          description: `Se sincronizará cuando vuelva la red (${updatedCount} pendiente/s)`,
           duration: 5000,
         });
         setPackages(prev => prev.filter(p => p.id !== pkg.id));
       } catch (err) {
+        console.error('Error al guardar entrega offline:', err);
         toast.error('No se pudo guardar la entrega offline');
       } finally {
         setUpdating(null);
@@ -472,13 +508,16 @@ export function DriverDashboard() {
                 : `${pendingCount} entrega(s) pendiente(s) de sincronizar`}
             </span>
           </div>
-          <button
-            onClick={syncNow}
-            className="min-h-[48px] px-3 flex items-center gap-1 text-xs text-amber-300 hover:text-amber-100 transition-colors"
-          >
-            <RefreshCw size={12} />
-            Sincronizar
-          </button>
+          {pendingCount > 0 && (
+            <button
+              onClick={syncNow}
+              disabled={!isOnline || isSyncing}
+              className="min-h-[48px] px-3 flex items-center gap-1 text-xs text-amber-300 hover:text-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={12} className={clsx(isSyncing && 'animate-spin')} />
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+            </button>
+          )}
         </div>
       )}
 
@@ -490,7 +529,7 @@ export function DriverDashboard() {
           <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
           <p>No tienes paquetes pendientes asignados.</p>
           <button
-            onClick={fetchMyPackages}
+            onClick={() => void fetchMyPackages()}
             className="min-h-[48px] px-4 text-blue-500 underline text-sm flex items-center justify-center"
           >
             Actualizar
@@ -508,7 +547,7 @@ export function DriverDashboard() {
                 <Route size={12} /> Optimizar
               </button>
               <button
-                onClick={fetchMyPackages}
+                onClick={() => void fetchMyPackages()}
                 className="min-h-[48px] text-xs text-blue-400 bg-blue-900/20 px-3 py-2 rounded-lg flex items-center justify-center hover:bg-blue-900/40 transition-colors"
               >
                 Refrescar

@@ -11,10 +11,16 @@ const DB_VERSION = 1;
 const STORE_NAME = 'statusQueue';
 
 let enqueueSequence = 0;
+let committedEnqueueVersion = 0;
+
+export function getEnqueueVersion(): number {
+  return committedEnqueueVersion;
+}
 
 export interface QueuedStatusUpdate {
   id: string; // locally generated unique ID
   packageId: string;
+  trackingCode?: string;
   status: string;
   lat?: number;
   lng?: number;
@@ -22,6 +28,30 @@ export interface QueuedStatusUpdate {
   photo?: string;
   createdAt: number; // epoch ms
   retries: number;
+}
+
+type QueueChangeListener = () => void;
+
+const queueChangeListeners = new Set<QueueChangeListener>();
+
+/**
+ * Subscribes to queue mutations (enqueue / clear) so hooks stay immediately synced.
+ */
+export function subscribeQueueChanges(listener: QueueChangeListener): () => void {
+  queueChangeListeners.add(listener);
+  return () => {
+    queueChangeListeners.delete(listener);
+  };
+}
+
+function notifyQueueChanges(): void {
+  for (const listener of Array.from(queueChangeListeners)) {
+    try {
+      listener();
+    } catch (err) {
+      console.error('Error notifying offline queue listener:', err);
+    }
+  }
 }
 
 interface TransactionContext<T> {
@@ -206,11 +236,14 @@ export async function enqueueStatusUpdate(
     retries: 0,
   };
 
-  return withTransaction<QueuedStatusUpdate>('readwrite', ({ store, setResult, onRequestError }) => {
+  const saved = await withTransaction<QueuedStatusUpdate>('readwrite', ({ store, setResult, onRequestError }) => {
     const req = store.add(item);
     req.onsuccess = () => setResult(item);
     req.onerror = () => onRequestError(req);
   });
+  committedEnqueueVersion += 1;
+  notifyQueueChanges();
+  return saved;
 }
 
 export async function getQueuedUpdates(): Promise<QueuedStatusUpdate[]> {
@@ -223,10 +256,11 @@ export async function getQueuedUpdates(): Promise<QueuedStatusUpdate[]> {
 }
 
 export async function clearQueuedUpdate(id: string): Promise<void> {
-  return withTransaction<void>('readwrite', ({ store, onRequestError }) => {
+  await withTransaction<void>('readwrite', ({ store, onRequestError }) => {
     const req = store.delete(id);
     req.onerror = () => onRequestError(req);
   });
+  notifyQueueChanges();
 }
 
 export async function incrementRetry(id: string): Promise<void> {
