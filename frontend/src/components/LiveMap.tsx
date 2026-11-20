@@ -1,12 +1,17 @@
 
-import { useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Popup, Marker, useMap } from 'react-leaflet';
+import { useEffect, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useSocket } from '../context/SocketContext';
 import { Truck, Navigation, User, Package } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { getPackageStatusToken } from '../utils/packageStatus';
+import {
+    PACKAGE_STATUS_ORDER,
+    PACKAGE_STATUS_TOKENS,
+    getPackageStatusToken,
+} from '../utils/packageStatus';
+import { SmoothMarker } from './SmoothMarker';
 
 // --- Types ---
 interface DriverInfo {
@@ -15,7 +20,7 @@ interface DriverInfo {
     lat?: number | null;
     lng?: number | null;
     user?: { username: string };
-    zones?: { id: string, name: string }[];
+    zones?: { id: string; name: string }[];
 }
 
 interface SocketLocation {
@@ -39,18 +44,48 @@ interface PackageLocation {
     recipientAddress: string;
 }
 
+export interface ZoneCoordinate {
+    lat: number;
+    lng: number;
+}
+
+export interface MapZone {
+    id: string;
+    name: string;
+    coordinates?: ZoneCoordinate[] | null;
+    description?: string;
+    isActive?: boolean;
+    driver?: { id: string; name: string } | null;
+}
+
+const DEFAULT_MAP_CENTER: [number, number] = [-31.416, -64.186]; // Córdoba, Argentina (vista inicial por defecto)
+
+const toValidLatLng = (lat: unknown, lng: unknown): [number, number] | null => {
+    if (
+        typeof lat === 'number' &&
+        typeof lng === 'number' &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180
+    ) {
+        return [lat, lng];
+    }
+    return null;
+};
+
 // --- Icons Generator ---
-// Creates a divIcon with a Truck SVG inside
-const createCustomIcon = (_driver: DriverInfo | undefined, status: string) => {
+const createDriverIcon = (status: 'online' | 'offline'): L.DivIcon => {
     const isOnline = status === 'online';
-    
-    // Emerald (Online) or Slate (Offline)
-    const colorBg = isOnline ? 'bg-emerald-600' : 'bg-slate-600'; 
+
+    const colorBg = isOnline ? 'bg-emerald-600' : 'bg-slate-600';
     const colorPulse = isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500 hidden';
 
     const html = renderToStaticMarkup(
         <div className="relative flex items-center justify-center w-8 h-8">
-            <div className={`absolute inset-0 rounded-full opacity-20 ${colorPulse}`}></div>
+            <div className={`absolute inset-0 rounded-full opacity-25 ${colorPulse}`} />
             <div className={`relative z-10 p-1.5 rounded-full border-2 border-white shadow-lg ${colorBg}`}>
                 <Truck color="white" size={14} />
             </div>
@@ -59,20 +94,21 @@ const createCustomIcon = (_driver: DriverInfo | undefined, status: string) => {
 
     return L.divIcon({
         className: 'custom-driver-icon-v2',
-        html: html,
+        html,
         iconSize: [32, 32],
         iconAnchor: [16, 16],
-        popupAnchor: [0, -16]
+        popupAnchor: [0, -16],
     });
 };
 
-const createPackageIcon = (status: string) => {
-    const color = getPackageStatusToken(status).hexColor;
-    
+const createPackageIcon = (hexColor: string): L.DivIcon => {
     const html = renderToStaticMarkup(
         <div className="relative flex items-center justify-center w-6 h-6">
-            <div className={`absolute inset-0 rounded-sm opacity-50`} style={{backgroundColor: color}}></div>
-            <div className={`relative z-10 p-1 rounded-sm border border-white shadow-sm`} style={{backgroundColor: color}}>
+            <div className="absolute inset-0 rounded-sm opacity-45" style={{ backgroundColor: hexColor }} />
+            <div
+                className="relative z-10 p-1 rounded-sm border border-white/90 shadow-sm"
+                style={{ backgroundColor: hexColor }}
+            >
                 <Package color="white" size={12} />
             </div>
         </div>
@@ -80,138 +116,287 @@ const createPackageIcon = (status: string) => {
 
     return L.divIcon({
         className: 'custom-package-icon',
-        html: html,
+        html,
         iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12],
     });
 };
 
 // --- Helper Component to Fit Bounds ---
-function FitBounds({ markers }: { markers: SocketLocation[] }) {
+function FitBounds({ points, signature }: { points: [number, number][]; signature: string }) {
     const map = useMap();
-    
+    const lastFitSignatureRef = useRef<string>('');
+
     useEffect(() => {
-        if (markers.length === 0) return;
-        
-        // Create bounds from all markers
-        const bounds = L.latLngBounds(markers.map(m => [m.lat, m.lng]));
-        
-        // Pad bounds slightly
+        if (points.length === 0) {
+            lastFitSignatureRef.current = '';
+            return;
+        }
+        if (lastFitSignatureRef.current === signature) return;
+
+        lastFitSignatureRef.current = signature;
+        const bounds = L.latLngBounds(points);
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15, animate: true });
-    }, [markers.length]); // Only refit when count changes (avoids jitter on every movement)
-    
+    }, [map, points, signature]);
+
     return null;
 }
 
 // --- Main Component ---
 interface LiveMapProps {
-    visibleDriverIds?: string[]; 
+    visibleDriverIds?: string[];
     allDrivers?: DriverInfo[]; // Metadata to enrich popups
-    packages?: PackageLocation[]; // New Prop
+    packages?: PackageLocation[];
+    zones?: MapZone[];
 }
 
-export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: LiveMapProps) {
+export function LiveMap({
+    visibleDriverIds,
+    allDrivers = [],
+    packages = [],
+    zones = [],
+}: LiveMapProps) {
     const { locations } = useSocket();
-    
-    // Filter valid packages (must have lat/lng)
+
+    const driverIcons = useMemo(
+        () => ({
+            online: createDriverIcon('online'),
+            offline: createDriverIcon('offline'),
+        }),
+        []
+    );
+
+    const fallbackPackageColor = getPackageStatusToken('').hexColor;
+    const packageIcons = useMemo(() => {
+        const icons = new Map<string, L.DivIcon>();
+        for (const status of PACKAGE_STATUS_ORDER) {
+            const { hexColor } = PACKAGE_STATUS_TOKENS[status];
+            if (!icons.has(hexColor)) {
+                icons.set(hexColor, createPackageIcon(hexColor));
+            }
+        }
+        if (!icons.has(fallbackPackageColor)) {
+            icons.set(fallbackPackageColor, createPackageIcon(fallbackPackageColor));
+        }
+        return icons;
+    }, [fallbackPackageColor]);
+
+    // Filter valid packages (must have finite non-zero coordinates)
     const validPackages = useMemo(() => {
-        return packages.filter(p => p.lat && p.lng);
+        return packages.filter((p) => {
+            const coords = toValidLatLng(p.lat, p.lng);
+            return coords !== null && !(coords[0] === 0 && coords[1] === 0);
+        });
     }, [packages]);
-    
+
+    // Filter active zones with valid polygon vertices (>= 3 points in [lat, lng] order)
+    const activeZonePolygons = useMemo(() => {
+        return zones
+            .filter((zone) => zone.isActive === true && Array.isArray(zone.coordinates))
+            .map((zone) => {
+                const positions: [number, number][] = (zone.coordinates ?? [])
+                    .map((pt) => (pt ? toValidLatLng(pt.lat, pt.lng) : null))
+                    .filter((coords): coords is [number, number] => coords !== null);
+
+                return {
+                    id: zone.id,
+                    name: zone.name,
+                    description: zone.description,
+                    driverName: zone.driver?.name ?? null,
+                    positions,
+                };
+            })
+            .filter((zone) => zone.positions.length >= 3);
+    }, [zones]);
+
     const activeDrivers = useMemo(() => {
-        const driversMap = new Map<string, ActiveDriverMarker>();
+        const driversById = new Map<string, DriverInfo>();
+        allDrivers.forEach((d) => {
+            driversById.set(d.id, d);
+        });
+
+        const markersMap = new Map<string, ActiveDriverMarker>();
 
         // 1. Populate with DB Drivers (Offline/Static)
-        allDrivers.forEach(d => {
-             // Skip if no location available in DB
-             if (typeof d.lat === 'number' && typeof d.lng === 'number' && d.lat !== 0 && d.lng !== 0) {
-                 driversMap.set(d.id, {
-                     driverId: d.id,
-                     lat: d.lat,
-                     lng: d.lng,
-                     timestamp: 0, // Old
-                     status: 'offline', // Mark as offline initially
-                     meta: d
-                 });
-             }
+        allDrivers.forEach((d) => {
+            const coords = toValidLatLng(d.lat, d.lng);
+            if (coords && !(coords[0] === 0 && coords[1] === 0)) {
+                markersMap.set(d.id, {
+                    driverId: d.id,
+                    lat: coords[0],
+                    lng: coords[1],
+                    timestamp: 0,
+                    status: 'offline',
+                    meta: d,
+                });
+            }
         });
 
         // 2. Override with Real-Time Socket Data (Online)
         locations.forEach((loc, driverId) => {
-             const meta = allDrivers.find(d => d.id === driverId);
-             // Use socket location as authoritative
-             driversMap.set(driverId, { 
-                 ...loc, 
-                 status: 'online', 
-                 meta 
-             });
+            const coords = toValidLatLng(loc.lat, loc.lng);
+            if (!coords || (coords[0] === 0 && coords[1] === 0)) {
+                return;
+            }
+            markersMap.set(driverId, {
+                driverId: loc.driverId,
+                lat: coords[0],
+                lng: coords[1],
+                timestamp: loc.timestamp,
+                status: 'online',
+                meta: driversById.get(driverId),
+            });
         });
 
         // 3. Filter by Visibility
-        const result = Array.from(driversMap.values());
+        const result = Array.from(markersMap.values());
         if (visibleDriverIds) {
-            return result.filter(d => visibleDriverIds.includes(d.driverId));
+            return result.filter((d) => visibleDriverIds.includes(d.driverId));
         }
         return result;
     }, [locations, visibleDriverIds, allDrivers]);
 
-    const center: [number, number] = [-31.43547, -64.20090]; // Buenos Aires default
+    const { boundsPoints, boundsSignature } = useMemo(() => {
+        if (activeDrivers.length > 0) {
+            return {
+                boundsPoints: activeDrivers.map((d): [number, number] => [d.lat, d.lng]),
+                boundsSignature: `drivers:${activeDrivers.map((d) => d.driverId).sort().join(',')}`,
+            };
+        }
+
+        const fallbackPoints: [number, number][] = [
+            ...validPackages.map((p): [number, number] => [p.lat, p.lng]),
+            ...activeZonePolygons.flatMap((z) => z.positions),
+        ];
+        const pkgSig = validPackages.map((p) => p.id).sort().join(',');
+        const zoneSig = activeZonePolygons.map((z) => z.id).sort().join(',');
+
+        return {
+            boundsPoints: fallbackPoints,
+            boundsSignature: `fallback:${pkgSig}|${zoneSig}`,
+        };
+    }, [activeDrivers, validPackages, activeZonePolygons]);
 
     return (
         <div className="h-full w-full relative z-0">
-             <MapContainer 
-                center={center} 
-                zoom={12} 
+            <MapContainer
+                center={DEFAULT_MAP_CENTER}
+                zoom={12}
                 style={{ height: '100%', width: '100%' }}
                 scrollWheelZoom={true}
                 className="bg-slate-900"
-             >
+            >
                 {/* Dark Mode Tiles */}
                 <TileLayer
                     attribution='&copy; CARTO'
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
-                
-                <FitBounds markers={activeDrivers} />
 
-                {activeDrivers.map(d => (
-                    <Marker 
-                        key={d.driverId} 
-                        position={[d.lat, d.lng]}
-                        icon={createCustomIcon(d.meta, d.status)}
+                <FitBounds points={boundsPoints} signature={boundsSignature} />
+
+                {/* Active Zone Polygons (rendered below markers) */}
+                {activeZonePolygons.map((zone) => (
+                    <Polygon
+                        key={zone.id}
+                        positions={zone.positions}
+                        pathOptions={{
+                            color: '#0ea5e9',
+                            weight: 2,
+                            opacity: 0.85,
+                            fillColor: '#0ea5e9',
+                            fillOpacity: 0.12,
+                        }}
                     >
-                        <Popup className="custom-popup-dark">
-                            <div className="p-1 min-w-[200px]">
-                                <div className="flex items-center gap-3 mb-2 border-b border-slate-200 pb-2">
-                                    <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600">
-                                        <User size={16} />
+                        <Popup className="custom-popup-dark" maxWidth={260}>
+                            <div className="p-0.5 min-w-[175px] space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+                                    <h3 className="font-semibold text-slate-100 text-xs truncate">
+                                        {zone.name}
+                                    </h3>
+                                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                        Activa
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                                    <Truck size={12} className="text-brand-400 shrink-0" />
+                                    <span className="truncate">
+                                        {zone.driverName ?? 'Sin conductor asignado'}
+                                    </span>
+                                </div>
+                                {zone.description && (
+                                    <p className="text-[11px] text-slate-400 leading-snug">
+                                        {zone.description}
+                                    </p>
+                                )}
+                                <div className="text-[10px] font-mono tabular-nums text-slate-400">
+                                    {zone.positions.length} vértices
+                                </div>
+                            </div>
+                        </Popup>
+                    </Polygon>
+                ))}
+
+                {/* Render Drivers with 60fps SmoothMarker interpolation */}
+                {activeDrivers.map((d) => (
+                    <SmoothMarker
+                        key={d.driverId}
+                        position={[d.lat, d.lng]}
+                        icon={driverIcons[d.status]}
+                    >
+                        <Popup className="custom-popup-dark" maxWidth={280}>
+                            <div className="p-0.5 min-w-[190px]">
+                                <div className="flex items-center gap-2.5 mb-2 border-b border-slate-800 pb-2">
+                                    <div className="h-8 w-8 shrink-0 rounded-full bg-brand-500/15 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                                        <User size={15} />
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-slate-800 text-sm">{d.meta?.name || 'Conductor Desconocido'}</h3>
-                                        <span className="text-xs text-slate-500 font-mono tabular-nums">ID: {d.driverId.slice(0,6)}</span>
+                                    <div className="min-w-0">
+                                        <h3 className="font-semibold text-slate-100 text-sm truncate">
+                                            {d.meta?.name || 'Conductor Desconocido'}
+                                        </h3>
+                                        <span className="text-xs text-slate-400 font-mono tabular-nums">
+                                            ID: {d.driverId.slice(0, 6)}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="space-y-1 text-xs text-slate-600">
+                                <div className="space-y-1.5 text-xs text-slate-300">
                                     <div className="flex items-center gap-2">
-                                        <Navigation size={12} className="text-slate-400" />
-                                        <span className="font-mono tabular-nums">{d.lat.toFixed(4)}, {d.lng.toFixed(4)}</span>
+                                        <Navigation size={12} className="text-slate-400 shrink-0" />
+                                        <span className="font-mono tabular-nums text-slate-200">
+                                            {d.lat.toFixed(4)}, {d.lng.toFixed(4)}
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className={`h-1.5 w-1.5 rounded-full ${d.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
-                                        <span className={`font-medium ${d.status === 'online' ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                        <div
+                                            className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                                                d.status === 'online'
+                                                    ? 'bg-emerald-400 animate-pulse'
+                                                    : 'bg-slate-500'
+                                            }`}
+                                        />
+                                        <span
+                                            className={`font-medium ${
+                                                d.status === 'online' ? 'text-emerald-400' : 'text-slate-400'
+                                            }`}
+                                        >
                                             {d.status === 'online' ? 'En Línea' : 'Desconectado'}
                                         </span>
-                                        <span className="text-slate-400 ml-auto tabular-nums">
+                                        <span className="text-slate-400 ml-auto font-mono tabular-nums">
                                             {d.timestamp > 0 ? new Date(d.timestamp).toLocaleTimeString() : 'N/A'}
                                         </span>
                                     </div>
-                                    
+
                                     {d.meta?.zones && d.meta.zones.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t border-slate-100">
-                                            <span className="text-[10px] uppercase font-bold text-slate-400">Zonas Asignadas:</span>
+                                        <div className="mt-2 pt-2 border-t border-slate-800">
+                                            <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400">
+                                                Zonas Asignadas
+                                            </span>
                                             <div className="flex flex-wrap gap-1 mt-1">
                                                 {d.meta.zones.map((z) => (
-                                                    <span key={z.id} className="bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded text-[10px] border border-brand-200">
+                                                    <span
+                                                        key={z.id}
+                                                        className="bg-brand-500/10 text-brand-300 px-1.5 py-0.5 rounded text-[10px] border border-brand-500/25"
+                                                    >
                                                         {z.name}
                                                     </span>
                                                 ))}
@@ -221,51 +406,77 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
                                 </div>
                             </div>
                         </Popup>
-                    </Marker>
+                    </SmoothMarker>
                 ))}
 
                 {/* Render Packages */}
-                {validPackages.map(p => (
-                    <Marker 
-                        key={p.id} 
-                        position={[p.lat, p.lng]}
-                        icon={createPackageIcon(p.status)}
-                    >
-                        <Popup className="custom-popup-dark">
-                             <div className="p-1 min-w-[150px]">
-                                <h3 className="font-bold text-slate-800 text-xs font-mono tabular-nums flex items-center gap-1">
-                                    <Package size={12} /> {p.trackingCode}
-                                </h3>
-                                <div className="text-[10px] text-slate-500 mt-1">
-                                    {p.recipientAddress}
-                                </div>
-                                <span className="text-[10px] font-mono uppercase bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded mt-1 inline-block">
-                                    {getPackageStatusToken(p.status).label}
-                                </span>
-                             </div>
-                        </Popup>
-                    </Marker>
-                ))}
+                {validPackages.map((p) => {
+                    const statusToken = getPackageStatusToken(p.status);
+                    const packageIcon =
+                        packageIcons.get(statusToken.hexColor) ??
+                        packageIcons.get(fallbackPackageColor)!;
 
+                    return (
+                        <Marker
+                            key={p.id}
+                            position={[p.lat, p.lng]}
+                            icon={packageIcon}
+                        >
+                            <Popup className="custom-popup-dark" maxWidth={260}>
+                                <div className="p-0.5 min-w-[160px]">
+                                    <h3 className="font-semibold text-slate-100 text-xs font-mono tabular-nums flex items-center gap-1.5">
+                                        <Package size={12} className="text-brand-400 shrink-0" />
+                                        <span className="truncate">{p.trackingCode}</span>
+                                    </h3>
+                                    <div className="text-xs text-slate-300 mt-1 leading-snug">
+                                        {p.recipientAddress}
+                                    </div>
+                                    <span
+                                        className={`text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded border mt-2 inline-block ${statusToken.badgeClass}`}
+                                    >
+                                        {statusToken.label}
+                                    </span>
+                                </div>
+                            </Popup>
+                        </Marker>
+                    );
+                })}
             </MapContainer>
-            
+
             {/* Overlay Stats */}
-            <div className="absolute bottom-6 left-6 bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-xl border border-slate-800/80 shadow-2xl z-[1000] flex items-center gap-4">
+            <div className="absolute bottom-3 left-3 sm:bottom-5 sm:left-5 max-w-[calc(100%-1.5rem)] bg-slate-900/90 backdrop-blur-md text-white px-3 py-2.5 sm:p-3 rounded-xl border border-slate-800/80 shadow-2xl z-[1000] flex flex-wrap items-center gap-3 sm:gap-4">
                 <div className="flex flex-col">
                     <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Activos</span>
-                    <span className="text-2xl font-bold text-emerald-400 tabular-nums">{activeDrivers.length}</span>
+                    <span className="text-xl sm:text-2xl font-bold text-emerald-400 tabular-nums">
+                        {activeDrivers.length}
+                    </span>
                 </div>
                 <div className="h-8 w-px bg-slate-800/80" />
                 <div className="flex flex-col">
                     <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Total Flota</span>
-                    <span className="text-lg font-semibold text-slate-200 tabular-nums">{allDrivers.length}</span>
+                    <span className="text-base sm:text-lg font-semibold text-slate-200 tabular-nums">
+                        {allDrivers.length}
+                    </span>
                 </div>
                 {validPackages.length > 0 && (
                     <>
                         <div className="h-8 w-px bg-slate-800/80" />
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Paquetes</span>
-                            <span className="text-lg font-semibold text-amber-400 tabular-nums">{validPackages.length}</span>
+                            <span className="text-base sm:text-lg font-semibold text-amber-400 tabular-nums">
+                                {validPackages.length}
+                            </span>
+                        </div>
+                    </>
+                )}
+                {activeZonePolygons.length > 0 && (
+                    <>
+                        <div className="h-8 w-px bg-slate-800/80" />
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Zonas</span>
+                            <span className="text-base sm:text-lg font-semibold text-brand-400 tabular-nums">
+                                {activeZonePolygons.length}
+                            </span>
                         </div>
                     </>
                 )}

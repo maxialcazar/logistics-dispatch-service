@@ -120,9 +120,9 @@ export function DriverMap() {
                         icon={createPackageIcon(pkg.status, idx)}
                     >
                         <Popup className="custom-popup-dark">
-                             <div className="min-w-[200px] p-2">
-                                 <h3 className="font-bold text-slate-800">{pkg.recipientName}</h3>
-                                 <p className="text-xs text-slate-600 mb-2">{pkg.recipientAddress}</p>
+                             <div className="min-w-[200px] p-1">
+                                 <h3 className="font-semibold text-slate-100">{pkg.recipientName}</h3>
+                                 <p className="text-xs text-slate-300 mb-2">{pkg.recipientAddress}</p>
                                  <button 
                                     onClick={() => openNav(pkg.lat!, pkg.lng!)}
                                     className="w-full min-h-[48px] bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"

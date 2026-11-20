@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { driverService } from '../services/driverService';
-import { zoneService } from '../services/zoneService';
+import { zoneService, type Zone } from '../services/zoneService';
 import { packageService } from '../services/packageService';
 import { useSocket } from '../context/SocketContext';
 import { LiveMap } from '../components/LiveMap';
@@ -9,7 +9,6 @@ import { Skeleton } from '../components/Skeleton';
 import { Map, MapPin, Truck, Search, X, Check } from 'lucide-react';
 
 // Types
-interface Zone { id: string; name: string; }
 interface Driver { id: string; name: string; zones: { id: string; name: string }[]; user?: { username: string } }
 interface ActivePackage { 
     id: string; 
@@ -204,6 +203,11 @@ export function MonitorPage() {
         return filtered.map((d) => d.id);
     }, [drivers, filteredPackages, selectedZones, selectedDrivers, normalizedSearch]);
 
+    const visibleZones = useMemo(() => {
+        if (selectedZones.length === 0) return zones;
+        return zones.filter((z) => selectedZones.includes(z.id));
+    }, [zones, selectedZones]);
+
     // Helpers to toggle filters
     const toggleZone = (id: string) => {
         setSelectedZones(prev => prev.includes(id) ? prev.filter(z => z !== id) : [...prev, id]);
@@ -347,6 +351,7 @@ export function MonitorPage() {
                     visibleDriverIds={visibleDriverIds} 
                     allDrivers={drivers} 
                     packages={mapPackages}
+                    zones={visibleZones}
                  />
             </div>
         </div>
