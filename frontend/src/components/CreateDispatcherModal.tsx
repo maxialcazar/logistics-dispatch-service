@@ -1,5 +1,6 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, UserPlus, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +16,15 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -42,23 +52,42 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
     }
   };
 
-  return (
-    <div className="fixed top-0 right-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
+  const modalContent = (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-dispatcher-modal-title"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+
+      <div className="relative flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
         
         {/* Header */}
-        <div className="bg-slate-950/50 p-4 border-b border-slate-800 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+        <div className="shrink-0 bg-slate-950/50 p-4 border-b border-slate-800 flex justify-between items-center">
+          <h2
+            id="create-dispatcher-modal-title"
+            className="text-lg font-bold text-white flex items-center gap-2"
+          >
             <UserPlus className="h-5 w-5 text-blue-500" />
             Nuevo Despachador
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar modal"
+            className="text-slate-400 hover:text-white transition-colors"
+          >
             <X size={20} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-400">Usuario</label>
             <div className="relative">
@@ -116,4 +145,8 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 }
