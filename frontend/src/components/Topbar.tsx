@@ -1,11 +1,14 @@
 import { Bell, Search, PlusCircle, CheckCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { CreateDispatcherModal } from './CreateDispatcherModal';
 import { NotificationsPopover } from './NotificationsPopover';
 
 export function Topbar() {
+  const { user } = useAuth();
   const [showDispatcherModal, setShowDispatcherModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const isAdmin = user?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-800 bg-slate-900/80 px-6 backdrop-blur-md">
@@ -42,16 +45,20 @@ export function Topbar() {
             )}
         </div>
 
-        <button 
-            onClick={() => setShowDispatcherModal(true)}
-            className="hidden sm:flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-blue-500 hover:shadow-blue-900/40 active:scale-95"
-        >
-          <PlusCircle className="h-4 w-4" />
-          Nuevo Despachador
-        </button>
+        {isAdmin && (
+          <button 
+              onClick={() => setShowDispatcherModal(true)}
+              className="hidden sm:flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-blue-500 hover:shadow-blue-900/40 active:scale-95"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Nuevo Despachador
+          </button>
+        )}
       </div>
 
-      <CreateDispatcherModal isOpen={showDispatcherModal} onClose={() => setShowDispatcherModal(false)} />
+      {isAdmin && (
+        <CreateDispatcherModal isOpen={showDispatcherModal} onClose={() => setShowDispatcherModal(false)} />
+      )}
     </header>
   );
 }

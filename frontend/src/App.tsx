@@ -19,17 +19,58 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TrackingPage } from "./pages/TrackingPage";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+type UserRole = 'admin' | 'dispatcher' | 'driver';
+
+function RoleGuard({
+    allowedRoles,
+    children,
+}: {
+    allowedRoles: UserRole[];
+    children: React.ReactNode;
+}) {
+    const { token, user } = useAuth();
+
+    if (!token || !user) {
+        return <Navigate to="/login" replace />;
+    }
+
+    if (!allowedRoles.includes(user.role as UserRole)) {
+        if (user.role === 'driver') {
+            return <Navigate to="/driver" replace />;
+        }
+        if (user.role === 'admin' || user.role === 'dispatcher') {
+            return <Navigate to="/" replace />;
+        }
+        return <Navigate to="/login" replace />;
+    }
+
+    return <>{children}</>;
+}
+
+function ProtectedRoute({
+    allowedRoles,
+    children,
+}: {
+    allowedRoles?: UserRole[];
+    children: React.ReactNode;
+}) {
     const { token } = useAuth();
     if (!token) {
         return <Navigate to="/login" replace />;
     }
-    return (
+
+    const authenticatedContent = (
         <SocketProvider token={token}>
             <NotificationListener />
             {children}
         </SocketProvider>
     );
+
+    if (allowedRoles) {
+        return <RoleGuard allowedRoles={allowedRoles}>{authenticatedContent}</RoleGuard>;
+    }
+
+    return authenticatedContent;
 }
 
 import { NotificationProvider, useNotifications } from "./context/NotificationContext";
@@ -76,8 +117,6 @@ function NotificationListener() {
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
-  
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -85,14 +124,28 @@ function AppRoutes() {
       <Route path="/tracking/:trackingCode" element={<TrackingPage />} />
       
       {/* Driver Routes */}
-      <Route path="/driver" element={<ProtectedRoute><DriverLayout /></ProtectedRoute>}>
+      <Route
+        path="/driver"
+        element={
+          <ProtectedRoute allowedRoles={['driver']}>
+            <DriverLayout />
+          </ProtectedRoute>
+        }
+      >
           <Route index element={<DriverDashboard />} />
           <Route path="map" element={<DriverMap />} />
       </Route>
 
       {/* Admin/Dispatcher Routes */}
-      <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-        <Route index element={user?.role === 'driver' ? <Navigate to="/driver" replace /> : <Dashboard />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'dispatcher']}>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Dashboard />} />
         
         {/* Dispatch Control */}
         <Route path="/dispatch" element={<DispatchPage />} />
