@@ -6,13 +6,14 @@ WORKDIR /app
 # Copy config files
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY prisma.config.ts ./
 COPY prisma ./prisma/
 
 # Install dependencies (including devDeps for building)
 RUN npm ci
 
 # Generate Prisma Client
-RUN npx prisma generate
+RUN npm run prisma:generate
 
 # Copy source code
 COPY src ./src
@@ -30,20 +31,20 @@ ENV NODE_ENV=production
 
 # Install only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
-# Copy built assets from builder stage
+# Copy built assets and pre-generated Prisma Client from builder stage
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
-# Generate Prisma Client for production runtime
-RUN npx prisma generate
-
-# Create logs directory
-RUN mkdir logs
+# Create logs and uploads directories
+RUN mkdir -p logs public/uploads
 
 # Expose API port
 EXPOSE 3010
 
 # Start application
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]
