@@ -7,6 +7,7 @@ import { MapPin, Truck, Search, GripVertical, CheckCircle, AlertTriangle, Plus }
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Skeleton } from '../components/Skeleton';
 
 interface Zone {
     id: string;
@@ -14,10 +15,13 @@ interface Zone {
     description?: string;
 }
 
-    export function DispatchPage() {
+export function DispatchPage() {
     const { token } = useAuth();
     const [zones, setZones] = useState<Zone[]>([]);
     const [drivers, setDrivers] = useState<AppDriver[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [retryKey, setRetryKey] = useState(0);
     const [searchZone, setSearchZone] = useState('');
     const [searchDriver, setSearchDriver] = useState('');
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -41,17 +45,37 @@ interface Zone {
     // Initial Load
     useEffect(() => {
         if (!token) return;
+        let isActive = true;
+
         Promise.all([
             zoneService.getZones(token),
             driverService.getDrivers(token)
         ]).then(([zonesData, driversData]) => {
+            if (!isActive) return;
             setZones(zonesData.items || []); 
             setDrivers(driversData.items || []);
-        }).catch(err => {
+            setError('');
+        }).catch((err: unknown) => {
+            if (!isActive) return;
             console.error(err);
+            setError(err instanceof Error ? err.message : 'Error al cargar datos de despacho');
             toast.error('Error al cargar datos');
+        }).finally(() => {
+            if (isActive) setLoading(false);
         });
-    }, [token]);
+
+        return () => {
+            isActive = false;
+        };
+    }, [token, retryKey]);
+
+    const isLoading = Boolean(token) && loading;
+
+    const handleRetry = () => {
+        setLoading(true);
+        setError('');
+        setRetryKey((prev) => prev + 1);
+    };
 
     // Drag & Drop Logic
     const handleDragStart = (e: React.DragEvent, zone: Zone) => {
@@ -178,6 +202,103 @@ interface Zone {
                 <p className="text-slate-400 text-sm mt-1">Arrastra las zonas hacia los conductores para asignarlas.</p>
             </div>
 
+            {isLoading ? (
+                <div
+                    role="status"
+                    aria-label="Cargando centro de despacho"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-4 md:flex-1 md:min-h-0"
+                >
+                    <span className="sr-only">Cargando zonas y conductores...</span>
+
+                    {/* Column 1 Skeleton: Zones */}
+                    <div className="bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col min-h-0 overflow-hidden shadow-sm">
+                        <div className="p-4 border-b border-slate-800/80 bg-slate-900 flex-shrink-0">
+                            <h2 className="text-base font-semibold text-white mb-2.5 flex items-center">
+                                <MapPin className="h-4 w-4 mr-2 text-brand-400" />
+                                Zonas Disponibles
+                                <Skeleton className="ml-2 h-5 w-8 rounded border border-slate-800/80" />
+                            </h2>
+                            <Skeleton className="h-[38px] w-full rounded-lg border border-slate-800/80" />
+                        </div>
+                        <div className="flex-1 min-h-0 max-h-[360px] md:max-h-none overflow-hidden p-4 space-y-2">
+                            {[0, 1, 2, 3, 4, 5].map((i) => (
+                                <div
+                                    key={i}
+                                    aria-hidden="true"
+                                    className="p-3 bg-slate-950/70 border border-slate-800/80 rounded-lg flex justify-between items-center gap-3"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <Skeleton className="h-4 w-4 rounded flex-shrink-0" />
+                                        <div className="space-y-1.5 min-w-0 flex-1">
+                                            <Skeleton className={clsx('h-4', i % 2 === 0 ? 'w-32' : 'w-40')} />
+                                            <Skeleton className={clsx('h-3', i % 2 === 0 ? 'w-48' : 'w-36')} />
+                                        </div>
+                                    </div>
+                                    <Skeleton className="h-2 w-2 rounded-full flex-shrink-0" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Column 2 Skeleton: Drivers */}
+                    <div className="bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col min-h-0 overflow-hidden shadow-sm">
+                        <div className="p-4 border-b border-slate-800/80 bg-slate-900 flex-shrink-0">
+                            <h2 className="text-base font-semibold text-white mb-2.5 flex items-center">
+                                <Truck className="h-4 w-4 mr-2 text-brand-400" />
+                                Conductores Activos
+                                <Skeleton className="ml-2 h-5 w-8 rounded border border-slate-800/80" />
+                            </h2>
+                            <Skeleton className="h-[38px] w-full rounded-lg border border-slate-800/80" />
+                        </div>
+                        <div className="flex-1 min-h-0 max-h-[480px] md:max-h-none overflow-hidden p-4 space-y-3">
+                            {[0, 1, 2].map((i) => (
+                                <div
+                                    key={i}
+                                    aria-hidden="true"
+                                    className="p-4 bg-slate-950 border border-slate-800/80 rounded-xl"
+                                >
+                                    <div className="flex justify-between items-start gap-2 mb-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+                                            <div className="space-y-1.5">
+                                                <Skeleton className={clsx('h-4', i % 2 === 0 ? 'w-32' : 'w-28')} />
+                                                <Skeleton className="h-3 w-20" />
+                                            </div>
+                                        </div>
+                                        <Skeleton className="h-5 w-16 rounded-full flex-shrink-0" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-3 w-24" />
+                                        <div className="flex flex-wrap gap-2">
+                                            <Skeleton className="h-7 w-24 rounded-md" />
+                                            {i % 2 === 0 && <Skeleton className="h-7 w-20 rounded-md" />}
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row gap-2">
+                                            <Skeleton className="h-[34px] flex-1 rounded-lg" />
+                                            <Skeleton className="h-[36px] w-full sm:w-24 rounded-lg" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            ) : error ? (
+                <div
+                    role="alert"
+                    className="bg-slate-900 border border-red-500/20 rounded-xl p-10 text-center flex flex-col items-center justify-center gap-3"
+                >
+                    <AlertTriangle className="h-8 w-8 text-red-400" />
+                    <p className="text-sm text-red-300">Error: {error}</p>
+                    <button
+                        type="button"
+                        onClick={handleRetry}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-white text-xs font-medium rounded-lg transition-colors"
+                    >
+                        Reintentar
+                    </button>
+                </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:flex-1 md:min-h-0">
                 {/* Column 1: Zones (Draggable Source) */}
                 <div className="bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col min-h-0 overflow-hidden shadow-sm">
@@ -342,6 +463,7 @@ interface Zone {
                     </div>
                 </div>
             </div>
+            )}
         </div>
     );
 }

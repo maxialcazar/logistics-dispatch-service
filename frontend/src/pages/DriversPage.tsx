@@ -3,12 +3,14 @@ import { Users, UserPlus, Loader2, AlertCircle, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { driverService, type AppDriver } from '../services/driverService';
 import { Modal } from '../components/Modal';
+import { SkeletonTableRows } from '../components/Skeleton';
 
 export function DriversPage() {
   const { token } = useAuth();
   const [drivers, setDrivers] = useState<AppDriver[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
   
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -32,21 +34,36 @@ export function DriversPage() {
   };
 
   useEffect(() => {
-    fetchDrivers();
-  }, [token]);
-
-  const fetchDrivers = async () => {
     if (!token) return;
+    let isActive = true;
+
+    driverService
+      .getDrivers(token)
+      .then((data) => {
+        if (!isActive) return;
+        setDrivers(data.items);
+        setError('');
+      })
+      .catch((err: unknown) => {
+        if (!isActive) return;
+        setError(err instanceof Error ? err.message : 'Error al cargar conductores');
+      })
+      .finally(() => {
+        if (isActive) setLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [token, refreshKey]);
+
+  const triggerRefresh = () => {
     setLoading(true);
-    try {
-      const data = await driverService.getDrivers(token);
-      setDrivers(data.items);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al cargar conductores');
-    } finally {
-      setLoading(false);
-    }
+    setError('');
+    setRefreshKey((prev) => prev + 1);
   };
+
+  const isLoading = Boolean(token) && loading;
 
   const handleCreateDriver = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +77,7 @@ export function DriversPage() {
       await driverService.createDriver(token, formData);
       setFormData({ name: '', username: '', password: '' });
       setShowModal(false);
-      fetchDrivers(); // Refresh list
+      triggerRefresh(); // Refresh list
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : 'Error al crear conductor');
     } finally {
@@ -87,10 +104,48 @@ export function DriversPage() {
         </button>
       </div>
 
-      {loading ? (
-        <div className="text-center py-12 text-slate-400">Cargando conductores...</div>
+      {isLoading ? (
+        <div
+          role="status"
+          aria-label="Cargando conductores"
+          className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm"
+        >
+          <span className="sr-only">Cargando conductores...</span>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-800/80 bg-slate-950/60 text-xs text-slate-400 uppercase tracking-wider">
+                  <th className="px-6 py-3.5 font-semibold">Nombre</th>
+                  <th className="px-6 py-3.5 font-semibold">Usuario de Sistema</th>
+                  <th className="px-6 py-3.5 font-semibold">Zonas Asignadas</th>
+                  <th className="px-6 py-3.5 font-semibold">Fecha Registro</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/80 text-sm">
+                <SkeletonTableRows
+                  rows={6}
+                  cellClassName="px-6 py-3.5"
+                  columns={['text', 'icon-text', 'badges', 'short']}
+                />
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : error ? (
-        <div className="text-center py-12 text-red-400">Error: {error}</div>
+        <div
+          role="alert"
+          className="bg-slate-900 border border-red-500/20 rounded-xl p-10 text-center flex flex-col items-center justify-center gap-3"
+        >
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-300">Error: {error}</p>
+          <button
+            type="button"
+            onClick={triggerRefresh}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-white text-xs font-medium rounded-lg transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
       ) : drivers.length === 0 ? (
         <div className="text-center py-12 text-slate-400 bg-slate-900 rounded-xl border border-slate-800/80">
            <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
