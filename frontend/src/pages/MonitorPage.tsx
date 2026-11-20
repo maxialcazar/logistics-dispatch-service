@@ -4,7 +4,6 @@ import { driverService } from '../services/driverService';
 import { zoneService } from '../services/zoneService';
 import { packageService } from '../services/packageService';
 import { useSocket } from '../context/SocketContext';
-import { socketService } from '../services/socket';
 import { LiveMap } from '../components/LiveMap';
 import { Skeleton } from '../components/Skeleton';
 import { Map, MapPin, Truck, Search, X, Check } from 'lucide-react';
@@ -38,7 +37,7 @@ export function MonitorPage() {
     const [isZoneDropdownOpen, setIsZoneDropdownOpen] = useState(false);
     const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
 
-    const { isConnected } = useSocket();
+    const { socket } = useSocket();
 
     // Fetch Initial Data
     useEffect(() => {
@@ -69,29 +68,37 @@ export function MonitorPage() {
 
     // WebSocket Listener for Package Updates
     useEffect(() => {
-        if (!isConnected) return;
+        if (!socket) return;
 
-        const handlePackageUpdate = (data: any) => {
-             setActivePackages(prev => prev.map(p => {
-                 if (p.id === data.packageId) {
-                     return { 
-                         ...p, 
-                         status: data.status, 
-                         // Preserve existing lat/lng if update is missing them or 0
-                         lat: (data.lat && data.lat !== 0) ? data.lat : p.lat,
-                         lng: (data.lng && data.lng !== 0) ? data.lng : p.lng
-                     };
-                 }
-                 return p;
-             }));
+        const handlePackageUpdate = (data: {
+            packageId: string;
+            status: string;
+            lat?: number | null;
+            lng?: number | null;
+        }) => {
+            if (!data?.packageId) return;
+            setActivePackages((prev) =>
+                prev.map((p) => {
+                    if (p.id === data.packageId) {
+                        return {
+                            ...p,
+                            status: data.status ?? p.status,
+                            // Preserve existing lat/lng if update is missing them or 0
+                            lat: data.lat && data.lat !== 0 ? data.lat : p.lat,
+                            lng: data.lng && data.lng !== 0 ? data.lng : p.lng,
+                        };
+                    }
+                    return p;
+                })
+            );
         };
 
-        socketService.on('package-status-updated', handlePackageUpdate);
+        socket.on('package-status-updated', handlePackageUpdate);
 
         return () => {
-             socketService.off('package-status-updated', handlePackageUpdate);
+            socket.off('package-status-updated', handlePackageUpdate);
         };
-    }, [isConnected]);
+    }, [socket]);
 
     // Derived Visible Drivers
     const visibleDriverIds = useMemo(() => {
