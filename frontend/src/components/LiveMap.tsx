@@ -6,11 +6,14 @@ import L from 'leaflet';
 import { useSocket } from '../context/SocketContext';
 import { Truck, Navigation, User, Package } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { getPackageStatusToken } from '../utils/packageStatus';
 
 // --- Types ---
 interface DriverInfo {
     id: string;
     name: string;
+    lat?: number | null;
+    lng?: number | null;
     user?: { username: string };
     zones?: { id: string, name: string }[];
 }
@@ -20,6 +23,11 @@ interface SocketLocation {
     lat: number;
     lng: number;
     timestamp: number;
+}
+
+interface ActiveDriverMarker extends SocketLocation {
+    status: 'online' | 'offline';
+    meta?: DriverInfo;
 }
 
 interface PackageLocation {
@@ -36,9 +44,9 @@ interface PackageLocation {
 const createCustomIcon = (_driver: DriverInfo | undefined, status: string) => {
     const isOnline = status === 'online';
     
-    // Green (Online) or Gray (Offline)
-    const colorBg = isOnline ? 'bg-green-600' : 'bg-slate-600'; 
-    const colorPulse = isOnline ? 'bg-green-500 animate-pulse' : 'bg-slate-500 hidden';
+    // Emerald (Online) or Slate (Offline)
+    const colorBg = isOnline ? 'bg-emerald-600' : 'bg-slate-600'; 
+    const colorPulse = isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500 hidden';
 
     const html = renderToStaticMarkup(
         <div className="relative flex items-center justify-center w-8 h-8">
@@ -59,10 +67,7 @@ const createCustomIcon = (_driver: DriverInfo | undefined, status: string) => {
 };
 
 const createPackageIcon = (status: string) => {
-    let color = '#f59e0b'; // Amber (Pending)
-    if (status === 'assigned') color = '#3b82f6'; // Blue
-    if (status === 'in_transit') color = '#8b5cf6'; // Purple
-    if (status === 'delivered') color = '#10b981'; // Green
+    const color = getPackageStatusToken(status).hexColor;
     
     const html = renderToStaticMarkup(
         <div className="relative flex items-center justify-center w-6 h-6">
@@ -114,18 +119,16 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
     }, [packages]);
     
     const activeDrivers = useMemo(() => {
-        const driversMap = new Map<string, any>();
+        const driversMap = new Map<string, ActiveDriverMarker>();
 
         // 1. Populate with DB Drivers (Offline/Static)
         allDrivers.forEach(d => {
              // Skip if no location available in DB
-             // Note: d object from API needs lat/lng. If interface is missing it, we cast.
-             const dAny = d as any;
-             if (dAny.lat && dAny.lng) {
+             if (typeof d.lat === 'number' && typeof d.lng === 'number' && d.lat !== 0 && d.lng !== 0) {
                  driversMap.set(d.id, {
                      driverId: d.id,
-                     lat: dAny.lat,
-                     lng: dAny.lng,
+                     lat: d.lat,
+                     lng: d.lng,
                      timestamp: 0, // Old
                      status: 'offline', // Mark as offline initially
                      meta: d
@@ -180,25 +183,25 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
                         <Popup className="custom-popup-dark">
                             <div className="p-1 min-w-[200px]">
                                 <div className="flex items-center gap-3 mb-2 border-b border-slate-200 pb-2">
-                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-600">
                                         <User size={16} />
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-slate-800 text-sm">{d.meta?.name || 'Conductor Desconocido'}</h3>
-                                        <span className="text-xs text-slate-500 font-mono">ID: {d.driverId.slice(0,6)}</span>
+                                        <span className="text-xs text-slate-500 font-mono tabular-nums">ID: {d.driverId.slice(0,6)}</span>
                                     </div>
                                 </div>
                                 <div className="space-y-1 text-xs text-slate-600">
                                     <div className="flex items-center gap-2">
                                         <Navigation size={12} className="text-slate-400" />
-                                        <span>{d.lat.toFixed(4)}, {d.lng.toFixed(4)}</span>
+                                        <span className="font-mono tabular-nums">{d.lat.toFixed(4)}, {d.lng.toFixed(4)}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className={`h-1.5 w-1.5 rounded-full ${d.status === 'online' ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`} />
-                                        <span className={`font-medium ${d.status === 'online' ? 'text-green-600' : 'text-slate-500'}`}>
+                                        <div className={`h-1.5 w-1.5 rounded-full ${d.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+                                        <span className={`font-medium ${d.status === 'online' ? 'text-emerald-600' : 'text-slate-500'}`}>
                                             {d.status === 'online' ? 'En Línea' : 'Desconectado'}
                                         </span>
-                                        <span className="text-slate-400 ml-auto">
+                                        <span className="text-slate-400 ml-auto tabular-nums">
                                             {d.timestamp > 0 ? new Date(d.timestamp).toLocaleTimeString() : 'N/A'}
                                         </span>
                                     </div>
@@ -207,8 +210,8 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
                                         <div className="mt-2 pt-2 border-t border-slate-100">
                                             <span className="text-[10px] uppercase font-bold text-slate-400">Zonas Asignadas:</span>
                                             <div className="flex flex-wrap gap-1 mt-1">
-                                                {d.meta.zones.map((z: any) => (
-                                                    <span key={z.id} className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] border border-purple-200">
+                                                {d.meta.zones.map((z) => (
+                                                    <span key={z.id} className="bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded text-[10px] border border-brand-200">
                                                         {z.name}
                                                     </span>
                                                 ))}
@@ -230,14 +233,14 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
                     >
                         <Popup className="custom-popup-dark">
                              <div className="p-1 min-w-[150px]">
-                                <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1">
+                                <h3 className="font-bold text-slate-800 text-xs font-mono tabular-nums flex items-center gap-1">
                                     <Package size={12} /> {p.trackingCode}
                                 </h3>
                                 <div className="text-[10px] text-slate-500 mt-1">
                                     {p.recipientAddress}
                                 </div>
-                                <span className="text-[10px] font-mono uppercase bg-slate-100 px-1 rounded mt-1 inline-block">
-                                    {p.status}
+                                <span className="text-[10px] font-mono uppercase bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded mt-1 inline-block">
+                                    {getPackageStatusToken(p.status).label}
                                 </span>
                              </div>
                         </Popup>
@@ -247,22 +250,22 @@ export function LiveMap({ visibleDriverIds, allDrivers = [], packages = [] }: Li
             </MapContainer>
             
             {/* Overlay Stats */}
-            <div className="absolute bottom-6 left-6 bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-xl border border-slate-700/50 shadow-2xl z-[1000] flex items-center gap-4">
+            <div className="absolute bottom-6 left-6 bg-slate-900/90 backdrop-blur-md text-white p-3 rounded-xl border border-slate-800/80 shadow-2xl z-[1000] flex items-center gap-4">
                 <div className="flex flex-col">
                     <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Activos</span>
-                    <span className="text-2xl font-bold text-green-400">{activeDrivers.length}</span>
+                    <span className="text-2xl font-bold text-emerald-400 tabular-nums">{activeDrivers.length}</span>
                 </div>
-                <div className="h-8 w-px bg-slate-700" />
+                <div className="h-8 w-px bg-slate-800/80" />
                 <div className="flex flex-col">
                     <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Total Flota</span>
-                    <span className="text-lg font-semibold text-slate-200">{allDrivers.length}</span>
+                    <span className="text-lg font-semibold text-slate-200 tabular-nums">{allDrivers.length}</span>
                 </div>
                 {validPackages.length > 0 && (
                     <>
-                        <div className="h-8 w-px bg-slate-700" />
+                        <div className="h-8 w-px bg-slate-800/80" />
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Paquetes</span>
-                            <span className="text-lg font-semibold text-amber-400">{validPackages.length}</span>
+                            <span className="text-lg font-semibold text-amber-400 tabular-nums">{validPackages.length}</span>
                         </div>
                     </>
                 )}

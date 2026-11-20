@@ -215,31 +215,31 @@ export function MonitorPage() {
 
     if (loading) {
         return (
-            <div className="h-[calc(100vh-100px)] flex flex-col space-y-4">
-                <Skeleton className="h-[72px] w-full rounded-xl" />
-                <Skeleton className="flex-1 w-full rounded-xl" />
+            <div className="min-h-full lg:h-full lg:min-h-0 flex flex-col gap-4">
+                <Skeleton className="h-[72px] w-full rounded-xl flex-shrink-0" />
+                <Skeleton className="h-[360px] sm:h-[420px] lg:h-auto lg:flex-1 lg:min-h-0 w-full rounded-xl" />
             </div>
         );
     }
 
     return (
-        <div className="h-[calc(100vh-100px)] flex flex-col space-y-4">
+        <div className="min-h-full lg:h-full lg:min-h-0 flex flex-col gap-4">
             {/* Header / Filters Bar */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between shadow-lg">
+            <div className="flex-shrink-0 bg-slate-900 border border-slate-800/80 rounded-xl p-3.5 sm:p-4 flex flex-col lg:flex-row gap-3 lg:gap-4 items-start lg:items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">
-                     <div className="bg-blue-600/20 p-2 rounded-lg text-blue-400">
-                        <Map className="h-6 w-6" />
+                     <div className="bg-brand-500/10 border border-brand-500/20 p-2 rounded-lg text-brand-400">
+                        <Map className="h-5 w-5" />
                      </div>
                      <div>
-                        <h1 className="text-xl font-bold text-white">Monitor de Flota</h1>
-                        <p className="text-xs text-slate-400">
+                        <h1 className="text-xl font-bold tracking-tight text-white">Monitor de Flota</h1>
+                        <p className="text-xs text-slate-400 tabular-nums">
                             Mostrando {visibleDriverIds.length} de {drivers.length} conductores
                         </p>
                      </div>
                 </div>
 
                 {/* Filter Controls */}
-                <div className="flex flex-wrap gap-3 flex-1 justify-end w-full lg:w-auto">
+                <div className="flex flex-wrap gap-2.5 flex-1 justify-start lg:justify-end w-full lg:w-auto">
                     
                     {/* Zone Filter Dropdown (Custom implementation for multi-select) */}
                     <div className="relative">
@@ -250,24 +250,26 @@ export function MonitorPage() {
                                 setIsZoneDropdownOpen(prev => !prev);
                                 setIsDriverDropdownOpen(false);
                             }}
-                            className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white hover:border-purple-500 transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-950 border border-slate-800/80 rounded-lg text-sm text-slate-300 hover:text-white hover:border-brand-500/50 transition-colors"
                         >
-                            <MapPin className="h-4 w-4 text-purple-400" />
-                            {selectedZones.length > 0 ? `${selectedZones.length} Zonas` : 'Filtrar Zonas'}
+                            <MapPin className="h-4 w-4 text-brand-400" />
+                            <span className="tabular-nums">
+                              {selectedZones.length > 0 ? `${selectedZones.length} Zonas` : 'Filtrar Zonas'}
+                            </span>
                         </button>
                         {/* Dropdown Content */}
                         {isZoneDropdownOpen && (
-                            <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-2 z-[1000]">
-                                <div className="text-xs font-semibold text-slate-500 mb-2 px-2 uppercase">Seleccionar Zonas</div>
-                                <div className="max-h-60 overflow-y-auto space-y-1">
+                            <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-60 sm:w-64 max-w-[calc(100vw-2rem)] bg-slate-900 border border-slate-800/80 rounded-xl shadow-2xl p-2 z-[1000]">
+                                <div className="text-xs font-semibold text-slate-400 mb-2 px-2 uppercase tracking-wider">Seleccionar Zonas</div>
+                                <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
                                     {zones.map(z => (
                                         <div 
                                             key={z.id} 
                                             onClick={() => toggleZone(z.id)}
-                                            className="flex items-center justify-between p-2 hover:bg-slate-800 rounded cursor-pointer"
+                                            className="flex items-center justify-between p-2 hover:bg-slate-800/70 rounded-lg cursor-pointer"
                                         >
-                                            <span className="text-sm text-slate-300">{z.name}</span>
-                                            {selectedZones.includes(z.id) && <Check className="h-4 w-4 text-purple-500" />}
+                                            <span className="text-sm text-slate-200">{z.name}</span>
+                                            {selectedZones.includes(z.id) && <Check className="h-4 w-4 text-brand-400" />}
                                         </div>
                                     ))}
                                 </div>
@@ -284,26 +286,28 @@ export function MonitorPage() {
                                 setIsDriverDropdownOpen(prev => !prev);
                                 setIsZoneDropdownOpen(false);
                             }}
-                            className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white hover:border-blue-500 transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-950 border border-slate-800/80 rounded-lg text-sm text-slate-300 hover:text-white hover:border-brand-500/50 transition-colors"
                         >
-                            <Truck className="h-4 w-4 text-blue-400" />
-                            {selectedDrivers.length > 0 ? `${selectedDrivers.length} Conductores` : 'Filtrar Conductores'}
+                            <Truck className="h-4 w-4 text-brand-400" />
+                            <span className="tabular-nums">
+                              {selectedDrivers.length > 0 ? `${selectedDrivers.length} Conductores` : 'Filtrar Conductores'}
+                            </span>
                         </button>
                         {isDriverDropdownOpen && (
-                            <div className="absolute top-full right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-2 z-[1000]">
-                                <div className="text-xs font-semibold text-slate-500 mb-2 px-2 uppercase">Seleccionar Conductores</div>
-                                <div className="max-h-60 overflow-y-auto space-y-1">
+                            <div className="absolute top-full right-0 mt-2 w-60 sm:w-64 max-w-[calc(100vw-2rem)] bg-slate-900 border border-slate-800/80 rounded-xl shadow-2xl p-2 z-[1000]">
+                                <div className="text-xs font-semibold text-slate-400 mb-2 px-2 uppercase tracking-wider">Seleccionar Conductores</div>
+                                <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1">
                                     {drivers.map(d => (
                                         <div 
                                             key={d.id} 
                                             onClick={() => toggleDriver(d.id)}
-                                            className="flex items-center justify-between p-2 hover:bg-slate-800 rounded cursor-pointer"
+                                            className="flex items-center justify-between p-2 hover:bg-slate-800/70 rounded-lg cursor-pointer"
                                         >
                                             <div className="flex flex-col">
-                                                <span className="text-sm text-slate-300">{d.name}</span>
-                                                <span className="text-[10px] text-slate-500">@{d.user?.username}</span>
+                                                <span className="text-sm text-slate-200">{d.name}</span>
+                                                <span className="text-[11px] font-mono text-slate-400">@{d.user?.username}</span>
                                             </div>
-                                            {selectedDrivers.includes(d.id) && <Check className="h-4 w-4 text-blue-500" />}
+                                            {selectedDrivers.includes(d.id) && <Check className="h-4 w-4 text-brand-400" />}
                                         </div>
                                     ))}
                                 </div>
@@ -312,14 +316,14 @@ export function MonitorPage() {
                     </div>
 
                     {/* Package Search */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                    <div className="relative flex-1 sm:flex-initial min-w-[160px]">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                         <input 
                             type="text"
                             placeholder="Buscar Paquete..."
                             value={packageSearch}
                             onChange={e => setPackageSearch(e.target.value)}
-                            className="w-48 bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-green-500 text-sm"
+                            className="w-full sm:w-52 bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 text-sm transition-colors"
                         />
                     </div>
                     
@@ -328,7 +332,7 @@ export function MonitorPage() {
                         <button 
                             type="button"
                             onClick={() => { setSelectedZones([]); setSelectedDrivers([]); setPackageSearch(''); setIsZoneDropdownOpen(false); setIsDriverDropdownOpen(false); }}
-                            className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-950/30 border border-slate-800/80 rounded-lg transition-colors"
                             title="Limpiar Filtros"
                         >
                             <X className="h-5 w-5" />
@@ -338,7 +342,7 @@ export function MonitorPage() {
             </div>
 
             {/* Map Area */}
-            <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden relative shadow-2xl">
+            <div className="h-[360px] sm:h-[420px] lg:h-auto lg:flex-1 lg:min-h-0 bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden relative shadow-sm">
                  <LiveMap 
                     visibleDriverIds={visibleDriverIds} 
                     allDrivers={drivers} 

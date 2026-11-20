@@ -21,16 +21,9 @@ import {
   type QueuedStatusUpdate,
 } from '../services/offlineQueue';
 import { packageService } from '../services/packageService';
+import { getPackageStatusToken } from '../utils/packageStatus';
 
 const MAX_RETRIES = 3;
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
-  assigned: 'Asignado',
-  in_transit: 'En camino',
-  delivered: 'Entregado',
-  cancelled: 'Fallido / Cancelado',
-};
 
 type SyncTriggerSource = 'mount' | 'online' | 'manual';
 
@@ -42,7 +35,7 @@ interface DiscardedUpdate {
 function notifyDiscardedUpdates(discardedItems: DiscardedUpdate[]): void {
   for (const { item, reason } of discardedItems) {
     const pkgLabel = item.trackingCode ? `#${item.trackingCode}` : item.packageId;
-    const statusLabel = STATUS_LABELS[item.status] ?? item.status;
+    const statusLabel = getPackageStatusToken(item.status).label;
     const attempts = (typeof item.retries === 'number' ? item.retries : 0) + 1;
     toast.error(`Actualización descartada (${pkgLabel})`, {
       description: `Se eliminó "${statusLabel}" de la cola tras ${attempts} intentos fallidos (${reason}). Reinténtalo manualmente.`,

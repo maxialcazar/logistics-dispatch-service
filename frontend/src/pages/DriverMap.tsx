@@ -8,13 +8,14 @@ import { packageService, type Package } from '../services/packageService';
 import { useDriverLocation } from '../hooks/useDriverLocation';
 import { Navigation, Package as PackageIcon } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { getPackageStatusToken } from '../utils/packageStatus';
 
 // --- Icons ---
 const createDriverIcon = () => {
     const html = renderToStaticMarkup(
         <div className="relative flex items-center justify-center w-8 h-8">
-            <div className="absolute inset-0 rounded-full bg-blue-500 opacity-20 animate-pulse"></div>
-            <div className="relative z-10 p-1.5 rounded-full bg-blue-600 border-2 border-white shadow-lg">
+            <div className="absolute inset-0 rounded-full bg-brand-500 opacity-20 animate-pulse"></div>
+            <div className="relative z-10 p-1.5 rounded-full bg-brand-600 border-2 border-white shadow-lg">
                 <Navigation color="white" size={14} className="transform -rotate-45" />
             </div>
         </div>
@@ -23,14 +24,11 @@ const createDriverIcon = () => {
 };
 
 const createPackageIcon = (status: string, index: number) => {
-    let color = '#64748b'; // Default
-    if (status === 'assigned') color = '#3b82f6'; // Blue
-    if (status === 'in_transit') color = '#a855f7'; // Purple
-    if (status === 'delivered') color = '#22c55e'; // Green
+    const color = getPackageStatusToken(status).hexColor;
 
     const html = renderToStaticMarkup(
         <div className="relative flex flex-col items-center">
-             <div className="relative z-10 px-2 py-0.5 rounded-md text-white font-bold text-xs shadow-md mb-1" style={{backgroundColor: color}}>
+             <div className="relative z-10 px-2 py-0.5 rounded-md text-white font-bold font-mono tabular-nums text-xs shadow-md mb-1" style={{backgroundColor: color}}>
                  #{index + 1}
              </div>
              <div className="p-1.5 rounded-full border-2 border-white shadow-lg" style={{backgroundColor: color}}>
@@ -127,7 +125,7 @@ export function DriverMap() {
                                  <p className="text-xs text-slate-600 mb-2">{pkg.recipientAddress}</p>
                                  <button 
                                     onClick={() => openNav(pkg.lat!, pkg.lng!)}
-                                    className="w-full min-h-[48px] bg-blue-600 text-white text-xs font-bold py-2 rounded flex items-center justify-center gap-2"
+                                    className="w-full min-h-[48px] bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
                                  >
                                      <Navigation size={12} /> Navegar Aquí
                                  </button>
@@ -138,15 +136,15 @@ export function DriverMap() {
             </MapContainer>
 
             {/* Bottom Floating Stats */}
-            <div className="absolute bottom-20 left-4 right-4 bg-slate-900/90 backdrop-blur border border-slate-700 p-4 rounded-xl z-[1000] shadow-2xl flex justify-between items-center">
+            <div className="absolute bottom-20 left-4 right-4 bg-slate-900/90 backdrop-blur border border-slate-800/80 p-4 rounded-xl z-[1000] shadow-2xl flex justify-between items-center">
                  <div>
-                     <p className="text-xs text-slate-400 uppercase font-bold">Ruta Actual</p>
-                     <p className="text-white font-bold text-lg">{packages.length} Destinos</p>
+                     <p className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Ruta Actual</p>
+                     <p className="text-white font-bold text-lg tabular-nums">{packages.length} Destinos</p>
                  </div>
                  {packages.length > 0 && packages[0].lat && packages[0].lng && (
                      <button 
                         onClick={() => openNav(packages[0].lat!, packages[0].lng!)}
-                        className="min-h-[48px] bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-purple-900/20 text-sm flex items-center gap-2 animate-pulse"
+                        className="min-h-[48px] bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-brand-950/30 text-sm flex items-center gap-2 transition-colors"
                      >
                          <Navigation className="h-4 w-4" />
                          Ir al #1

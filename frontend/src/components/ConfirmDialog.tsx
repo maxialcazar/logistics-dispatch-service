@@ -31,17 +31,17 @@ export function ConfirmDialog({
 
     const getIcon = () => {
         switch (variant) {
-            case 'danger': return <Trash2 className="h-6 w-6 text-red-500" />;
-            case 'warning': return <AlertTriangle className="h-6 w-6 text-orange-500" />;
-            default: return <Info className="h-6 w-6 text-blue-500" />;
+            case 'danger': return <Trash2 className="h-6 w-6 text-red-400" />;
+            case 'warning': return <AlertTriangle className="h-6 w-6 text-amber-400" />;
+            default: return <Info className="h-6 w-6 text-brand-400" />;
         }
     };
 
     const getConfirmButtonClass = () => {
         switch (variant) {
             case 'danger': return 'bg-red-600 hover:bg-red-500 shadow-red-900/20';
-            case 'warning': return 'bg-orange-600 hover:bg-orange-500 shadow-orange-900/20';
-            default: return 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20';
+            case 'warning': return 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/20';
+            default: return 'bg-brand-600 hover:bg-brand-500 shadow-brand-950/30';
         }
     };
 
@@ -90,8 +90,8 @@ export function ConfirmDialog({
             <div className="flex items-start gap-4">
                 <div className={clsx("p-3 rounded-xl border flex-shrink-0", 
                     variant === 'danger' && "bg-red-500/10 border-red-500/20",
-                    variant === 'warning' && "bg-orange-500/10 border-orange-500/20",
-                    variant === 'info' && "bg-blue-500/10 border-blue-500/20"
+                    variant === 'warning' && "bg-amber-500/10 border-amber-500/20",
+                    variant === 'info' && "bg-brand-500/10 border-brand-500/20"
                 )}>
                     {getIcon()}
                 </div>

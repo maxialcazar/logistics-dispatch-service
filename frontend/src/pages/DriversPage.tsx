@@ -29,8 +29,8 @@ export function DriversPage() {
     try {
       const data = await driverService.getDrivers(token);
       setDrivers(data.items);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al cargar conductores');
     } finally {
       setLoading(false);
     }
@@ -49,8 +49,8 @@ export function DriversPage() {
       setFormData({ name: '', username: '', password: '' });
       setShowModal(false);
       fetchDrivers(); // Refresh list
-    } catch (err: any) {
-      setCreateError(err.message);
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : 'Error al crear conductor');
     } finally {
       setCreateLoading(false);
     }
@@ -58,67 +58,67 @@ export function DriversPage() {
 
   return (
     <div className="space-y-6 relative">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Users className="h-8 w-8 text-emerald-500" />
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Users className="h-7 w-7 text-brand-400" />
             Gestión de Conductores
           </h1>
-          <p className="text-slate-400 mt-1">Administra la flota de conductores y sus accesos.</p>
+          <p className="text-slate-400 text-sm mt-1">Administra la flota de conductores y sus accesos.</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg shadow-lg shadow-emerald-900/30 transition-all"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg shadow-lg shadow-brand-950/30 transition-all"
         >
-          <UserPlus className="h-5 w-5" />
+          <UserPlus className="h-4 w-4" />
           Nuevo Conductor
         </button>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-slate-500">Cargando conductores...</div>
+        <div className="text-center py-12 text-slate-400">Cargando conductores...</div>
       ) : error ? (
-        <div className="text-center py-12 text-red-500">Error: {error}</div>
+        <div className="text-center py-12 text-red-400">Error: {error}</div>
       ) : drivers.length === 0 ? (
-        <div className="text-center py-12 text-slate-500 bg-slate-900/50 rounded-xl border border-slate-800">
+        <div className="text-center py-12 text-slate-400 bg-slate-900 rounded-xl border border-slate-800/80">
            <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
            <p>No hay conductores registrados.</p>
-           <button onClick={() => setShowModal(true)} className="text-emerald-400 hover:text-emerald-300 mt-2 text-sm font-medium">Registrar el primer conductor</button>
+           <button onClick={() => setShowModal(true)} className="text-brand-400 hover:text-brand-300 mt-2 text-sm font-medium">Registrar el primer conductor</button>
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
+        <div className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left">
                     <thead>
-                        <tr className="border-b border-slate-800 bg-slate-950/50 text-xs text-slate-400 uppercase tracking-wider">
-                            <th className="px-6 py-4 font-semibold">Nombre</th>
-                            <th className="px-6 py-4 font-semibold">Usuario de Sistema</th>
-                            <th className="px-6 py-4 font-semibold">Zonas Asignadas</th>
-                            <th className="px-6 py-4 font-semibold">Fecha Registro</th>
+                        <tr className="border-b border-slate-800/80 bg-slate-950/60 text-xs text-slate-400 uppercase tracking-wider">
+                            <th className="px-6 py-3.5 font-semibold">Nombre</th>
+                            <th className="px-6 py-3.5 font-semibold">Usuario de Sistema</th>
+                            <th className="px-6 py-3.5 font-semibold">Zonas Asignadas</th>
+                            <th className="px-6 py-3.5 font-semibold">Fecha Registro</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800 text-sm">
+                    <tbody className="divide-y divide-slate-800/80 text-sm">
                         {drivers.map((driver) => (
                             <tr key={driver.id} className="hover:bg-slate-800/30 transition-colors">
-                                <td className="px-6 py-4 font-medium text-white">{driver.name}</td>
-                                <td className="px-6 py-4 text-slate-300 font-mono text-xs flex items-center gap-2">
-                                    <Shield className="h-3 w-3 text-slate-500" />
+                                <td className="px-6 py-3.5 font-medium text-white">{driver.name}</td>
+                                <td className="px-6 py-3.5 text-slate-300 font-mono text-xs flex items-center gap-2">
+                                    <Shield className="h-3 w-3 text-slate-400" />
                                     {driver.user?.username || 'Sin Usuario'}
                                 </td>
-                                <td className="px-6 py-4 text-slate-400">
+                                <td className="px-6 py-3.5 text-slate-400">
                                     {driver.zones && driver.zones.length > 0 ? (
                                         <div className="flex flex-wrap gap-1">
                                             {driver.zones.map(z => (
-                                                <span key={z.id} className="px-2 py-0.5 bg-slate-800 rounded text-xs text-slate-300 border border-slate-700">
+                                                <span key={z.id} className="px-2 py-0.5 bg-slate-950 rounded text-xs text-slate-200 border border-slate-800/80">
                                                     {z.name}
                                                 </span>
                                             ))}
                                         </div>
                                     ) : (
-                                        <span className="text-slate-600 italic">Sin zonas</span>
+                                        <span className="text-slate-400 italic">Sin zonas</span>
                                     )}
                                 </td>
-                                <td className="px-6 py-4 text-slate-500">
+                                <td className="px-6 py-3.5 text-slate-400 tabular-nums">
                                     {new Date(driver.createdAt).toLocaleDateString()}
                                 </td>
                             </tr>
@@ -131,8 +131,8 @@ export function DriversPage() {
 
       {/* Create Driver Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md p-6 shadow-2xl relative">
+        <div className="fixed inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800/80 rounded-xl w-full max-w-md p-6 shadow-2xl relative">
              <button 
                onClick={() => setShowModal(false)}
                className="absolute top-4 right-4 text-slate-400 hover:text-white"
@@ -141,13 +141,13 @@ export function DriversPage() {
              </button>
              
              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                 <UserPlus className="h-5 w-5 text-emerald-500" />
+                 <UserPlus className="h-5 w-5 text-brand-400" />
                  Registrar Conductor
              </h2>
              
              <form onSubmit={handleCreateDriver} className="space-y-4">
                {createError && (
-                 <div className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
+                 <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
                    <AlertCircle className="h-4 w-4" /> {createError}
                  </div>
                )}
@@ -158,7 +158,7 @@ export function DriversPage() {
                    type="text" 
                    value={formData.name}
                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none placeholder:text-slate-600"
+                   className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none placeholder:text-slate-500"
                    placeholder="ej. Juan Perez"
                    autoFocus
                    disabled={createLoading}
@@ -171,7 +171,7 @@ export function DriversPage() {
                    type="text" 
                    value={formData.username}
                    onChange={(e) => setFormData({...formData, username: e.target.value})}
-                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none placeholder:text-slate-600"
+                   className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none placeholder:text-slate-500"
                    placeholder="ej. jperez"
                    disabled={createLoading}
                  />
@@ -183,7 +183,7 @@ export function DriversPage() {
                    type="password" 
                    value={formData.password}
                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none placeholder:text-slate-600"
+                   className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none placeholder:text-slate-500"
                    placeholder="Mínimo 6 caracteres"
                    disabled={createLoading}
                  />
@@ -201,7 +201,7 @@ export function DriversPage() {
                  <button
                    type="submit"
                    disabled={createLoading || !formData.name || !formData.username || !formData.password}
-                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium shadow-lg shadow-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                   className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-medium shadow-lg shadow-brand-950/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                  >
                    {createLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                    Crear Conductor

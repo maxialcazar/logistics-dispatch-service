@@ -40,8 +40,8 @@ export function CreatePackagePage() {
   useEffect(() => {
     if (token) {
       packageService.getZones(token)
-        .then((data: any) => setZones(data))
-        .catch(err => setError(err.message));
+        .then((data: Zone[]) => setZones(data))
+        .catch(err => setError(err instanceof Error ? err.message : 'Error al cargar zonas'));
     }
   }, [token]);
 
@@ -95,8 +95,8 @@ export function CreatePackagePage() {
         recipientName: '', recipientAddress: '', recipientPhone: '', addressReferences: '',
         addressStreet: '', addressNumber: '', addressCity: ''
       }));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al crear paquete');
     } finally {
       setLoading(false);
     }
@@ -111,11 +111,11 @@ export function CreatePackagePage() {
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Package className="h-8 w-8 text-blue-500" />
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Package className="h-7 w-7 text-brand-400" />
             Nuevo Paquete
           </h1>
-          <p className="text-slate-400 mt-1">Registrar un nuevo envío en el sistema con detalle completo.</p>
+          <p className="text-slate-400 text-sm mt-1">Registrar un nuevo envío en el sistema con detalle completo.</p>
         </div>
       </div>
 
@@ -123,20 +123,20 @@ export function CreatePackagePage() {
         
         {/* Alerts */}
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl flex items-center gap-2">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl flex items-center gap-2">
             <AlertCircle className="h-5 w-5" /> {error}
           </div>
         )}
         {success && (
-          <div className="p-4 bg-green-500/10 border border-green-500/20 text-green-500 rounded-xl flex items-center gap-2">
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl flex items-center gap-2">
             <Package className="h-5 w-5" /> {success}
           </div>
         )}
 
         {/* Section 1: Identification & Route */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Box className="h-5 w-5 text-blue-400" /> Identificación del Paquete
+        <div className="bg-slate-900 border border-slate-800/80 rounded-xl p-6 shadow-sm space-y-4">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                <Box className="h-5 w-5 text-brand-400" /> Identificación del Paquete
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -145,14 +145,14 @@ export function CreatePackagePage() {
                         <input
                             type="text"
                             placeholder="ej. TRK-123456789"
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono"
+                            className="flex-1 bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors font-mono tabular-nums"
                             value={formData.trackingCode}
                             onChange={e => setFormData({ ...formData, trackingCode: e.target.value })}
                         />
                         <button
                             type="button"
                             onClick={generateTracking}
-                            className="px-3 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 text-sm font-medium transition-colors"
+                            className="px-3 py-2 bg-slate-800 border border-slate-700/80 text-slate-200 rounded-lg hover:bg-slate-700 text-sm font-medium transition-colors"
                         >
                             Generar
                         </button>
@@ -162,7 +162,7 @@ export function CreatePackagePage() {
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-slate-300">Zona de Destino</label>
                     <select
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                        className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
                         value={formData.zoneId}
                         onChange={e => setFormData({ ...formData, zoneId: e.target.value })}
                         required
@@ -177,9 +177,9 @@ export function CreatePackagePage() {
         </div>
 
         {/* Section 2: Sender Details (New) */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-orange-400" /> Datos del Remitente (Opcional)
+        <div className="bg-slate-900 border border-slate-800/80 rounded-xl p-6 shadow-sm space-y-4">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-amber-400" /> Datos del Remitente (Opcional)
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div className="space-y-2">
@@ -187,7 +187,7 @@ export function CreatePackagePage() {
                     <input
                         type="text"
                         placeholder="ej. Logística Central"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                        className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500 transition-colors"
                         value={formData.senderName}
                         onChange={e => setFormData({ ...formData, senderName: e.target.value })}
                     />
@@ -195,11 +195,11 @@ export function CreatePackagePage() {
                  <div className="space-y-2">
                     <label className="text-sm font-medium text-slate-300">Teléfono de Origen</label>
                     <div className="relative">
-                        <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                        <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                         <input
                             type="text"
                             placeholder="ej. +54 11 ..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                            className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-3 py-2 text-white tabular-nums focus:outline-none focus:border-brand-500 transition-colors"
                             value={formData.senderPhone}
                             onChange={e => setFormData({ ...formData, senderPhone: e.target.value })}
                         />
@@ -209,11 +209,11 @@ export function CreatePackagePage() {
              <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-300">Dirección de Retiro / Origen</label>
                 <div className="relative">
-                    <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                    <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Calle, Altura, Ciudad"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                        className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-brand-500 transition-colors"
                         value={formData.senderAddress}
                         onChange={e => setFormData({ ...formData, senderAddress: e.target.value })}
                     />
@@ -223,8 +223,8 @@ export function CreatePackagePage() {
 
 
         {/* Section 3: Recipient Details */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+        <div className="bg-slate-900 border border-slate-800/80 rounded-xl p-6 shadow-sm space-y-4">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
                 <User className="h-5 w-5 text-emerald-400" /> Datos del Destinatario
             </h2>
             
@@ -234,7 +234,7 @@ export function CreatePackagePage() {
                     <input
                         type="text"
                         placeholder="ej. Juan Perez S.A."
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                        className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500 transition-colors"
                         value={formData.recipientName}
                         onChange={e => setFormData({ ...formData, recipientName: e.target.value })}
                         required
@@ -243,11 +243,11 @@ export function CreatePackagePage() {
                  <div className="space-y-2">
                     <label className="text-sm font-medium text-slate-300">Teléfono</label>
                     <div className="relative">
-                        <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                        <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                         <input
                             type="text"
                             placeholder="ej. +54 9 11 1234 5678"
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                            className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-3 py-2 text-white tabular-nums focus:outline-none focus:border-brand-500 transition-colors"
                             value={formData.recipientPhone}
                             onChange={e => setFormData({ ...formData, recipientPhone: e.target.value })}
                             required
@@ -259,28 +259,28 @@ export function CreatePackagePage() {
              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-slate-300">Dirección de Entrega</label>
-                    <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">Geocodificación Automática</span>
+                    <span className="text-xs text-slate-400 bg-slate-950 border border-slate-800/80 px-2 py-1 rounded">Geocodificación Automática</span>
                 </div>
                 
                 {/* Structured Address Fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Country & Province (Defaults) */}
                     <div className="space-y-2">
-                         <label className="text-xs text-slate-500">País</label>
+                         <label className="text-xs text-slate-400">País</label>
                          <input 
                             type="text" 
                             value="Argentina" 
                             disabled 
-                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-400 cursor-not-allowed"
+                            className="w-full bg-slate-950/60 border border-slate-800/80 rounded-lg px-3 py-2 text-slate-400 cursor-not-allowed"
                          />
                     </div>
                     <div className="space-y-2">
-                         <label className="text-xs text-slate-500">Provincia</label>
+                         <label className="text-xs text-slate-400">Provincia</label>
                          <input 
                             type="text" 
                             value="Córdoba" 
                             disabled 
-                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-slate-400 cursor-not-allowed"
+                            className="w-full bg-slate-950/60 border border-slate-800/80 rounded-lg px-3 py-2 text-slate-400 cursor-not-allowed"
                          />
                     </div>
 
@@ -291,7 +291,7 @@ export function CreatePackagePage() {
                             list="barrios-cordoba"
                             type="text"
                             placeholder="Seleccione o escriba..."
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                            className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500 transition-colors"
                             value={formData.addressCity || ''} // Reusing addressCity for Neighborhood temporarily
                             onChange={e => {
                                 const val = e.target.value;
@@ -332,7 +332,7 @@ export function CreatePackagePage() {
                              <input
                                 type="text"
                                 placeholder="Calle"
-                                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                                className="flex-1 bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500 transition-colors"
                                 value={formData.addressStreet || ''}
                                 onChange={e => {
                                     const val = e.target.value;
@@ -346,7 +346,7 @@ export function CreatePackagePage() {
                              <input
                                 type="text"
                                 placeholder="N°"
-                                className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                                className="w-20 bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white tabular-nums focus:outline-none focus:border-brand-500 transition-colors"
                                 value={formData.addressNumber || ''}
                                 onChange={e => {
                                     const val = e.target.value;
@@ -363,12 +363,12 @@ export function CreatePackagePage() {
 
                 {/* Full Address Preview (Readonly) */}
                 <div className="relative pt-2">
-                    <MapPin className="absolute left-3 top-5 h-4 w-4 text-slate-500" />
-                    <label className="text-xs text-slate-500 mb-1 block">Dirección Completa (Generada)</label>
+                    <MapPin className="absolute left-3 top-9 h-4 w-4 text-slate-400" />
+                    <label className="text-xs text-slate-400 mb-1 block">Dirección Completa (Generada)</label>
                     <input
                         type="text"
                         disabled
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-slate-300 font-mono text-sm"
+                        className="w-full bg-slate-950/60 border border-slate-800/80 rounded-lg pl-9 pr-3 py-2 text-slate-300 font-mono tabular-nums text-sm"
                         value={formData.recipientAddress}
                     />
                 </div>
@@ -379,7 +379,7 @@ export function CreatePackagePage() {
                 <input
                     type="text"
                     placeholder="ej. Portón negro, al lado del kiosco, tocar timbre fuerte"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all"
+                    className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-brand-500 transition-colors"
                     value={formData.addressReferences}
                     onChange={e => setFormData({ ...formData, addressReferences: e.target.value })}
                 />
@@ -389,7 +389,7 @@ export function CreatePackagePage() {
         <div className="flex justify-end pt-4 gap-4">
             <button
               type="button"
-              className="px-6 py-3 text-slate-400 hover:text-white transition-colors"
+              className="px-6 py-2.5 text-slate-400 hover:text-white transition-colors text-sm font-medium"
               onClick={() => setFormData({ 
                   trackingCode: '', 
                   senderName: '', senderAddress: '', senderPhone: '',
@@ -403,11 +403,11 @@ export function CreatePackagePage() {
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-lg shadow-blue-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+              className="flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-lg shadow-lg shadow-brand-950/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               {loading ? 'Procesando...' : (
                 <>
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-4 w-4" />
                   Crear Paquete
                 </>
               )}

@@ -13,13 +13,10 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
+import { StatusBadge } from '../components/StatusBadge';
+import { getPackageStatusToken, type PackageStatus } from '../utils/packageStatus';
 
-export type TrackingStatus =
-  | 'pending'
-  | 'assigned'
-  | 'in_transit'
-  | 'delivered'
-  | 'cancelled';
+export type TrackingStatus = PackageStatus;
 
 export interface PublicTrackingData {
   trackingCode: string;
@@ -40,46 +37,15 @@ interface LiveLocationUpdate {
 
 type StreamState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'closed';
 
-const STATUS_CONFIG: Record<
-  TrackingStatus,
-  { label: string; badgeClass: string; description: string }
-> = {
-  pending: {
-    label: 'Pendiente',
-    badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    description: 'Tu envío fue registrado y espera asignación de unidad.',
-  },
-  assigned: {
-    label: 'Asignado',
-    badgeClass: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-    description: 'Un conductor fue asignado y preparará la salida.',
-  },
-  in_transit: {
-    label: 'En Camino',
-    badgeClass: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-    description: 'El paquete se encuentra en ruta hacia el destino.',
-  },
-  delivered: {
-    label: 'Entregado',
-    badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    description: 'El paquete fue entregado en la dirección indicada.',
-  },
-  cancelled: {
-    label: 'Cancelado',
-    badgeClass: 'bg-red-500/15 text-red-300 border-red-500/30',
-    description: 'Este envío fue cancelado. Contacta al remitente para más detalles.',
-  },
-};
-
 const TIMELINE_STEPS: Array<{
   key: Exclude<TrackingStatus, 'cancelled'>;
   label: string;
   icon: typeof Package;
 }> = [
   { key: 'pending', label: 'Registrado', icon: Package },
-  { key: 'assigned', label: 'Asignado', icon: Clock },
-  { key: 'in_transit', label: 'En Camino', icon: Truck },
-  { key: 'delivered', label: 'Entregado', icon: CheckCircle2 },
+  { key: 'assigned', label: getPackageStatusToken('assigned').label, icon: Clock },
+  { key: 'in_transit', label: getPackageStatusToken('in_transit').label, icon: Truck },
+  { key: 'delivered', label: getPackageStatusToken('delivered').label, icon: CheckCircle2 },
 ];
 
 function formatDateTime(value: string | number | null): string {
@@ -260,7 +226,7 @@ export function TrackingPage() {
       ? TIMELINE_STEPS.findIndex((step) => step.key === trackingData.status)
       : -1;
 
-  const statusMeta = trackingData ? STATUS_CONFIG[trackingData.status] : null;
+  const statusToken = trackingData ? getPackageStatusToken(trackingData.status) : null;
   const currentLat = liveLocation?.lat ?? trackingData?.lat ?? null;
   const currentLng = liveLocation?.lng ?? trackingData?.lng ?? null;
 
@@ -272,12 +238,12 @@ export function TrackingPage() {
             to="/tracking"
             className="flex items-center gap-3 text-white hover:opacity-90 transition-opacity"
           >
-            <div className="h-10 w-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
-              <Package className="h-5 w-5 text-blue-400" />
+            <div className="h-10 w-10 rounded-xl bg-brand-500/10 border border-brand-500/25 flex items-center justify-center">
+              <Package className="h-5 w-5 text-brand-400" />
             </div>
             <div>
               <span className="block text-base font-bold tracking-tight">
-                Logistics <span className="text-blue-400">OS</span>
+                Logistics <span className="text-brand-400">OS</span>
               </span>
               <span className="block text-xs text-slate-400">Seguimiento Público de Envíos</span>
             </div>
@@ -285,7 +251,7 @@ export function TrackingPage() {
 
           <Link
             to="/login"
-            className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+            className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
           >
             <LogIn className="h-4 w-4 text-slate-400" />
             <span>Portal Operadores</span>
@@ -294,7 +260,7 @@ export function TrackingPage() {
       </header>
 
       <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8 sm:py-12 space-y-8">
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl">
+        <section className="rounded-2xl border border-slate-800/80 bg-slate-900 p-6 sm:p-8 shadow-xl">
           <div className="max-w-2xl space-y-2 mb-6">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Rastrea tu paquete en tiempo real
@@ -319,14 +285,14 @@ export function TrackingPage() {
                 onChange={(e) => setQueryInput(e.target.value)}
                 placeholder="Ej. PKG-2026-001"
                 autoComplete="off"
-                className="block w-full min-h-[48px] rounded-xl border border-slate-700 bg-slate-950 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors"
+                className="block w-full min-h-[48px] rounded-xl border border-slate-800/80 bg-slate-950 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 transition-colors"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-950/30 hover:bg-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Search className="h-4 w-4" />
               <span>{loading ? 'Buscando...' : 'Rastrear Envío'}</span>
@@ -337,7 +303,7 @@ export function TrackingPage() {
         {loading && (
           <section
             aria-label="Cargando estado del envío"
-            className="rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 space-y-6"
+            className="rounded-2xl border border-slate-800/80 bg-slate-900 p-6 sm:p-8 space-y-6"
           >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-2">
@@ -373,8 +339,8 @@ export function TrackingPage() {
         )}
 
         {!loading && !error && !trackingData && (
-          <section className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-8 sm:p-10 text-center space-y-3">
-            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center">
+          <section className="rounded-2xl border border-dashed border-slate-800/80 bg-slate-900/50 p-8 sm:p-10 text-center space-y-3">
+            <div className="mx-auto h-12 w-12 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center">
               <Package className="h-6 w-6 text-slate-400" />
             </div>
             <h2 className="text-lg font-semibold text-white">Consulta el estado de tu entrega</h2>
@@ -384,30 +350,26 @@ export function TrackingPage() {
           </section>
         )}
 
-        {!loading && !error && trackingData && statusMeta && (
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-xl space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-800 pb-6">
+        {!loading && !error && trackingData && statusToken && (
+          <section className="rounded-2xl border border-slate-800/80 bg-slate-900 p-6 sm:p-8 shadow-xl space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-800/80 pb-6">
               <div className="space-y-1">
                 <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
                   Código de seguimiento
                 </p>
-                <h2 className="text-2xl font-bold tracking-tight text-white font-mono">
+                <h2 className="text-2xl font-bold tracking-tight text-white font-mono tabular-nums">
                   {trackingData.trackingCode}
                 </h2>
-                <p className="text-sm text-slate-400">{statusMeta.description}</p>
+                <p className="text-sm text-slate-400">{statusToken.trackingDescription}</p>
               </div>
 
-              <span
-                className={`inline-flex items-center self-start rounded-full border px-3.5 py-1.5 text-xs font-semibold ${statusMeta.badgeClass}`}
-              >
-                {statusMeta.label}
-              </span>
+              <StatusBadge status={trackingData.status} size="md" className="self-start" />
             </div>
 
             {trackingData.status === 'cancelled' ? (
               <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 flex items-center gap-3">
                 <XCircle className="h-5 w-5 text-red-400 shrink-0" />
-                <p className="text-sm text-red-200">
+                <p className="text-sm text-red-200 tabular-nums">
                   El envío fue marcado como cancelado el {formatDateTime(trackingData.updatedAt)}.
                 </p>
               </div>
@@ -427,20 +389,20 @@ export function TrackingPage() {
                         key={step.key}
                         className={`rounded-xl border p-4 transition-colors ${
                           isCurrent
-                            ? 'border-blue-500/50 bg-blue-500/10'
+                            ? 'border-brand-500/50 bg-brand-500/10'
                             : isCompleted
                               ? 'border-emerald-500/30 bg-emerald-500/5'
-                              : 'border-slate-800 bg-slate-950/60'
+                              : 'border-slate-800/80 bg-slate-950/60'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <div
                             className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
                               isCurrent
-                                ? 'bg-blue-500/20 text-blue-400'
+                                ? 'bg-brand-500/20 text-brand-400'
                                 : isCompleted
                                   ? 'bg-emerald-500/20 text-emerald-400'
-                                  : 'bg-slate-800 text-slate-500'
+                                  : 'bg-slate-800 text-slate-400'
                             }`}
                           >
                             <Icon className="h-4 w-4" />
@@ -466,9 +428,9 @@ export function TrackingPage() {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5">
+              <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-4 space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-                  <MapPin className="h-4 w-4 text-blue-400" />
+                  <MapPin className="h-4 w-4 text-brand-400" />
                   <span>Destino de entrega</span>
                 </div>
                 <p className="text-sm font-medium text-white">
@@ -476,16 +438,16 @@ export function TrackingPage() {
                 </p>
               </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5">
+              <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-4 space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-                  <Clock className="h-4 w-4 text-blue-400" />
+                  <Clock className="h-4 w-4 text-brand-400" />
                   <span>Última actualización</span>
                 </div>
-                <p className="text-sm font-medium text-white">
+                <p className="text-sm font-medium text-white tabular-nums">
                   {formatDateTime(liveLocation?.timestamp ?? trackingData.updatedAt)}
                 </p>
                 {trackingData.estimatedDeliveryAt && (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-400 tabular-nums">
                     Entrega estimada: {formatDateTime(trackingData.estimatedDeliveryAt)}
                   </p>
                 )}
@@ -497,7 +459,7 @@ export function TrackingPage() {
                 className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                   streamState === 'closed'
                     ? 'border-amber-500/30 bg-amber-500/10'
-                    : 'border-blue-500/20 bg-blue-500/5'
+                    : 'border-brand-500/25 bg-brand-500/5'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -505,7 +467,7 @@ export function TrackingPage() {
                     className={`h-5 w-5 shrink-0 ${
                       streamState === 'closed'
                         ? 'text-amber-400'
-                        : 'text-blue-400 animate-pulse'
+                        : 'text-brand-400 animate-pulse'
                     }`}
                   />
                   <div>
@@ -519,11 +481,18 @@ export function TrackingPage() {
                             : 'Monitoreo en vivo activo'}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {streamState === 'closed'
-                        ? 'La conexión en tiempo real se cerró. Pulsa "Rastrear Envío" para reintentar.'
-                        : currentLat !== null && currentLng !== null
-                          ? `Última posición reportada: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`
-                          : 'Esperando señal GPS de la unidad asignada...'}
+                      {streamState === 'closed' ? (
+                        'La conexión en tiempo real se cerró. Pulsa "Rastrear Envío" para reintentar.'
+                      ) : currentLat !== null && currentLng !== null ? (
+                        <>
+                          Última posición reportada:{' '}
+                          <span className="font-mono tabular-nums text-slate-200">
+                            {currentLat.toFixed(5)}, {currentLng.toFixed(5)}
+                          </span>
+                        </>
+                      ) : (
+                        'Esperando señal GPS de la unidad asignada...'
+                      )}
                     </p>
                   </div>
                 </div>
@@ -533,7 +502,7 @@ export function TrackingPage() {
                       ? 'text-amber-300'
                       : streamState === 'reconnecting' || streamState === 'connecting'
                         ? 'text-slate-300'
-                        : 'text-blue-300'
+                        : 'text-brand-300'
                   }`}
                 >
                   {streamState === 'closed'

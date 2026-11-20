@@ -65,15 +65,15 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
         onClick={onClose}
       />
 
-      <div className="relative flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden">
+      <div className="relative flex w-full max-w-md max-h-[calc(100vh-2rem)] flex-col bg-slate-900 border border-slate-800/80 rounded-xl shadow-2xl overflow-hidden">
         
         {/* Header */}
-        <div className="shrink-0 bg-slate-950/50 p-4 border-b border-slate-800 flex justify-between items-center">
+        <div className="shrink-0 bg-slate-950/50 p-4 border-b border-slate-800/80 flex justify-between items-center">
           <h2
             id="create-dispatcher-modal-title"
             className="text-lg font-bold text-white flex items-center gap-2"
           >
-            <UserPlus className="h-5 w-5 text-blue-500" />
+            <UserPlus className="h-5 w-5 text-brand-400" />
             Nuevo Despachador
           </h2>
           <button
@@ -91,13 +91,13 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-400">Usuario</label>
             <div className="relative">
-              <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+              <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input 
                 type="text" 
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none"
                 placeholder="ej. despachador1"
               />
             </div>
@@ -106,21 +106,21 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-400">Contraseña</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input 
                 type="password" 
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:ring-1 focus:ring-brand-500 focus:border-brand-500 focus:outline-none"
                 placeholder="******"
               />
             </div>
           </div>
 
-          <div className="bg-blue-900/10 border border-blue-900/20 rounded-lg p-3">
-              <p className="text-xs text-blue-400">
+          <div className="bg-brand-500/10 border border-brand-500/20 rounded-lg p-3">
+              <p className="text-xs text-brand-300">
                   ⚠️ Esta cuenta tendrá permisos para gestionar despachos y conductores, pero no podrá crear más usuarios.
               </p>
           </div>
@@ -136,7 +136,7 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
             <button 
               type="submit" 
               disabled={loading}
-              className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-bold py-2 rounded-lg shadow-lg shadow-brand-950/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? 'Creando...' : 'Crear Cuenta'}
             </button>

@@ -31,7 +31,7 @@ export function Sidebar() {
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="Abrir menú de navegación"
-          className="md:hidden fixed bottom-4 left-4 z-40 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-slate-200 hover:text-white shadow-lg"
+          className="md:hidden fixed bottom-4 left-4 z-40 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800/80 text-slate-200 hover:text-white shadow-lg"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -48,7 +48,7 @@ export function Sidebar() {
       <aside 
         className={clsx(
           mobileOpen ? "flex fixed inset-y-0 left-0 w-64 md:inset-auto" : "hidden md:flex",
-          "h-screen bg-slate-950 border-r border-slate-800 flex-col transition-all duration-300 md:relative z-50",
+          "h-full flex-shrink-0 bg-slate-950 border-r border-slate-800/80 flex-col transition-all duration-300 md:relative z-50",
           collapsed ? "md:w-20" : "md:w-64"
         )}
       >
@@ -57,24 +57,24 @@ export function Sidebar() {
           type="button"
           onClick={() => setCollapsed(!collapsed)}
           aria-label={collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
-          className="hidden md:flex absolute -right-3 top-8 bg-blue-600 rounded-full p-1 text-white shadow-lg hover:bg-blue-500 transition-colors z-50"
+          className="hidden md:flex absolute -right-3 top-8 bg-brand-600 rounded-full p-1 text-white shadow-lg shadow-brand-950/50 hover:bg-brand-500 transition-colors z-50"
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
 
         {/* Brand */}
         <div className={clsx(
-          "h-16 flex items-center border-b border-slate-800 transition-all duration-300",
+          "h-16 flex-shrink-0 flex items-center border-b border-slate-800/80 transition-all duration-300",
           collapsed ? "px-6 md:px-0 md:justify-center" : "px-6"
         )}>
-          <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-blue-900/50 shadow-lg">
+          <div className="h-8 w-8 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-brand-950/50 shadow-lg">
             <Truck className="h-5 w-5 text-white" />
           </div>
           <span className={clsx(
             "font-bold text-lg tracking-tight text-white whitespace-nowrap transition-all duration-300",
             collapsed ? "ml-3 md:ml-0 md:opacity-0 md:w-0 md:overflow-hidden" : "ml-3 opacity-100"
           )}>
-            Logistics <span className="text-blue-400">OS</span>
+            Logistics <span className="text-brand-400">OS</span>
           </span>
           <button
             type="button"
@@ -87,14 +87,14 @@ export function Sidebar() {
         </div>
 
         {/* Active Tenant */}
-        <div className={clsx("px-3 pt-3", collapsed && "md:px-2")}>
+        <div className={clsx("px-3 pt-3 flex-shrink-0", collapsed && "md:px-2")}>
           <div
             className={clsx(
-              "group relative flex items-center rounded-lg border border-slate-800/90 bg-slate-900/80 transition-colors",
+              "group relative flex items-center rounded-lg border border-slate-800/80 bg-slate-900/80 transition-colors",
               collapsed ? "gap-2.5 px-3 py-2 md:justify-center md:gap-0 md:px-2 md:py-2" : "gap-2.5 px-3 py-2"
             )}
           >
-            <div className="h-8 w-8 rounded-md bg-blue-500/10 border border-blue-500/25 flex items-center justify-center flex-shrink-0 text-blue-400">
+            <div className="h-8 w-8 rounded-md bg-brand-500/10 border border-brand-500/25 flex items-center justify-center flex-shrink-0 text-brand-400">
               <Building2 className="h-4 w-4" />
             </div>
             <div className={clsx(
@@ -114,7 +114,7 @@ export function Sidebar() {
                 {tenantName}
               </p>
               <p
-                className="text-xs font-mono text-blue-300 truncate mt-0.5"
+                className="text-xs font-mono text-brand-300 truncate mt-0.5"
                 title={tenantSlug ?? undefined}
               >
                 {tenantSlug ?? 'Sesión corporativa'}
@@ -122,9 +122,9 @@ export function Sidebar() {
             </div>
 
             {collapsed && (
-              <div className="hidden md:block absolute left-16 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap border border-slate-700 shadow-xl">
+              <div className="hidden md:block absolute left-16 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap border border-slate-800/80 shadow-xl">
                 <p className="font-semibold text-white">{tenantName}</p>
-                <p className="text-[11px] font-mono text-blue-300">
+                <p className="text-[11px] font-mono text-brand-300">
                   {tenantSlug ?? 'Sesión corporativa'}
                 </p>
               </div>
@@ -133,7 +133,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 min-h-0 py-4 space-y-1 px-3 overflow-y-auto custom-scrollbar">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.path}
@@ -143,8 +143,8 @@ export function Sidebar() {
                 clsx(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-sm font-medium",
                   isActive 
-                    ? "bg-blue-600/10 text-blue-400 shadow-sm border border-blue-600/20" 
-                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                    ? "bg-brand-500/10 text-brand-400 shadow-sm border border-brand-500/25" 
+                    : "text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent"
                 )
               }
             >
@@ -157,7 +157,7 @@ export function Sidebar() {
               </span>
               {/* Tooltip for collapsed state */}
               {collapsed && (
-                 <div className="hidden md:block absolute left-16 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap border border-slate-700">
+                 <div className="hidden md:block absolute left-16 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap border border-slate-800/80">
                    {item.label}
                  </div>
               )}
@@ -165,11 +165,11 @@ export function Sidebar() {
           ))}
 
           {/* Divider */}
-          <div className="my-4 border-t border-slate-800 mx-2"></div>
+          <div className="my-4 border-t border-slate-800/80 mx-2"></div>
            
            {/* System Links */}
            <div className="space-y-1">
-               <div className={clsx("px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider", collapsed && "md:hidden")}>
+               <div className={clsx("px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider", collapsed && "md:hidden")}>
                   Sistema
                </div>
               <NavLink
@@ -179,12 +179,12 @@ export function Sidebar() {
                   clsx(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group text-sm font-medium",
                     isActive
-                      ? "bg-blue-600/10 text-blue-400 shadow-sm border border-blue-600/20"
-                      : "text-slate-400 hover:text-white hover:bg-slate-900"
+                      ? "bg-brand-500/10 text-brand-400 shadow-sm border border-brand-500/25"
+                      : "text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent"
                   )
                 }
               >
-                  <Settings className="h-5 w-5 flex-shrink-0 group-hover:text-blue-400 transition-colors" />
+                  <Settings className="h-5 w-5 flex-shrink-0 group-hover:text-brand-400 transition-colors" />
                   <span className={clsx("font-medium text-sm", collapsed ? "md:hidden" : "block")}>Configuración</span>
               </NavLink>
            </div>
@@ -192,9 +192,9 @@ export function Sidebar() {
         </nav>
 
         {/* User Logic */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+        <div className="p-4 flex-shrink-0 border-t border-slate-800/80 bg-slate-900/50">
           <div className={clsx("flex items-center gap-3", collapsed && "md:justify-center md:gap-0")}>
-            <div className="h-9 w-9 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+            <div className="h-9 w-9 flex-shrink-0 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold text-sm shadow-lg">
               {userInitials}
             </div>
             <div className={clsx("flex-1 overflow-hidden transition-all duration-300", collapsed ? "md:w-0 md:opacity-0 md:flex-none" : "w-auto opacity-100")}>

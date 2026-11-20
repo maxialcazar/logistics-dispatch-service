@@ -188,15 +188,15 @@ export function App() {
               theme="dark"
               toastOptions={{
                 classNames: {
-                  toast: 'bg-slate-900 border border-slate-800 shadow-2xl shadow-blue-900/10 text-slate-200 rounded-xl',
+                  toast: 'bg-slate-900 border border-slate-800/80 shadow-2xl shadow-brand-950/20 text-slate-200 rounded-xl',
                   title: 'text-white font-semibold text-sm',
                   description: 'text-slate-400 text-xs',
-                  actionButton: 'bg-blue-600 hover:bg-blue-500 text-white',
+                  actionButton: 'bg-brand-600 hover:bg-brand-500 text-white',
                   cancelButton: 'bg-slate-800 hover:bg-slate-700 text-white',
                   error: 'border-red-900/50 bg-red-950/30 text-red-200',
-                  success: 'border-green-900/50 bg-green-950/30 text-green-200',
-                  warning: 'border-yellow-900/50 bg-yellow-950/30 text-yellow-200',
-                  info: 'border-blue-900/50 bg-blue-950/30 text-blue-200',
+                  success: 'border-emerald-900/50 bg-emerald-950/30 text-emerald-200',
+                  warning: 'border-amber-900/50 bg-amber-950/30 text-amber-200',
+                  info: 'border-brand-900/50 bg-brand-950/30 text-brand-200',
                 },
               }}
             />

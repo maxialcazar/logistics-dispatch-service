@@ -8,6 +8,8 @@ import { useDriverLocation } from '../hooks/useDriverLocation';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { enqueueStatusUpdate } from '../services/offlineQueue';
 import { Skeleton } from '../components/Skeleton';
+import { StatusBadge } from '../components/StatusBadge';
+import { getPackageStatusToken } from '../utils/packageStatus';
 
 // ---------- Canvas Signature Pad Hook ----------
 function useSignaturePad(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
@@ -114,31 +116,31 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
       />
 
       {/* Modal Sheet */}
-      <div className="relative w-full sm:max-w-md bg-slate-900 border border-slate-700/50 rounded-t-3xl sm:rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+      <div className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800/80 rounded-t-3xl sm:rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
         {/* Drag handle (mobile) */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="w-10 h-1 rounded-full bg-slate-700" />
         </div>
 
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-800/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center border border-green-500/20">
-              <ShieldCheck className="h-4 w-4 text-green-400" />
+            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
             </div>
             <div>
               <h3 className="font-bold text-white text-sm">Confirmar Entrega</h3>
-              <p className="text-xs text-slate-500 font-mono">#{pkg.trackingCode}</p>
+              <p className="text-xs text-slate-400 font-mono tabular-nums">#{pkg.trackingCode}</p>
             </div>
           </div>
-          <button onClick={onClose} className="min-h-[48px] min-w-[48px] p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 transition-colors flex items-center justify-center">
+          <button onClick={onClose} className="min-h-[48px] min-w-[48px] p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors flex items-center justify-center">
             <X size={18} />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-5 overflow-y-auto max-h-[80vh]">
           {/* Recipient info */}
-          <div className="bg-slate-800/50 rounded-xl p-3 flex items-start gap-3 border border-slate-700/30">
+          <div className="bg-slate-950/60 rounded-xl p-3 flex items-start gap-3 border border-slate-800/80">
             <MapPin className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-white text-sm font-semibold">{pkg.recipientName}</p>
@@ -155,7 +157,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
               </label>
               <button
                 onClick={clearCanvas}
-                className="min-h-[48px] px-2 flex items-center gap-1 text-xs text-slate-500 hover:text-red-400 transition-colors"
+                className="min-h-[48px] px-2 flex items-center gap-1 text-xs text-slate-400 hover:text-red-400 transition-colors"
               >
                 <Trash2 size={11} />
                 Borrar
@@ -205,7 +207,7 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full min-h-[48px] h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 hover:border-blue-500/50 hover:bg-slate-900 transition-all flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-blue-400"
+                className="w-full min-h-[48px] h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 hover:border-brand-500/50 hover:bg-slate-900 transition-all flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-brand-400"
               >
                 <Camera size={24} />
                 <span className="text-xs font-medium">Tomar foto del paquete</span>
@@ -224,10 +226,10 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
         </div>
 
         {/* Action buttons */}
-        <div className="px-5 py-4 border-t border-slate-800 grid grid-cols-2 gap-3">
+        <div className="px-5 py-4 border-t border-slate-800/80 grid grid-cols-2 gap-3">
           <button
             onClick={onClose}
-            className="min-h-[48px] py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 font-medium transition-all text-sm"
+            className="min-h-[48px] py-3 rounded-xl border border-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-800 font-medium transition-all text-sm"
           >
             Cancelar
           </button>
@@ -237,8 +239,8 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
             className={clsx(
               "min-h-[48px] py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
               submitting
-                ? "bg-green-700/50 text-green-300 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30 active:scale-95"
+                ? "bg-emerald-700/50 text-emerald-300 cursor-not-allowed"
+                : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/30 active:scale-95"
             )}
           >
             <Check size={16} />
@@ -347,7 +349,7 @@ export function DriverDashboard() {
     try {
       await packageService.updateStatus(token, pkg.id, newStatus);
       toast.success(
-        newStatus === 'in_transit' ? 'Viaje iniciado' : `Estado: ${newStatus}`,
+        newStatus === 'in_transit' ? 'Viaje iniciado' : `Estado: ${getPackageStatusToken(newStatus).label}`,
         { id: loadingToast }
       );
       fetchMyPackages();
@@ -492,7 +494,7 @@ export function DriverDashboard() {
           </div>
         </div>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div key={i} className="bg-slate-900 border border-slate-800/80 rounded-xl p-4 space-y-3">
             <div className="flex justify-between">
               <Skeleton className="h-5 w-24" />
               <Skeleton className="h-5 w-20 rounded-full" />
@@ -545,15 +547,15 @@ export function DriverDashboard() {
       )}
 
       {packages.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full gap-4">
-          <div className="h-20 w-20 bg-slate-800 rounded-full flex items-center justify-center">
-            <Check className="h-10 w-10 text-green-500" />
+        <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full gap-4">
+          <div className="h-20 w-20 bg-slate-900 border border-slate-800/80 rounded-full flex items-center justify-center">
+            <Check className="h-10 w-10 text-emerald-400" />
           </div>
           <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
           <p>No tienes paquetes pendientes asignados.</p>
           <button
             onClick={() => void fetchMyPackages()}
-            className="min-h-[48px] px-4 text-blue-500 underline text-sm flex items-center justify-center"
+            className="min-h-[48px] px-4 text-brand-400 hover:text-brand-300 underline text-sm flex items-center justify-center"
           >
             Actualizar
           </button>
@@ -561,45 +563,37 @@ export function DriverDashboard() {
       ) : (
         <div className="p-4 space-y-4 pb-24 relative">
           <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
-            <span>Mis Entregas ({packages.length})</span>
+            <span>Mis Entregas (<span className="tabular-nums">{packages.length}</span>)</span>
             <div className="flex gap-2">
               <button
                 onClick={handleOptimizeRoute}
-                className="min-h-[48px] text-xs text-purple-400 bg-purple-900/20 px-3 py-2 rounded-lg border border-purple-500/20 flex items-center gap-1.5 hover:bg-purple-900/40 transition-colors"
+                className="min-h-[48px] text-xs text-slate-200 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800/80 flex items-center gap-1.5 hover:border-brand-500/40 hover:text-white transition-colors"
               >
-                <Route size={12} /> Optimizar
+                <Route size={12} className="text-brand-400" /> Optimizar
               </button>
               <button
                 onClick={() => void fetchMyPackages()}
-                className="min-h-[48px] text-xs text-blue-400 bg-blue-900/20 px-3 py-2 rounded-lg flex items-center justify-center hover:bg-blue-900/40 transition-colors"
+                className="min-h-[48px] text-xs text-brand-300 bg-brand-500/10 border border-brand-500/25 px-3 py-2 rounded-lg flex items-center justify-center hover:bg-brand-500/20 transition-colors"
               >
                 Refrescar
               </button>
             </div>
           </h2>
 
-        {packages.map(pkg => (
-          <div key={pkg.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg relative">
+        {packages.map(pkg => {
+          const statusToken = getPackageStatusToken(pkg.status);
+          return (
+          <div key={pkg.id} className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm relative">
             {/* Status color bar */}
-            <div className={clsx('h-1.5 w-full',
-              pkg.status === 'in_transit' ? 'bg-purple-500 animate-pulse' :
-              pkg.status === 'assigned'   ? 'bg-blue-500' : 'bg-slate-700'
-            )} />
+            <div className={clsx('h-1.5 w-full', statusToken.barClass, statusToken.pulse && 'animate-pulse')} />
 
             <div className="p-4">
               {/* Tracking code + status badge */}
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-mono text-xs text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+              <div className="flex justify-between items-start gap-2 mb-2">
+                <span className="font-mono tabular-nums text-xs text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800/80">
                   #{pkg.trackingCode}
                 </span>
-                <span className={clsx(
-                  'text-xs font-bold px-2 py-0.5 rounded-full uppercase',
-                  pkg.status === 'in_transit' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                  pkg.status === 'assigned'   ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                  'bg-slate-700 text-slate-400'
-                )}>
-                  {pkg.status.replace('_', ' ')}
-                </span>
+                <StatusBadge status={pkg.status} />
               </div>
 
               <h3 className="text-lg font-bold text-white mb-1">{pkg.recipientName}</h3>
@@ -610,7 +604,7 @@ export function DriverDashboard() {
               </div>
 
               {pkg.recipientPhone && (
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-4">
+                <div className="flex items-center gap-2 text-slate-400 text-xs mb-4 tabular-nums">
                   <Phone className="h-3 w-3" />
                   <span>{pkg.recipientPhone}</span>
                 </div>
@@ -620,9 +614,9 @@ export function DriverDashboard() {
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <button
                   onClick={() => openNavigation(pkg)}
-                  className="col-span-2 min-h-[48px] bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                  className="col-span-2 min-h-[48px] bg-slate-950 hover:bg-slate-800 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-800/80 transition-all"
                 >
-                  <Navigation className="h-4 w-4 text-blue-400" />
+                  <Navigation className="h-4 w-4 text-brand-400" />
                   Navegar a Destino
                 </button>
 
@@ -630,7 +624,7 @@ export function DriverDashboard() {
                   <button
                     onClick={() => handleStatusUpdate(pkg, 'in_transit')}
                     disabled={!!updating}
-                    className="col-span-2 min-h-[48px] bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                    className="col-span-2 min-h-[48px] bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-brand-950/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
                   >
                     <Truck className="h-5 w-5" />
                     Iniciar Viaje
@@ -641,7 +635,7 @@ export function DriverDashboard() {
                     <button
                       onClick={() => setPodPackage(pkg)}
                       disabled={!!updating}
-                      className="min-h-[48px] bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                      className="min-h-[48px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-emerald-950/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
                     >
                       <ShieldCheck className="h-5 w-5" />
                       Entregado
@@ -649,7 +643,7 @@ export function DriverDashboard() {
                     <button
                       onClick={() => handleStatusUpdate(pkg, 'cancelled')}
                       disabled={!!updating}
-                      className="min-h-[48px] bg-red-600/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-500 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                      className="min-h-[48px] bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-300 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
                     >
                       <X className="h-5 w-5" />
                       Fallido
@@ -659,7 +653,8 @@ export function DriverDashboard() {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         </div>
       )}
     </>

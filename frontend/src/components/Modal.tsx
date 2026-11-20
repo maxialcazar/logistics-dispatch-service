@@ -31,8 +31,8 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
             />
             
             {/* Modal Content */}
-            <div className="relative bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-md transform transition-all animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between p-5 border-b border-slate-800">
+            <div className="relative bg-slate-900 border border-slate-800/80 rounded-xl shadow-2xl w-full max-w-md transform transition-all animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between p-5 border-b border-slate-800/80">
                     <h3 className="text-lg font-bold text-white tracking-tight">{title}</h3>
                     <button 
                         onClick={onClose} 
@@ -47,7 +47,7 @@ export function Modal({ isOpen, onClose, title, children, footer }: ModalProps) 
                 </div>
 
                 {footer && (
-                    <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-800 bg-slate-950/30 rounded-b-xl">
+                    <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-800/80 bg-slate-950/30 rounded-b-xl">
                         {footer}
                     </div>
                 )}

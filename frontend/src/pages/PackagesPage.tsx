@@ -7,6 +7,8 @@ import clsx from 'clsx';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Skeleton } from '../components/Skeleton';
+import { StatusBadge } from '../components/StatusBadge';
+import { PACKAGE_STATUS_ORDER, getPackageStatusToken } from '../utils/packageStatus';
 
 export function PackagesPage() {
   const { token } = useAuth();
@@ -269,27 +271,16 @@ export function PackagesPage() {
       });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending': return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">Pendiente</span>;
-      case 'assigned': return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20">Asignado</span>;
-      case 'in_transit': return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-500 border border-purple-500/20">En Camino</span>;
-      case 'delivered': return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-500 border border-green-500/20">Entregado</span>;
-      case 'cancelled': return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20">Cancelado</span>;
-      default: return <span className="text-slate-400">{status}</span>;
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Package className="h-8 w-8 text-blue-500" />
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Package className="h-7 w-7 text-brand-400" />
             {showArchived ? 'Paquetes Expirados' : 'Gestión de Paquetes'}
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-slate-400 text-sm mt-1">
               {showArchived ? 'Historial de envíos archivados.' : 'Administra todos los envíos y su estado actual.'}
           </p>
         </div>
@@ -302,10 +293,10 @@ export function PackagesPage() {
                   setSelectedIds(new Set());
                 }}
                 className={clsx(
-                    "flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-all border",
+                    "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all border",
                     showArchived 
-                        ? "bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
-                        : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                        ? "bg-slate-800 border-slate-700/80 text-white hover:bg-slate-700"
+                        : "bg-slate-900 border-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-800"
                 )}
             >
                 {showArchived ? 'Volver a Activos' : 'Ver Expirados'}
@@ -317,7 +308,7 @@ export function PackagesPage() {
                         type="button"
                         onClick={handleArchiveClick}
                         disabled={selectedIds.size === 0 || loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:bg-orange-900/40 hover:text-orange-400 hover:border-orange-500/50 text-slate-300 font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-slate-300 disabled:hover:border-slate-700"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800/80 hover:bg-amber-500/10 hover:text-amber-300 hover:border-amber-500/30 text-slate-300 text-sm font-medium rounded-lg transition-all tabular-nums disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-900 disabled:hover:text-slate-300 disabled:hover:border-slate-800/80"
                         title={
                           selectedIds.size === 0
                             ? 'Selecciona paquetes finalizados para archivar'
@@ -329,9 +320,9 @@ export function PackagesPage() {
                     <button
                         type="button"
                         onClick={() => navigate('/packages/new')}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/30 transition-all"
+                        className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg shadow-lg shadow-brand-950/30 transition-all"
                     >
-                        <Plus className="h-5 w-5" />
+                        <Plus className="h-4 w-4" />
                         Nuevo Paquete
                     </button>
                 </>
@@ -342,7 +333,7 @@ export function PackagesPage() {
                     type="button"
                     onClick={handleDeleteClick}
                     disabled={selectedIds.size === 0 || loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600/20 border border-red-500/50 hover:bg-red-600 hover:text-white text-red-500 font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600/20 disabled:hover:text-red-500"
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-300 text-sm font-medium rounded-lg transition-all tabular-nums disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:text-red-300"
                     title={
                       selectedIds.size === 0
                         ? 'Selecciona paquetes archivados para eliminar'
@@ -356,14 +347,14 @@ export function PackagesPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800/80">
          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input 
               type="text"
               maxLength={200}
               placeholder="Buscar por tracking, destinatario, dirección o teléfono..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-8 py-2 text-white focus:outline-none focus:border-blue-500 transition-all text-sm"
+              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-8 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors text-sm"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
@@ -383,8 +374,8 @@ export function PackagesPage() {
               </button>
             )}
          </div>
-         <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-             {['', 'pending', 'assigned', 'in_transit', 'delivered', 'cancelled'].map((status) => (
+         <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 sm:pb-0">
+             {(['', ...PACKAGE_STATUS_ORDER] as const).map((status) => (
                <button
                  type="button"
                  key={status}
@@ -396,19 +387,19 @@ export function PackagesPage() {
                  className={clsx(
                    "px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border",
                    activeFilter === status 
-                     ? "bg-blue-600/10 border-blue-600/30 text-blue-400" 
-                     : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                     ? "bg-brand-500/10 border-brand-500/30 text-brand-300" 
+                     : "bg-slate-950 border-slate-800/80 text-slate-400 hover:text-white"
                  )}
                >
-                 {status === '' ? 'Todos' : status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                 {status === '' ? 'Todos' : getPackageStatusToken(status).label}
                </button>
              ))}
          </div>
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-blue-950/30 border border-blue-800/50 rounded-xl text-sm">
-          <span className="text-blue-200 font-medium">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-brand-950/40 border border-brand-500/30 rounded-xl text-sm">
+          <span className="text-brand-200 font-medium tabular-nums">
             {selectedIds.size} {selectedIds.size === 1 ? 'paquete seleccionado' : 'paquetes seleccionados'}
           </span>
           <button
@@ -422,7 +413,7 @@ export function PackagesPage() {
       )}
 
       {/* Data Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+      <div className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
         {loading ? (
              <div className="p-6 space-y-4">
                 {[...Array(5)].map((_, i) => (
@@ -442,18 +433,18 @@ export function PackagesPage() {
                 <button
                     type="button"
                     onClick={() => navigate('/packages/new')}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/30 transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg shadow-lg shadow-brand-950/30 transition-all"
                 >
                     <Plus className="h-4 w-4" />
                     Crear Paquete
                 </button>
              </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-950/50 text-xs text-slate-400 uppercase tracking-wider">
-                  <th className="w-12 px-4 py-4">
+                <tr className="border-b border-slate-800/80 bg-slate-950/60 text-xs text-slate-400 uppercase tracking-wider">
+                  <th className="w-12 px-4 py-3.5">
                     <input
                       ref={selectAllRef}
                       type="checkbox"
@@ -461,17 +452,17 @@ export function PackagesPage() {
                       onChange={handleToggleSelectAll}
                       disabled={packages.length === 0 || loading}
                       aria-label="Seleccionar todos los paquetes de la página actual"
-                      className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </th>
-                  <th className="px-6 py-4 font-semibold">Tracking</th>
-                  <th className="px-6 py-4 font-semibold">Destinatario</th>
-                  <th className="px-6 py-4 font-semibold">Ubicación</th>
-                  <th className="px-6 py-4 font-semibold">Estado</th>
-                  <th className="px-6 py-4 font-semibold">Fecha</th>
+                  <th className="px-6 py-3.5 font-semibold">Tracking</th>
+                  <th className="px-6 py-3.5 font-semibold">Destinatario</th>
+                  <th className="px-6 py-3.5 font-semibold">Ubicación</th>
+                  <th className="px-6 py-3.5 font-semibold">Estado</th>
+                  <th className="px-6 py-3.5 font-semibold">Fecha</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800 text-sm">
+              <tbody className="divide-y divide-slate-800/80 text-sm">
                 {packages.map((pkg) => {
                   const isSelected = selectedIds.has(pkg.id);
                   return (
@@ -479,45 +470,45 @@ export function PackagesPage() {
                     key={pkg.id}
                     className={clsx(
                       "hover:bg-slate-800/30 transition-colors group",
-                      isSelected && "bg-blue-950/20"
+                      isSelected && "bg-brand-950/20"
                     )}
                   >
-                    <td className="w-12 px-4 py-4">
+                    <td className="w-12 px-4 py-3.5">
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleSelectRow(pkg.id)}
                         aria-label={`Seleccionar paquete ${pkg.trackingCode}`}
-                        className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-brand-600 focus:ring-brand-500 focus:ring-offset-0 cursor-pointer"
                       />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-mono text-white font-medium">{pkg.trackingCode}</div>
-                      <div className="text-xs text-slate-500">ID: {pkg.id.substring(0,8)}...</div>
+                    <td className="px-6 py-3.5">
+                      <div className="font-mono tabular-nums text-white font-medium">{pkg.trackingCode}</div>
+                      <div className="text-xs font-mono tabular-nums text-slate-400">ID: {pkg.id.substring(0,8)}...</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-slate-200 font-medium">{pkg.recipientName}</div>
-                      <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <td className="px-6 py-3.5">
+                      <div className="text-slate-100 font-medium">{pkg.recipientName}</div>
+                      <div className="text-xs text-slate-400 tabular-nums flex items-center gap-1 mt-0.5">
                          <Phone className="h-3 w-3" /> {pkg.recipientPhone}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-slate-300 max-w-xs truncate" title={pkg.recipientAddress}>
+                    <td className="px-6 py-3.5">
+                      <div className="text-slate-200 max-w-xs truncate" title={pkg.recipientAddress}>
                           {pkg.recipientAddress}
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                      <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
                           <MapPin className="h-3 w-3" /> Zona: {pkg.zone?.name || 'Sin Asignar'}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      {getStatusBadge(pkg.status)}
+                    <td className="px-6 py-3.5">
+                      <StatusBadge status={pkg.status} />
                     </td>
-                    <td className="px-6 py-4 text-slate-400 whitespace-nowrap">
+                    <td className="px-6 py-3.5 text-slate-300 tabular-nums whitespace-nowrap">
                        <div className="flex items-center gap-2">
-                           <Calendar className="h-3 w-3" />
+                           <Calendar className="h-3 w-3 text-slate-400" />
                            {new Date(pkg.createdAt).toLocaleDateString()}
                        </div>
-                       <div className="text-xs text-slate-600 mt-0.5">
+                       <div className="text-xs text-slate-400 mt-0.5">
                            {new Date(pkg.createdAt).toLocaleTimeString()}
                        </div>
                     </td>
@@ -531,8 +522,8 @@ export function PackagesPage() {
       </div>
 
        {/* Pagination */}
-       <div className="flex items-center justify-between text-sm text-slate-400 px-2 py-4 border-t border-slate-800 bg-slate-900/50 rounded-b-xl">
-           <div>Página {page} de {totalPages}</div>
+       <div className="flex items-center justify-between text-sm text-slate-400 px-4 py-3 border border-slate-800/80 bg-slate-900 rounded-xl">
+           <div className="tabular-nums">Página {page} de {totalPages}</div>
            <div className="flex gap-2">
                <button 
                 type="button"
@@ -541,7 +532,7 @@ export function PackagesPage() {
                   setSelectedIds(new Set());
                 }}
                 disabled={page === 1 || loading}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
+                className="px-4 py-2 bg-slate-950 border border-slate-800/80 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
                >
                  Anterior
                </button>
@@ -552,7 +543,7 @@ export function PackagesPage() {
                   setSelectedIds(new Set());
                 }}
                 disabled={page === totalPages || loading}
-                className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
+                className="px-4 py-2 bg-slate-950 border border-slate-800/80 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
                >
                  Siguiente
                </button>
