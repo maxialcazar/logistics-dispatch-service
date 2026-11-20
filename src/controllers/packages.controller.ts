@@ -5,21 +5,39 @@ import { PackageStatus } from "@prisma/client";
 import logger from "../utils/logger";
 import { sanitizePagination } from "../utils/pagination";
 
+function normalizeOptionalQueryString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 export async function getPackages(req: AuthRequest, res: Response) {
   try {
-    const { status, zoneId, trackingCode, isArchived } = req.query;
+    const { search, status, zoneId, driverId, trackingCode, dateFrom, dateTo, isArchived } = req.query;
     const { page, limit } = sanitizePagination(req.query);
 
     const result = await PackageService.getAllPackages(req.user!.companyId, {
-      status: typeof status === "string" ? (status as PackageStatus) : undefined,
-      zoneId: typeof zoneId === "string" ? zoneId : undefined,
-      trackingCode: typeof trackingCode === "string" ? trackingCode : undefined,
+      search: normalizeOptionalQueryString(search),
+      status: normalizeOptionalQueryString(status) as PackageStatus | string | undefined,
+      zoneId: normalizeOptionalQueryString(zoneId),
+      driverId: normalizeOptionalQueryString(driverId),
+      trackingCode: normalizeOptionalQueryString(trackingCode),
+      dateFrom: normalizeOptionalQueryString(dateFrom),
+      dateTo: normalizeOptionalQueryString(dateTo),
       page,
       limit,
-      isArchived: isArchived === "true",
+      isArchived: normalizeOptionalQueryString(isArchived) === "true",
     });
     res.json(result);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === "invalid_date_filter" || error?.message === "invalid_date_range") {
+      return res.status(400).json({
+        error:
+          error.message === "invalid_date_range"
+            ? "dateFrom must be earlier than or equal to dateTo"
+            : "Invalid date filter",
+      });
+    }
     logger.error("Error in getPackages:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }

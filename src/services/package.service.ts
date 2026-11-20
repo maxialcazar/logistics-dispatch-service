@@ -5,30 +5,135 @@ import { emitToRoom } from "../websocket";
 import { geocodeAddress } from "../utils/geocoder";
 import { saveBase64Image, deleteUploadedFile } from "../utils/fileUpload";
 import { ZoneService } from "./zone.service";
+import { parseDateBoundary } from "../schemas/package.schema";
 
 export class PackageService {
+  private static resolveDateFilter(
+    value: Date | string | undefined,
+    boundary: "start" | "end"
+  ): Date | undefined {
+    if (value === undefined) return undefined;
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        throw new Error("invalid_date_filter");
+      }
+      return value;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = parseDateBoundary(trimmed, boundary);
+    if (!parsed) {
+      throw new Error("invalid_date_filter");
+    }
+    return parsed;
+  }
+
   static async getAllPackages(companyId: string, filters: {
+    search?: string;
     status?: PackageStatus | string;
     zoneId?: string;
+    driverId?: string;
     trackingCode?: string;
+    dateFrom?: Date | string;
+    dateTo?: Date | string;
     page?: number;
     limit?: number;
     isArchived?: boolean; 
   }) {
-    const { status, zoneId, trackingCode, page = 1, limit = 10, isArchived = false } = filters;
+    const {
+      search,
+      status,
+      zoneId,
+      driverId,
+      trackingCode,
+      dateFrom,
+      dateTo,
+      page = 1,
+      limit = 10,
+      isArchived = false,
+    } = filters;
     const skip = (page - 1) * limit;
 
-    const where: any = { companyId, isArchived }; 
-    if (status) {
-        if (Object.values(PackageStatus).includes(status as PackageStatus)) {
-             where.status = status;
-        } else if (typeof status === 'string' && status.includes(',')) {
-             where.status = { in: status.split(',') };
+    const where: Prisma.PackageWhereInput = { companyId, isArchived };
+    const andConditions: Prisma.PackageWhereInput[] = [];
+
+    const normalizedStatus = typeof status === "string" ? status.trim() : undefined;
+    if (normalizedStatus) {
+      if (Object.values(PackageStatus).includes(normalizedStatus as PackageStatus)) {
+        where.status = normalizedStatus as PackageStatus;
+      } else if (normalizedStatus.includes(",")) {
+        const statuses = Array.from(
+          new Set(
+            normalizedStatus
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s): s is PackageStatus =>
+                Object.values(PackageStatus).includes(s as PackageStatus)
+              )
+          )
+        );
+        if (statuses.length === 1) {
+          where.status = statuses[0];
+        } else if (statuses.length > 1) {
+          where.status = { in: statuses };
         }
+      }
     }
-    if (zoneId) where.zoneId = zoneId;
-    if (trackingCode) {
-      where.trackingCode = { contains: trackingCode, mode: 'insensitive' };
+
+    const normalizedZoneId = zoneId?.trim();
+    if (normalizedZoneId) {
+      where.zoneId = normalizedZoneId;
+    }
+
+    const normalizedTrackingCode = trackingCode?.trim();
+    if (normalizedTrackingCode) {
+      where.trackingCode = { contains: normalizedTrackingCode, mode: "insensitive" };
+    }
+
+    const normalizedSearch = search?.trim();
+    if (normalizedSearch) {
+      andConditions.push({
+        OR: [
+          { trackingCode: { contains: normalizedSearch, mode: "insensitive" } },
+          { recipientName: { contains: normalizedSearch, mode: "insensitive" } },
+          { recipientAddress: { contains: normalizedSearch, mode: "insensitive" } },
+          { recipientPhone: { contains: normalizedSearch, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    const normalizedDriverId = driverId?.trim();
+    if (normalizedDriverId) {
+      andConditions.push({
+        OR: [
+          { driverId: normalizedDriverId },
+          {
+            driverId: null,
+            zone: {
+              driverId: normalizedDriverId,
+              companyId,
+            },
+          },
+        ],
+      });
+    }
+
+    const parsedDateFrom = PackageService.resolveDateFilter(dateFrom, "start");
+    const parsedDateTo = PackageService.resolveDateFilter(dateTo, "end");
+
+    if (parsedDateFrom && parsedDateTo && parsedDateFrom > parsedDateTo) {
+      throw new Error("invalid_date_range");
+    }
+
+    if (parsedDateFrom || parsedDateTo) {
+      where.createdAt = {
+        ...(parsedDateFrom ? { gte: parsedDateFrom } : {}),
+        ...(parsedDateTo ? { lte: parsedDateTo } : {}),
+      };
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [items, total] = await Promise.all([
@@ -42,7 +147,7 @@ export class PackageService {
         },
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       }),
       prisma.package.count({ where }),
     ]);

@@ -14,7 +14,13 @@ import {
 import { auth } from "../middlewares/auth.middleware";
 import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createPackageSchema, updatePackageStatusSchema, assignPackageSchema, getPackagesByDriverSchema } from "../schemas/package.schema";
+import {
+  getPackagesSchema,
+  createPackageSchema,
+  updatePackageStatusSchema,
+  assignPackageSchema,
+  getPackagesByDriverSchema,
+} from "../schemas/package.schema";
 
 const router = Router();
 
@@ -31,27 +37,57 @@ router.use(auth);
  * @openapi
  * /api/packages:
  *   get:
- *     summary: List all packages with filtering and pagination
+ *     summary: List all packages with server-side filtering and pagination
  *     tags: [Packages]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial search across trackingCode, recipientName, recipientAddress, and recipientPhone
+ *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, assigned, in_transit, delivered, cancelled]
- *         description: Filter by package status
+ *         description: Filter by package status (single value or comma-separated list from pending, assigned, in_transit, delivered, cancelled)
  *       - in: query
  *         name: zoneId
  *         schema:
  *           type: string
+ *           format: uuid
  *         description: Filter by zone ID
+ *       - in: query
+ *         name: driverId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by assigned driver ID (direct driverId or zone driver fallback when package driverId is null)
  *       - in: query
  *         name: trackingCode
  *         schema:
  *           type: string
- *         description: Search by tracking code (partial match)
+ *         description: Search by tracking code (partial match, case-insensitive)
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter packages created on or after this date/time (YYYY-MM-DD at 00:00:00.000Z or ISO 8601 datetime)
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter packages created on or before this date/time (YYYY-MM-DD inclusive until 23:59:59.999Z or ISO 8601 datetime)
+ *       - in: query
+ *         name: isArchived
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false"]
+ *           default: "false"
+ *         description: Filter archived packages
  *       - in: query
  *         name: page
  *         schema:
@@ -63,7 +99,7 @@ router.use(auth);
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Number of items per page
+ *         description: Number of items per page (capped at 100)
  *     responses:
  *       200:
  *         description: Success
@@ -87,8 +123,14 @@ router.use(auth);
  *                       type: integer
  *                     totalPages:
  *                       type: integer
+ *       400:
+ *         description: Validation failed for query parameters
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
-router.get("/", requireRole("dispatcher", "admin"), getPackages);
+router.get("/", requireRole("dispatcher", "admin"), validate(getPackagesSchema), getPackages);
 
 /**
  * @openapi
