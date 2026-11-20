@@ -11,7 +11,7 @@ import zonesRouter from "./routes/zones.routes";
 import authRouter from "./routes/auth.routes";
 import usersRouter from "./routes/users.routes";
 import publicRouter from "./routes/public.routes";
-import adminRouter from "./routes/admin.routes";
+import adminRouter, { companyRouter } from "./routes/admin.routes";
 
 // Middlewares
 import { errorHandler } from "./middlewares/error.middleware";
@@ -88,6 +88,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/company", companyRouter);
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));

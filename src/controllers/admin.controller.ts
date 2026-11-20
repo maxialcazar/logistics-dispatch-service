@@ -8,6 +8,77 @@ import {
 } from "../websocket";
 import { AuthRequest } from "../middlewares/auth.middleware";
 
+const COMPANY_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+export async function getCompany(req: AuthRequest, res: Response) {
+  const companyId = req.user?.companyId?.trim();
+  if (!companyId) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: COMPANY_SELECT,
+    });
+
+    if (!company) {
+      return res.status(404).json({ error: "Company not found" });
+    }
+
+    return res.json(company);
+  } catch (err) {
+    logger.error("Failed to fetch company", err);
+    return res.status(500).json({ error: "Failed to fetch company" });
+  }
+}
+
+export async function updateCompany(req: AuthRequest, res: Response) {
+  const companyId = req.user?.companyId?.trim();
+  if (!companyId) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const data: { name?: string; slug?: string } = {};
+  if (typeof req.body?.name === "string") {
+    data.name = req.body.name.trim();
+  }
+  if (typeof req.body?.slug === "string") {
+    data.slug = req.body.slug.trim();
+  }
+
+  if (Object.keys(data).length === 0) {
+    return res
+      .status(400)
+      .json({ error: "At least one updatable field (name or slug) must be provided" });
+  }
+
+  try {
+    const updated = await prisma.company.update({
+      where: { id: companyId },
+      data,
+      select: COMPANY_SELECT,
+    });
+
+    return res.json(updated);
+  } catch (err: any) {
+    if (err?.code === "P2002") {
+      return res.status(409).json({ error: "Company URL/Slug already exists" });
+    }
+    if (err?.code === "P2025") {
+      return res.status(404).json({ error: "Company not found" });
+    }
+    logger.error("Failed to update company", err);
+    return res.status(500).json({ error: "Failed to update company" });
+  }
+}
+
 export async function getSystemMetrics(req: AuthRequest, res: Response) {
   const companyId = req.user?.companyId?.trim();
   if (!companyId) {
