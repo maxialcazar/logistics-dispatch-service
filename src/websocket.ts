@@ -81,7 +81,16 @@ export function initSocket(server: HttpServer) {
 				typeof decoded.username === "string" && decoded.username.trim()
 					? decoded.username.trim()
 					: undefined;
-			const driverIdentifier = decoded.driverId || decoded.userId || decoded.id;
+			const resolvedDriverId =
+				typeof decoded.driverId === "string" && decoded.driverId.trim()
+					? decoded.driverId.trim()
+					: null;
+			const driverIdentifier = resolvedDriverId || decoded.userId || decoded.id;
+
+			socket.data.userId = decoded.userId.trim();
+			socket.data.companyId = companyId;
+			socket.data.role = decoded.role.trim();
+			socket.data.driverId = resolvedDriverId;
 
 			if (decoded.role === "driver") {
 				// Notify company that driver is online
@@ -139,4 +148,31 @@ export function getConnectedClientCount(companyId?: string): number {
 		return getTenantConnectedClientCount(companyId);
 	}
 	return getGlobalConnectedClientCount();
+}
+
+export function isDriverOnline(companyId: string, driverId: string): boolean {
+	if (!io || !companyId?.trim() || !driverId?.trim()) return false;
+	const room = io.sockets?.adapter?.rooms?.get(`company-${companyId.trim()}`);
+	if (!room || room.size === 0) return false;
+
+	for (const socketId of room) {
+		const sock = io.sockets.sockets.get(socketId);
+		if (sock?.data?.role === "driver" && sock?.data?.driverId === driverId) {
+			return true;
+		}
+	}
+	return false;
+}
+
+export function disconnectDriverSockets(companyId: string, driverId: string): void {
+	if (!io || !companyId?.trim() || !driverId?.trim()) return;
+	const room = io.sockets?.adapter?.rooms?.get(`company-${companyId.trim()}`);
+	if (!room || room.size === 0) return;
+
+	for (const socketId of [...room]) {
+		const sock = io.sockets.sockets.get(socketId);
+		if (sock?.data?.role === "driver" && sock?.data?.driverId === driverId) {
+			sock.disconnect(true);
+		}
+	}
 }

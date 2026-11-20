@@ -1,11 +1,28 @@
 import { randomUUID } from "crypto";
-import { Prisma } from "@prisma/client";
+import { PackageStatus, Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import bcrypt from "bcrypt";
 import { redis } from "../redis";
-import { emitToRoom } from "../websocket";
+import { disconnectDriverSockets, emitToRoom, isDriverOnline } from "../websocket";
 import logger from "../utils/logger";
 import { ZoneService } from "./zone.service";
+
+const SAFE_USER_SELECT = {
+  id: true,
+  username: true,
+  role: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+export interface UpdateDriverInput {
+  name?: string;
+  username?: string;
+  password?: string;
+  lat?: number | null;
+  lng?: number | null;
+}
 
 const LOCATION_BUFFER_KEY = "drivers:locations:buffer";
 const LOCATION_SYNC_KEY = "drivers:locations:buffer:sync";
@@ -348,6 +365,420 @@ export class DriverService {
     }
 
     return driver.zones;
+  }
+
+  private static buildDriverPackageWhere(
+    companyId: string,
+    driverId: string,
+    statuses?: PackageStatus[]
+  ): Prisma.PackageWhereInput {
+    return {
+      companyId,
+      isArchived: false,
+      ...(statuses ? { status: { in: statuses } } : {}),
+      OR: [
+        { driverId },
+        {
+          driverId: null,
+          zone: {
+            driverId,
+            companyId,
+          },
+        },
+      ],
+    };
+  }
+
+  /**
+   * Returns complete tenant-scoped driver details including zones, live coordinates,
+   * online status, active assigned/in-transit packages, and package counts without exposing password.
+   */
+  static async getDriverById(companyId: string, driverId: string) {
+    if (!companyId) throw new Error("company_id_required");
+
+    const driver = await prisma.driver.findFirst({
+      where: { id: driverId, companyId },
+      include: {
+        zones: {
+          where: { companyId },
+          orderBy: { createdAt: "desc" },
+        },
+        user: {
+          select: SAFE_USER_SELECT,
+        },
+      },
+    });
+
+    if (!driver) {
+      throw new Error("driver_not_found");
+    }
+
+    const [activePackages, groupedCounts, [driverWithLiveLocation]] = await Promise.all([
+      prisma.package.findMany({
+        where: this.buildDriverPackageWhere(companyId, driverId, ["assigned", "in_transit"]),
+        select: {
+          id: true,
+          trackingCode: true,
+          status: true,
+          recipientName: true,
+          recipientAddress: true,
+          recipientPhone: true,
+          lat: true,
+          lng: true,
+          zoneId: true,
+          driverId: true,
+          estimatedDeliveryAt: true,
+          deliveryWindowStart: true,
+          deliveryWindowEnd: true,
+          createdAt: true,
+          updatedAt: true,
+          zone: {
+            select: {
+              id: true,
+              name: true,
+              isActive: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: "desc" }],
+      }),
+      prisma.package.groupBy({
+        by: ["status"],
+        where: this.buildDriverPackageWhere(companyId, driverId),
+        _count: { _all: true },
+      }),
+      this.overlayLiveLocations([driver]),
+    ]);
+
+    const packageCounts = {
+      pending: 0,
+      assigned: 0,
+      in_transit: 0,
+      delivered: 0,
+      cancelled: 0,
+      total: 0,
+    };
+    for (const row of groupedCounts) {
+      const count = row._count._all;
+      packageCounts[row.status] = count;
+      packageCounts.total += count;
+    }
+
+    return {
+      ...driverWithLiveLocation,
+      isOnline: isDriverOnline(companyId, driverId),
+      packages: activePackages,
+      assignedPackagesCount: activePackages.length,
+      packageCounts,
+    };
+  }
+
+  /**
+   * Updates driver fields (name, coordinates) and linked user credentials (username, password)
+   * atomically within a tenant-scoped transaction, invalidating relevant caches.
+   */
+  static async updateDriver(companyId: string, driverId: string, data: UpdateDriverInput) {
+    if (!companyId) throw new Error("company_id_required");
+
+    const trimmedName = data.name !== undefined ? data.name.trim() : undefined;
+    const trimmedUsername = data.username !== undefined ? data.username.trim() : undefined;
+    const hashedPassword = data.password !== undefined ? await bcrypt.hash(data.password, 10) : undefined;
+
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        const lockedRows = await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id"
+          FROM "Driver"
+          WHERE "id" = ${driverId} AND "companyId" = ${companyId}
+          FOR UPDATE
+        `;
+        if (lockedRows.length === 0) {
+          throw new Error("driver_not_found");
+        }
+
+        const existingDriver = await tx.driver.findFirst({
+          where: { id: driverId, companyId },
+          include: {
+            user: {
+              select: { id: true, username: true },
+            },
+          },
+        });
+        if (!existingDriver) {
+          throw new Error("driver_not_found");
+        }
+
+        if (trimmedUsername !== undefined || hashedPassword !== undefined) {
+          if (!existingDriver.user) {
+            throw new Error("driver_user_not_found");
+          }
+
+          if (trimmedUsername !== undefined && trimmedUsername !== existingDriver.user.username) {
+            const conflictingUser = await tx.user.findUnique({
+              where: { username: trimmedUsername },
+              select: { id: true },
+            });
+            if (conflictingUser && conflictingUser.id !== existingDriver.user.id) {
+              throw new Error("username_exists");
+            }
+          }
+
+          await tx.user.update({
+            where: { id: existingDriver.user.id },
+            data: {
+              ...(trimmedUsername !== undefined ? { username: trimmedUsername } : {}),
+              ...(hashedPassword !== undefined ? { password: hashedPassword } : {}),
+            },
+          });
+        }
+
+        return tx.driver.update({
+          where: { id: driverId },
+          data: {
+            ...(trimmedName !== undefined ? { name: trimmedName } : {}),
+            ...(data.lat !== undefined ? { lat: data.lat } : {}),
+            ...(data.lng !== undefined ? { lng: data.lng } : {}),
+          },
+          include: {
+            zones: {
+              where: { companyId },
+              orderBy: { createdAt: "desc" },
+            },
+            user: {
+              select: SAFE_USER_SELECT,
+            },
+          },
+        });
+      });
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        throw new Error("username_exists");
+      }
+      throw error;
+    }
+
+    if (data.lat !== undefined || data.lng !== undefined) {
+      await redis.hDel(LOCATION_BUFFER_KEY, driverId).catch(() => {});
+    }
+
+    await Promise.all([
+      redis.delPrefix(`drivers:${companyId}:`),
+      redis.delPrefix(`zones:${companyId}:`),
+    ]);
+
+    const [driverWithLiveLocation] = await this.overlayLiveLocations([updated]);
+    const response = {
+      ...driverWithLiveLocation,
+      isOnline: isDriverOnline(companyId, driverId),
+    };
+
+    emitToRoom(`company-${companyId}`, "driver-updated", response);
+    return response;
+  }
+
+  /**
+   * Safely removes a driver inside a transaction: blocks if the driver has active in-transit
+   * packages, reverts assigned packages back to pending with PackageHistory entries, unlinks
+   * and deactivates owned zones, deletes the linked User account and Driver, and clears caches.
+   */
+  static async deleteDriver(companyId: string, driverId: string, userId?: string) {
+    if (!companyId) throw new Error("company_id_required");
+
+    const { driverName, unlinkedZoneIds, revertedPackages } = await prisma.$transaction(async (tx) => {
+      // Lock order: Driver -> Zone -> Package (matches assignZones and PackageService)
+      const driverRows = await tx.$queryRaw<{ id: string; name: string }[]>`
+        SELECT "id", "name"
+        FROM "Driver"
+        WHERE "id" = ${driverId} AND "companyId" = ${companyId}
+        FOR UPDATE
+      `;
+      if (driverRows.length === 0) {
+        throw new Error("driver_not_found");
+      }
+      const driver = driverRows[0];
+
+      const lockedZones = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id"
+        FROM "Zone"
+        WHERE "companyId" = ${companyId} AND "driverId" = ${driverId}
+        ORDER BY "id" ASC
+        FOR UPDATE
+      `;
+      const zoneIds = lockedZones.map((z) => z.id);
+
+      const packageOwnershipCondition =
+        zoneIds.length > 0
+          ? Prisma.sql`("driverId" = ${driverId} OR "zoneId" IN (${Prisma.join(zoneIds)}))`
+          : Prisma.sql`"driverId" = ${driverId}`;
+
+      const lockedPackages = await tx.$queryRaw<
+        {
+          id: string;
+          trackingCode: string;
+          zoneId: string | null;
+          driverId: string | null;
+          status: PackageStatus;
+          isArchived: boolean;
+        }[]
+      >`
+        SELECT "id", "trackingCode", "zoneId", "driverId", "status", "isArchived"
+        FROM "Package"
+        WHERE "companyId" = ${companyId}
+          AND "status" IN ('assigned'::"PackageStatus", 'in_transit'::"PackageStatus")
+          AND ${packageOwnershipCondition}
+        ORDER BY "id" ASC
+        FOR UPDATE
+      `;
+
+      const zoneIdSet = new Set(zoneIds);
+      const hasInTransit = lockedPackages.some(
+        (pkg) =>
+          pkg.status === "in_transit" &&
+          !pkg.isArchived &&
+          (pkg.driverId === driverId ||
+            (pkg.driverId === null && pkg.zoneId !== null && zoneIdSet.has(pkg.zoneId)))
+      );
+      if (hasInTransit) {
+        throw new Error("driver_has_in_transit_packages");
+      }
+
+      const assignedPackages = lockedPackages
+        .filter((pkg) => pkg.status === "assigned")
+        .map(({ id, trackingCode, zoneId }) => ({ id, trackingCode, zoneId }));
+
+      const actorUser = userId
+        ? await tx.user.findFirst({
+            where: {
+              id: userId,
+              companyId,
+              OR: [{ driverId: null }, { driverId: { not: driverId } }],
+            },
+            select: { id: true },
+          })
+        : null;
+
+      const resolvedActorUserId =
+        actorUser?.id ??
+        (
+          await tx.user.findFirst({
+            where: {
+              companyId,
+              OR: [{ driverId: null }, { driverId: { not: driverId } }],
+            },
+            orderBy: { createdAt: "asc" },
+            select: { id: true },
+          })
+        )?.id;
+
+      if (assignedPackages.length > 0) {
+        await tx.package.updateMany({
+          where: {
+            id: { in: assignedPackages.map((p) => p.id) },
+            companyId,
+            status: "assigned",
+          },
+          data: {
+            status: "pending",
+            driverId: null,
+            updatedAt: new Date(),
+          },
+        });
+
+        if (resolvedActorUserId) {
+          await tx.packageHistory.createMany({
+            data: assignedPackages.map((pkg) => ({
+              packageId: pkg.id,
+              status: "pending",
+              userId: resolvedActorUserId,
+              notes: `Reverted to pending: driver ${driver.name} deleted`,
+            })),
+          });
+        }
+      }
+
+      if (zoneIds.length > 0) {
+        // Zones without an assigned driver cannot remain active
+        await tx.zone.updateMany({
+          where: {
+            id: { in: zoneIds },
+            companyId,
+          },
+          data: {
+            driverId: null,
+            isActive: false,
+          },
+        });
+      }
+
+      await tx.user.deleteMany({
+        where: {
+          driverId,
+          companyId,
+        },
+      });
+
+      await tx.driver.delete({
+        where: { id: driverId },
+      });
+
+      return {
+        driverName: driver.name,
+        unlinkedZoneIds: zoneIds,
+        revertedPackages: assignedPackages,
+      };
+    });
+
+    await Promise.all([
+      redis.hDel(LOCATION_BUFFER_KEY, driverId).catch(() => {}),
+      redis.delPrefix(`drivers:${companyId}:`),
+      redis.delPrefix(`zones:${companyId}:`),
+      redis.delPrefix(`packages:${companyId}:`),
+    ]);
+
+    disconnectDriverSockets(companyId, driverId);
+
+    if (unlinkedZoneIds.length > 0) {
+      emitToRoom(`company-${companyId}`, "zones-reassigned", {
+        driverId,
+        zoneIds: [],
+        unlinkedZoneIds,
+      });
+    }
+
+    if (revertedPackages.length > 0) {
+      ZoneService.emitPackageTransitionEvents(
+        companyId,
+        revertedPackages,
+        "pending",
+        "Conductor Dado de Baja",
+        `${revertedPackages.length} paquete(s) revertido(s) a pendiente al dar de baja a ${driverName}`
+      );
+    } else {
+      emitToRoom(`company-${companyId}`, "business-event", {
+        id: `evt-${Date.now()}-${randomUUID()}`,
+        type: "SYSTEM",
+        title: "Conductor Dado de Baja",
+        description: `Se dio de baja al conductor ${driverName}`,
+        timestamp: Date.now(),
+      });
+    }
+
+    const revertedPackageIds = revertedPackages.map((p) => p.id);
+    emitToRoom(`company-${companyId}`, "driver-deleted", {
+      driverId,
+      name: driverName,
+      unlinkedZoneIds,
+      revertedPackageIds,
+    });
+
+    return {
+      ok: true,
+      deletedDriverId: driverId,
+      unlinkedZoneIds,
+      revertedPackageIds,
+      revertedCount: revertedPackages.length,
+    };
   }
 
   static async updateLocation(driverId: string, companyId: string, lat: number, lng: number) {
