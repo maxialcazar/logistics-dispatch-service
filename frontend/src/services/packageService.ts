@@ -132,6 +132,7 @@ export interface CreatePackageInput {
   addressFloor?: string;
   addressCity?: string;
   addressZip?: string;
+  addressCountry?: string;
   zoneId: string;
   lat?: number | null;
   lng?: number | null;
