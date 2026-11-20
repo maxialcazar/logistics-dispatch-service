@@ -2,6 +2,16 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
+import { ApiError, apiClient } from '../services/apiClient';
+
+interface LoginResponse {
+  token: string;
+  user?: {
+    id: string;
+    username: string;
+    role: string;
+  };
+}
 
 export function Login() {
   const [username, setUsername] = useState('adminA');
@@ -18,24 +28,24 @@ export function Login() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Credenciales inválidas');
-      }
-
-      const data = await response.json();
+      const data = await apiClient.post<LoginResponse>(
+        '/api/auth/login',
+        { username, password },
+        { skipAuthHandler: true, token: null }
+      );
       const user = data.user || { id: '1', username, role: 'dispatcher' };
       
       login(data.token, user);
       navigate('/');
       
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Credenciales inválidas');
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Credenciales inválidas');
+      }
     } finally {
       setLoading(false);
     }
