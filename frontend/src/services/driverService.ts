@@ -1,3 +1,5 @@
+import { apiClient } from './apiClient';
+
 export interface AppDriver {
   id: string;
   name: string;
@@ -23,52 +25,25 @@ interface PaginatedResponse<T> {
 
 export const driverService = {
   async getDrivers(token: string, page = 1, limit = 100): Promise<PaginatedResponse<AppDriver>> {
-    const res = await fetch(`/api/drivers?page=${page}&limit=${limit}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const query = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
     });
-    if (!res.ok) throw new Error('Failed to fetch drivers');
-    return res.json();
+    return apiClient.get<PaginatedResponse<AppDriver>>(`/api/drivers?${query.toString()}`, { token });
   },
 
-  async createDriver(token: string, data: { name: string; username: string; password: string }): Promise<AppDriver> {
-    const res = await fetch('/api/drivers', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` 
-      },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to create driver');
-    }
-    return res.json();
+  async createDriver(
+    token: string,
+    data: { name: string; username: string; password: string }
+  ): Promise<AppDriver> {
+    return apiClient.post<AppDriver>('/api/drivers', data, { token });
   },
 
   async assignZones(token: string, driverId: string, zoneIds: string[]) {
-    const res = await fetch(`/api/drivers/${driverId}/zones`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` 
-      },
-      body: JSON.stringify({ zoneIds })
-    });
-    if (!res.ok) throw new Error('Failed to assign zones');
-    return res.json();
+    return apiClient.post(`/api/drivers/${encodeURIComponent(driverId)}/zones`, { zoneIds }, { token });
   },
 
   async updateLocation(token: string, lat: number, lng: number) {
-    const res = await fetch('/api/drivers/location', {
-      method: 'PATCH',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` 
-      },
-      body: JSON.stringify({ lat, lng })
-    });
-    if (!res.ok) throw new Error('Failed to update location');
-    return res.json();
-  }
+    return apiClient.patch('/api/drivers/location', { lat, lng }, { token });
+  },
 };

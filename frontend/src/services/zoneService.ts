@@ -1,3 +1,4 @@
+import { apiClient } from './apiClient';
 
 export interface Zone {
   id: string;
@@ -21,64 +22,34 @@ interface PaginatedResponse<T> {
 
 export const zoneService = {
   async getZones(token: string, page = 1, limit = 100): Promise<PaginatedResponse<Zone>> {
-    const res = await fetch(`/api/zones?page=${page}&limit=${limit}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const query = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
     });
-    if (!res.ok) throw new Error('Failed to fetch zones');
-    return res.json();
+    return apiClient.get<PaginatedResponse<Zone>>(`/api/zones?${query.toString()}`, { token });
   },
 
-  async updateZone(token: string, id: string, data: { isActive?: boolean; driverId?: string; description?: string }): Promise<Zone> {
-    const res = await fetch(`/api/zones/${id}`, {
-      method: 'PATCH',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` 
-      },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update zone');
-    }
-    return res.json();
+  async updateZone(
+    token: string,
+    id: string,
+    data: { isActive?: boolean; driverId?: string; description?: string }
+  ): Promise<Zone> {
+    return apiClient.patch<Zone>(`/api/zones/${encodeURIComponent(id)}`, data, { token });
   },
 
-  async createZone(token: string, data: { name: string; coordinates: { lat: number; lng: number }[]; description?: string }): Promise<Zone> {
-    const res = await fetch('/api/zones', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}` 
-      },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to create zone');
-    }
-    return res.json();
+  async createZone(
+    token: string,
+    data: { name: string; coordinates: { lat: number; lng: number }[]; description?: string }
+  ): Promise<Zone> {
+    return apiClient.post<Zone>('/api/zones', data, { token });
   },
 
-  async deleteZone(token: string, id: string) {
-      const res = await fetch(`/api/zones/${id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed to delete zone');
-      return true;
+  async deleteZone(token: string, id: string): Promise<boolean> {
+    await apiClient.delete(`/api/zones/${encodeURIComponent(id)}`, { token });
+    return true;
   },
 
   async setAllZonesStatus(token: string, isActive: boolean) {
-      const res = await fetch('/api/zones/bulk-status', {
-          method: 'POST',
-          headers: { 
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}` 
-          },
-          body: JSON.stringify({ isActive })
-      });
-      if (!res.ok) throw new Error('Failed to update all zones');
-      return res.json();
-  }
+    return apiClient.post('/api/zones/bulk-status', { isActive }, { token });
+  },
 };
