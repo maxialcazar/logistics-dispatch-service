@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { closeDatabase, prisma } from "../src/prisma";
 
 async function main() {
-  const password = await bcrypt.hash("1234", 10);
+  const password = await bcrypt.hash("123456", 10);
 
   const company = await prisma.company.upsert({
     where: { slug: "logistica-central" },
@@ -16,7 +16,7 @@ async function main() {
 
   await prisma.user.upsert({
     where: { username: "admin" },
-    update: {},
+    update: { password, companyId: company.id },
     create: {
       username: "admin",
       password,
