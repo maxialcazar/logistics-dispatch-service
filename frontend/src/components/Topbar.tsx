@@ -6,6 +6,11 @@ import { useSocket } from '../context/SocketContext';
 import { useNotifications } from '../context/NotificationContext';
 import { CreateDispatcherModal } from './CreateDispatcherModal';
 import { NotificationsPopover } from './NotificationsPopover';
+import { CommandPalette } from './CommandPalette';
+
+const IS_APPLE_PLATFORM =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPod|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
 
 export function Topbar() {
   const { user } = useAuth();
@@ -13,8 +18,30 @@ export function Topbar() {
   const { unreadCount } = useNotifications();
   const [showDispatcherModal, setShowDispatcherModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (
+        !event.repeat &&
+        !event.altKey &&
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === 'k'
+      ) {
+        event.preventDefault();
+        if (showDispatcherModal) return;
+        setShowNotifications(false);
+        setShowCommandPalette((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, [showDispatcherModal]);
 
   useEffect(() => {
     if (!showNotifications) return;
@@ -44,14 +71,37 @@ export function Topbar() {
 
   return (
     <header className="flex-shrink-0 z-30 flex h-16 w-full items-center justify-between gap-2 sm:gap-4 border-b border-slate-800/80 bg-slate-900/90 px-4 sm:px-6 backdrop-blur-md">
-      <div className="flex flex-1 min-w-0 max-w-xs items-center gap-2.5 text-slate-400">
-        <Search className="h-4 w-4 flex-shrink-0 text-slate-400" aria-hidden="true" />
-        <input
-          type="text"
-          placeholder="Ctrl+K para buscar conductores o paquetes..."
-          className="bg-transparent text-sm focus:outline-none w-full min-w-0 placeholder-slate-500 text-slate-200 focus:text-white"
-        />
-      </div>
+      <button
+        type="button"
+        onClick={() => {
+          setShowNotifications(false);
+          setShowCommandPalette(true);
+        }}
+        aria-label={`Abrir paleta de comandos (${IS_APPLE_PLATFORM ? 'Cmd+K' : 'Ctrl+K'})`}
+        aria-haspopup="dialog"
+        aria-expanded={showCommandPalette}
+        aria-keyshortcuts="Control+k Meta+k"
+        className="group flex flex-1 min-w-0 max-w-md h-10 sm:h-9 items-center justify-between gap-2 rounded-lg border border-slate-800/80 bg-slate-950/90 px-3 text-left transition-colors hover:border-slate-700 hover:bg-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <Search
+            className="h-4 w-4 flex-shrink-0 text-slate-400 transition-colors group-hover:text-brand-400"
+            aria-hidden="true"
+          />
+          <span className="sm:hidden truncate text-xs text-slate-400 group-hover:text-slate-200">
+            Buscar...
+          </span>
+          <span className="hidden sm:inline truncate text-sm text-slate-400 group-hover:text-slate-200">
+            Buscar paquetes, conductores o zonas...
+          </span>
+        </span>
+        <kbd
+          aria-hidden="true"
+          className="hidden sm:inline-flex flex-shrink-0 items-center rounded border border-slate-800/80 bg-slate-900 px-1.5 py-0.5 font-mono text-[11px] font-medium text-slate-300"
+        >
+          {IS_APPLE_PLATFORM ? '⌘K' : 'Ctrl+K'}
+        </kbd>
+      </button>
 
       <div className="flex items-center gap-2.5 sm:gap-4 flex-shrink-0">
         <div
@@ -121,6 +171,11 @@ export function Topbar() {
           </button>
         )}
       </div>
+
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+      />
 
       {isAdmin && (
         <CreateDispatcherModal

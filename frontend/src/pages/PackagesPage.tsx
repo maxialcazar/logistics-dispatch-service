@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Package, MapPin, Phone, Calendar, Search, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package as IPackage } from '../services/packageService';
 import clsx from 'clsx';
@@ -13,14 +13,17 @@ import { PACKAGE_STATUS_ORDER, getPackageStatusToken } from '../utils/packageSta
 export function PackagesPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSearch = (searchParams.get('search') ?? '').trim().slice(0, 200);
+  const [syncedUrlSearch, setSyncedUrlSearch] = useState(urlSearch);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [packages, setPackages] = useState<IPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>(''); // '' = all
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState(urlSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(urlSearch);
   
   // New State for Archiving
   const [showArchived, setShowArchived] = useState(false);
@@ -30,6 +33,26 @@ export function PackagesPage() {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestIdRef = useRef(0);
+
+  if (urlSearch !== syncedUrlSearch) {
+    setSyncedUrlSearch(urlSearch);
+    setSearchTerm(urlSearch);
+    setDebouncedSearch(urlSearch);
+    setPage(1);
+    setSelectedIds(new Set());
+    if (urlSearch) {
+      setActiveFilter('');
+      setShowArchived(false);
+    }
+  }
+
+  const clearUrlSearchParam = () => {
+    if (!searchParams.has('search')) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('search');
+    setSyncedUrlSearch('');
+    setSearchParams(next, { replace: true });
+  };
 
   // Confirmation Modal State
   const [confirmState, setConfirmState] = useState<{
@@ -356,12 +379,16 @@ export function PackagesPage() {
               placeholder="Buscar por tracking, destinatario, dirección o teléfono..."
               className="w-full bg-slate-950 border border-slate-800/80 rounded-lg pl-9 pr-8 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors text-sm"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => {
+                clearUrlSearchParam();
+                setSearchTerm(e.target.value);
+              }}
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => {
+                  clearUrlSearchParam();
                   setSearchTerm('');
                   setDebouncedSearch('');
                   setPage(1);

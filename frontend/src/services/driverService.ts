@@ -24,12 +24,20 @@ interface PaginatedResponse<T> {
 }
 
 export const driverService = {
-  async getDrivers(token: string, page = 1, limit = 100): Promise<PaginatedResponse<AppDriver>> {
+  async getDrivers(
+    token: string,
+    page = 1,
+    limit = 100,
+    signal?: AbortSignal
+  ): Promise<PaginatedResponse<AppDriver>> {
     const query = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
-    return apiClient.get<PaginatedResponse<AppDriver>>(`/api/drivers?${query.toString()}`, { token });
+    return apiClient.get<PaginatedResponse<AppDriver>>(`/api/drivers?${query.toString()}`, {
+      token,
+      signal,
+    });
   },
 
   async createDriver(

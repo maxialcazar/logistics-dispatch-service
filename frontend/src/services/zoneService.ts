@@ -21,12 +21,20 @@ interface PaginatedResponse<T> {
 }
 
 export const zoneService = {
-  async getZones(token: string, page = 1, limit = 100): Promise<PaginatedResponse<Zone>> {
+  async getZones(
+    token: string,
+    page = 1,
+    limit = 100,
+    signal?: AbortSignal
+  ): Promise<PaginatedResponse<Zone>> {
     const query = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
-    return apiClient.get<PaginatedResponse<Zone>>(`/api/zones?${query.toString()}`, { token });
+    return apiClient.get<PaginatedResponse<Zone>>(`/api/zones?${query.toString()}`, {
+      token,
+      signal,
+    });
   },
 
   async updateZone(
