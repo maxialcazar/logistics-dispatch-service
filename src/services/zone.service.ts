@@ -98,9 +98,10 @@ export class ZoneService {
       toStatus: PackageStatus;
       actorUserId?: string;
       notes: string;
+      driverIdByZone?: Map<string, string | null>;
     }
   ): Promise<{ id: string; trackingCode: string; zoneId: string | null }[]> {
-    const { companyId, zoneIds, fromStatus, toStatus, actorUserId, notes } = params;
+    const { companyId, zoneIds, fromStatus, toStatus, actorUserId, notes, driverIdByZone } = params;
     const uniqueZoneIds = [...new Set(zoneIds)].sort();
     if (uniqueZoneIds.length === 0) return [];
 
@@ -118,14 +119,109 @@ export class ZoneService {
 
     if (lockedPackages.length === 0) return [];
 
+    const now = new Date();
+    if (toStatus === "assigned") {
+      let resolvedDriverMap = driverIdByZone;
+      if (!resolvedDriverMap) {
+        const zones = await tx.zone.findMany({
+          where: { id: { in: uniqueZoneIds }, companyId },
+          select: { id: true, driverId: true },
+        });
+        resolvedDriverMap = new Map(zones.map((z) => [z.id, z.driverId]));
+      }
+
+      const packageIdsByDriver = new Map<string | null, string[]>();
+      for (const pkg of lockedPackages) {
+        const targetDriverId = pkg.zoneId ? (resolvedDriverMap.get(pkg.zoneId) ?? null) : null;
+        const list = packageIdsByDriver.get(targetDriverId) ?? [];
+        list.push(pkg.id);
+        packageIdsByDriver.set(targetDriverId, list);
+      }
+
+      for (const [targetDriverId, pkgIds] of packageIdsByDriver.entries()) {
+        await tx.package.updateMany({
+          where: {
+            id: { in: pkgIds },
+            companyId,
+            status: fromStatus,
+          },
+          data: {
+            status: toStatus,
+            driverId: targetDriverId,
+            updatedAt: now,
+          },
+        });
+      }
+    } else {
+      await tx.package.updateMany({
+        where: {
+          id: { in: lockedPackages.map((p) => p.id) },
+          companyId,
+          status: fromStatus,
+        },
+        data: {
+          status: toStatus,
+          ...(toStatus === "pending" ? { driverId: null } : {}),
+          updatedAt: now,
+        },
+      });
+    }
+
+    if (actorUserId) {
+      await tx.packageHistory.createMany({
+        data: lockedPackages.map((p) => ({
+          packageId: p.id,
+          status: toStatus,
+          userId: actorUserId,
+          notes,
+        })),
+      });
+    }
+
+    return lockedPackages;
+  }
+
+  /**
+   * Reassigns only `assigned` packages in active zones whose driver changed,
+   * leaving `in_transit`, `delivered`, and `cancelled` packages' driverId history untouched.
+   */
+  static async reassignAssignedPackagesInZonesTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      companyId: string;
+      zoneIds: string[];
+      driverId: string;
+      actorUserId?: string;
+      notes: string;
+    }
+  ): Promise<{ id: string; trackingCode: string; zoneId: string | null }[]> {
+    const { companyId, zoneIds, driverId, actorUserId, notes } = params;
+    const uniqueZoneIds = [...new Set(zoneIds)].sort();
+    if (uniqueZoneIds.length === 0) return [];
+
+    const lockedPackages = await tx.$queryRaw<
+      { id: string; trackingCode: string; zoneId: string | null }[]
+    >`
+      SELECT "id", "trackingCode", "zoneId"
+      FROM "Package"
+      WHERE "companyId" = ${companyId}
+        AND "zoneId" IN (${Prisma.join(uniqueZoneIds)})
+        AND "status" = 'assigned'::"PackageStatus"
+        AND "driverId" IS DISTINCT FROM ${driverId}
+      ORDER BY "id" ASC
+      FOR UPDATE
+    `;
+
+    if (lockedPackages.length === 0) return [];
+
     await tx.package.updateMany({
       where: {
         id: { in: lockedPackages.map((p) => p.id) },
         companyId,
-        status: fromStatus,
+        status: "assigned",
       },
       data: {
-        status: toStatus,
+        driverId,
         updatedAt: new Date(),
       },
     });
@@ -134,7 +230,7 @@ export class ZoneService {
       await tx.packageHistory.createMany({
         data: lockedPackages.map((p) => ({
           packageId: p.id,
-          status: toStatus,
+          status: "assigned",
           userId: actorUserId,
           notes,
         })),
@@ -185,7 +281,7 @@ export class ZoneService {
     if (!companyId) throw new Error("company_id_required");
 
     try {
-      const { zone, transitionedPackages, newPackageStatus } = await prisma.$transaction(async (tx) => {
+      const { zone, transitionedPackages, reassignedPackages, newPackageStatus } = await prisma.$transaction(async (tx) => {
         const lockedRows = await tx.$queryRaw<{ id: string }[]>`
           SELECT id FROM "Zone" WHERE id = ${zoneId} AND "companyId" = ${companyId} FOR UPDATE
         `;
@@ -232,6 +328,7 @@ export class ZoneService {
         const actorUserId = await ZoneService.resolveActorUserIdTx(tx, companyId, userId);
 
         let packages: { id: string; trackingCode: string; zoneId: string | null }[] = [];
+        let reassigned: { id: string; trackingCode: string; zoneId: string | null }[] = [];
         let targetStatus: PackageStatus = "pending";
 
         const shouldRevertAssigned =
@@ -242,6 +339,7 @@ export class ZoneService {
 
         if (updated.isActive && updated.driverId) {
           targetStatus = "assigned";
+          const driverIdByZone = new Map([[zoneId, updated.driverId]]);
           packages = await ZoneService.transitionPackagesInZonesTx(tx, {
             companyId,
             zoneIds: [zoneId],
@@ -249,7 +347,17 @@ export class ZoneService {
             toStatus: "assigned",
             actorUserId,
             notes: `Assigned automatically via active zone ${updated.name}`,
+            driverIdByZone,
           });
+          if (currentZone.driverId !== updated.driverId) {
+            reassigned = await ZoneService.reassignAssignedPackagesInZonesTx(tx, {
+              companyId,
+              zoneIds: [zoneId],
+              driverId: updated.driverId,
+              actorUserId,
+              notes: `Reassigned to driver ${updated.driver?.name ?? updated.driverId} via active zone ${updated.name}`,
+            });
+          }
         } else if (shouldRevertAssigned) {
           targetStatus = "pending";
           packages = await ZoneService.transitionPackagesInZonesTx(tx, {
@@ -265,6 +373,7 @@ export class ZoneService {
         return {
           zone: updated,
           transitionedPackages: packages,
+          reassignedPackages: reassigned,
           newPackageStatus: targetStatus,
         };
       });
@@ -284,6 +393,14 @@ export class ZoneService {
           ? `${transitionedPackages.length} paquete(s) asignado(s) automáticamente en la zona ${zone.name}`
           : `${transitionedPackages.length} paquete(s) revertido(s) a pendiente en la zona ${zone.name}`
       );
+
+      for (const pkg of reassignedPackages) {
+        emitToRoom(`company-${companyId}`, "package-assigned", {
+          packageId: pkg.id,
+          driverId: zone.driverId,
+          driverName: zone.driver?.name,
+        });
+      }
 
       return zone;
     } catch (error: any) {
@@ -308,15 +425,15 @@ export class ZoneService {
 
     const { count, transitionedPackages } = await prisma.$transaction(async (tx) => {
       const lockedZones = isActive
-        ? await tx.$queryRaw<{ id: string }[]>`
-            SELECT "id"
+        ? await tx.$queryRaw<{ id: string; driverId: string | null }[]>`
+            SELECT "id", "driverId"
             FROM "Zone"
             WHERE "companyId" = ${companyId} AND "driverId" IS NOT NULL
             ORDER BY "id" ASC
             FOR UPDATE
           `
-        : await tx.$queryRaw<{ id: string }[]>`
-            SELECT "id"
+        : await tx.$queryRaw<{ id: string; driverId: string | null }[]>`
+            SELECT "id", "driverId"
             FROM "Zone"
             WHERE "companyId" = ${companyId}
             ORDER BY "id" ASC
@@ -338,6 +455,10 @@ export class ZoneService {
 
       const actorUserId = await ZoneService.resolveActorUserIdTx(tx, companyId, userId);
 
+      const driverIdByZone = isActive
+        ? new Map(lockedZones.map((z) => [z.id, z.driverId]))
+        : undefined;
+
       const packages = await ZoneService.transitionPackagesInZonesTx(tx, {
         companyId,
         zoneIds: targetZoneIds,
@@ -347,6 +468,7 @@ export class ZoneService {
         notes: isActive
           ? "Assigned automatically via bulk zone activation"
           : "Reverted to pending via bulk zone deactivation",
+        driverIdByZone,
       });
 
       return { count: result.count, transitionedPackages: packages };

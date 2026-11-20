@@ -37,7 +37,8 @@ export class PackageService {
         include: { 
           zone: {
             include: { driver: true }
-          } 
+          },
+          driver: true,
         },
         skip,
         take: limit,
@@ -224,6 +225,7 @@ export class PackageService {
 
     const pkg = await prisma.$transaction(async (tx) => {
       let initialStatus: PackageStatus = "pending";
+      let initialDriverId: string | null = null;
       let targetZoneId = resolvedZoneId;
 
       if (targetZoneId) {
@@ -240,6 +242,7 @@ export class PackageService {
           targetZoneId = undefined;
         } else if (zoneRows[0].isActive && zoneRows[0].driverId) {
           initialStatus = "assigned";
+          initialDriverId = zoneRows[0].driverId;
         }
       }
 
@@ -263,6 +266,7 @@ export class PackageService {
           lng: finalLng,
           estimatedDeliveryAt,
           zoneId: targetZoneId,
+          driverId: initialDriverId,
           companyId,
           status: initialStatus,
           history: {
@@ -278,7 +282,8 @@ export class PackageService {
         include: { 
           zone: {
             include: { driver: true }
-          }
+          },
+          driver: true,
         },
       });
     });
@@ -298,6 +303,17 @@ export class PackageService {
   }
 
 // ... 
+
+  private static isDriverAuthorizedForPackage(
+    pkg: { driverId: string | null; zone?: { driverId: string | null } | null },
+    userDriverId: string | null
+  ): boolean {
+    if (!userDriverId) return false;
+    if (pkg.driverId !== null) {
+      return pkg.driverId === userDriverId;
+    }
+    return pkg.zone?.driverId === userDriverId;
+  }
 
   private static async lockPackageWithZoneTx(
     tx: Prisma.TransactionClient,
@@ -324,9 +340,9 @@ export class PackageService {
     }
 
     const pkgRows = await tx.$queryRaw<
-      { id: string; trackingCode: string; status: PackageStatus; zoneId: string | null }[]
+      { id: string; trackingCode: string; status: PackageStatus; zoneId: string | null; driverId: string | null }[]
     >`
-      SELECT "id", "trackingCode", "status", "zoneId"
+      SELECT "id", "trackingCode", "status", "zoneId", "driverId"
       FROM "Package"
       WHERE "id" = ${packageId} AND "companyId" = ${companyId}
       FOR UPDATE
@@ -369,7 +385,7 @@ export class PackageService {
     if (!pkg) throw new Error("package_not_found");
 
     if (userRole === "driver") {
-        if (!pkg.zone || pkg.zone.driverId !== userDriverId) {
+        if (!PackageService.isDriverAuthorizedForPackage(pkg, userDriverId)) {
              throw new Error("not_authorized_for_zone");
         }
     }
@@ -418,7 +434,7 @@ export class PackageService {
         const { lockedPkg, lockedZone } = await PackageService.lockPackageWithZoneTx(tx, companyId, packageId);
 
         if (userRole === "driver") {
-          if (!lockedZone || lockedZone.driverId !== userDriverId) {
+          if (!PackageService.isDriverAuthorizedForPackage({ driverId: lockedPkg.driverId, zone: lockedZone }, userDriverId)) {
             throw new Error("not_authorized_for_zone");
           }
         }
@@ -428,6 +444,17 @@ export class PackageService {
           throw new Error(`invalid_transition:${lockedPkg.status}:${status}`);
         }
 
+        let resolvedDriverIdUpdate: string | undefined;
+        if (
+          lockedPkg.driverId === null &&
+          (status === "assigned" || status === "in_transit" || status === "delivered")
+        ) {
+          const candidateDriverId = userRole === "driver" ? userDriverId : (lockedZone?.driverId ?? null);
+          if (candidateDriverId) {
+            resolvedDriverIdUpdate = candidateDriverId;
+          }
+        }
+
         const updated = await tx.package.update({
           where: { id: packageId },
           data: { 
@@ -435,6 +462,7 @@ export class PackageService {
             lat,
             lng,
             estimatedDeliveryAt,
+            ...(resolvedDriverIdUpdate ? { driverId: resolvedDriverIdUpdate } : {}),
             ...(signatureUrl && { signatureUrl }),
             ...(photoUrl && { photoUrl }),
           }
@@ -518,11 +546,12 @@ export class PackageService {
 
       const saved = await tx.package.update({
         where: { id: packageId },
-        data: { status: "assigned" },
+        data: { status: "assigned", driverId },
         include: { 
           zone: {
             include: { driver: true }
-          }
+          },
+          driver: true,
         },
       });
 
@@ -566,12 +595,18 @@ export class PackageService {
       where: {
         companyId,
         isArchived: false,
-        zone: {
-          driverId: driverId,
-          companyId,
-        },
+        OR: [
+          { driverId },
+          {
+            driverId: null,
+            zone: {
+              driverId,
+              companyId,
+            },
+          },
+        ],
       },
-      include: { zone: true },
+      include: { zone: true, driver: true },
     });
   }
 
@@ -593,7 +628,7 @@ export class PackageService {
     if (!pkg) throw new Error("package_not_found");
 
     if (options?.userRole === "driver") {
-      if (!pkg.zone || !options.userDriverId || pkg.zone.driverId !== options.userDriverId) {
+      if (!PackageService.isDriverAuthorizedForPackage(pkg, options.userDriverId ?? null)) {
         throw new Error("not_authorized_for_zone");
       }
     }
@@ -624,7 +659,7 @@ export class PackageService {
       estimatedDeliveryAt: true,
       createdAt: true,
       updatedAt: true,
-      ...(includeZone ? { zone: { select: { driverId: true } } } : {}),
+      ...(includeZone ? { driverId: true, zone: { select: { driverId: true } } } : {}),
     };
 
     if (normalizedSlug) {
@@ -676,8 +711,8 @@ export class PackageService {
     const pkg = await this.findPublicPackage(trackingCode, companySlug, true);
     if (!pkg) return null;
 
-    const zone = (pkg as { zone?: { driverId: string | null } | null }).zone;
-    return { driverId: zone?.driverId ?? null };
+    const typedPkg = pkg as { driverId?: string | null; zone?: { driverId: string | null } | null };
+    return { driverId: typedPkg.driverId ?? typedPkg.zone?.driverId ?? null };
   }
 
   static async getDashboardStats(companyId: string) {

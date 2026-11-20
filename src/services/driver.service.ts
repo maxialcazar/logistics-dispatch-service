@@ -147,30 +147,38 @@ export class DriverService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const driver = await prisma.driver.create({
-      data: {
-        name,
-        companyId,
-        user: {
-          create: {
-            username,
-            password: hashedPassword,
-            role: "driver",
-            companyId,
+    let driver;
+    try {
+      driver = await prisma.driver.create({
+        data: {
+          name,
+          companyId,
+          user: {
+            create: {
+              username,
+              password: hashedPassword,
+              role: "driver",
+              companyId,
+            },
           },
         },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            role: true,
-            companyId: true,
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              role: true,
+              companyId: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        throw new Error("username_exists");
+      }
+      throw error;
+    }
 
     await redis.delPrefix(`drivers:${companyId}:`); 
     return driver;
@@ -181,7 +189,7 @@ export class DriverService {
 
     const uniqueZoneIds = [...new Set(zoneIds)];
 
-    const { revertedPackages, activatedPackages, driverName } = await prisma.$transaction(async (tx) => {
+    const { revertedPackages, activatedPackages, reassignedPackages, driverName } = await prisma.$transaction(async (tx) => {
       // Lock driver row (FOR NO KEY UPDATE) so concurrent zone assignments for the same driver serialize cleanly
       const driverRows = await tx.$queryRaw<{ id: string; name: string }[]>`
         SELECT "id", "name"
@@ -258,6 +266,7 @@ export class DriverService {
 
       // 4. Asignar paquetes pending en zonas activas asignadas al conductor
       const zonesToActivate = assignedZones.filter((z) => z.isActive).map((z) => z.id);
+      const driverIdByZone = new Map(zonesToActivate.map((zId) => [zId, driverId]));
       const activated = await ZoneService.transitionPackagesInZonesTx(tx, {
         companyId,
         zoneIds: zonesToActivate,
@@ -265,11 +274,25 @@ export class DriverService {
         toStatus: "assigned",
         actorUserId,
         notes: `Assigned automatically via active zone assigned to driver ${driver.name}`,
+        driverIdByZone,
+      });
+
+      // 5. Actualizar driverId solo en paquetes aun en estado assigned de zonas activas transferidas desde otro conductor
+      const reassignedActiveZones = assignedZones
+        .filter((z) => z.isActive && z.driverId !== driverId)
+        .map((z) => z.id);
+      const reassigned = await ZoneService.reassignAssignedPackagesInZonesTx(tx, {
+        companyId,
+        zoneIds: reassignedActiveZones,
+        driverId,
+        actorUserId,
+        notes: `Reassigned to driver ${driver.name} via active zone transfer`,
       });
 
       return {
         revertedPackages: reverted,
         activatedPackages: activated,
+        reassignedPackages: reassigned,
         driverName: driver.name,
       };
     });
@@ -281,6 +304,14 @@ export class DriverService {
     ]);
 
     emitToRoom(`company-${companyId}`, "zones-reassigned", { driverId, zoneIds: uniqueZoneIds });
+
+    for (const pkg of reassignedPackages) {
+      emitToRoom(`company-${companyId}`, "package-assigned", {
+        packageId: pkg.id,
+        driverId,
+        driverName,
+      });
+    }
 
     ZoneService.emitPackageTransitionEvents(
       companyId,
