@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { normalizeUserRecord } from '../utils/authSession';
-import { useNavigate } from 'react-router-dom';
-import { Lock, Truck, User } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Lock, MapPin, Truck, User } from 'lucide-react';
 import { ApiError, apiClient } from '../services/apiClient';
 
 interface RawCompanyResponse {
@@ -134,6 +134,20 @@ export function Login() {
             {loading ? 'Autenticando...' : 'Ingresar'}
           </button>
         </form>
+
+        <div className="border-t border-slate-800/80 pt-6 space-y-3">
+          <p className="text-xs text-slate-400 text-center">
+            ¿Esperas un paquete? Consulta tu entrega sin iniciar sesión
+          </p>
+          <Link
+            to="/tracking"
+            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700/80 bg-slate-950/80 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white hover:border-brand-500/50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-colors"
+          >
+            <MapPin className="h-4 w-4 text-brand-400 shrink-0" />
+            <span>Rastrear envío</span>
+            <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
+          </Link>
+        </div>
       </div>
     </div>
   );

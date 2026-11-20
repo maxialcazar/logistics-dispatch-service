@@ -1,16 +1,25 @@
 
-import { useEffect, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Popup, Marker, Polygon, useMap } from 'react-leaflet';
+import { useMemo } from 'react';
+import { MapContainer, TileLayer, Popup, Marker, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useSocket } from '../context/SocketContext';
 import { Truck, Navigation, User, Package } from 'lucide-react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import {
     PACKAGE_STATUS_ORDER,
     PACKAGE_STATUS_TOKENS,
     getPackageStatusToken,
 } from '../utils/packageStatus';
+import {
+    DARK_TILE_ATTRIBUTION,
+    DARK_TILE_URL,
+    DEFAULT_MAP_CENTER,
+    createDriverIcon,
+    createPackageIcon,
+    toValidLatLng,
+    toValidNonZeroLatLng,
+} from '../utils/mapUtils';
+import { MapFitBounds } from './MapFitBounds';
 import { SmoothMarker } from './SmoothMarker';
 
 // --- Types ---
@@ -58,91 +67,6 @@ export interface MapZone {
     driver?: { id: string; name: string } | null;
 }
 
-const DEFAULT_MAP_CENTER: [number, number] = [-31.416, -64.186]; // Córdoba, Argentina (vista inicial por defecto)
-
-const toValidLatLng = (lat: unknown, lng: unknown): [number, number] | null => {
-    if (
-        typeof lat === 'number' &&
-        typeof lng === 'number' &&
-        Number.isFinite(lat) &&
-        Number.isFinite(lng) &&
-        lat >= -90 &&
-        lat <= 90 &&
-        lng >= -180 &&
-        lng <= 180
-    ) {
-        return [lat, lng];
-    }
-    return null;
-};
-
-// --- Icons Generator ---
-const createDriverIcon = (status: 'online' | 'offline'): L.DivIcon => {
-    const isOnline = status === 'online';
-
-    const colorBg = isOnline ? 'bg-emerald-600' : 'bg-slate-600';
-    const colorPulse = isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500 hidden';
-
-    const html = renderToStaticMarkup(
-        <div className="relative flex items-center justify-center w-8 h-8">
-            <div className={`absolute inset-0 rounded-full opacity-25 ${colorPulse}`} />
-            <div className={`relative z-10 p-1.5 rounded-full border-2 border-white shadow-lg ${colorBg}`}>
-                <Truck color="white" size={14} />
-            </div>
-        </div>
-    );
-
-    return L.divIcon({
-        className: 'custom-driver-icon-v2',
-        html,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16],
-    });
-};
-
-const createPackageIcon = (hexColor: string): L.DivIcon => {
-    const html = renderToStaticMarkup(
-        <div className="relative flex items-center justify-center w-6 h-6">
-            <div className="absolute inset-0 rounded-sm opacity-45" style={{ backgroundColor: hexColor }} />
-            <div
-                className="relative z-10 p-1 rounded-sm border border-white/90 shadow-sm"
-                style={{ backgroundColor: hexColor }}
-            >
-                <Package color="white" size={12} />
-            </div>
-        </div>
-    );
-
-    return L.divIcon({
-        className: 'custom-package-icon',
-        html,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, -12],
-    });
-};
-
-// --- Helper Component to Fit Bounds ---
-function FitBounds({ points, signature }: { points: [number, number][]; signature: string }) {
-    const map = useMap();
-    const lastFitSignatureRef = useRef<string>('');
-
-    useEffect(() => {
-        if (points.length === 0) {
-            lastFitSignatureRef.current = '';
-            return;
-        }
-        if (lastFitSignatureRef.current === signature) return;
-
-        lastFitSignatureRef.current = signature;
-        const bounds = L.latLngBounds(points);
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15, animate: true });
-    }, [map, points, signature]);
-
-    return null;
-}
-
 // --- Main Component ---
 interface LiveMapProps {
     visibleDriverIds?: string[];
@@ -184,10 +108,7 @@ export function LiveMap({
 
     // Filter valid packages (must have finite non-zero coordinates)
     const validPackages = useMemo(() => {
-        return packages.filter((p) => {
-            const coords = toValidLatLng(p.lat, p.lng);
-            return coords !== null && !(coords[0] === 0 && coords[1] === 0);
-        });
+        return packages.filter((p) => toValidNonZeroLatLng(p.lat, p.lng) !== null);
     }, [packages]);
 
     // Filter active zones with valid polygon vertices (>= 3 points in [lat, lng] order)
@@ -220,8 +141,8 @@ export function LiveMap({
 
         // 1. Populate with DB Drivers (Offline/Static)
         allDrivers.forEach((d) => {
-            const coords = toValidLatLng(d.lat, d.lng);
-            if (coords && !(coords[0] === 0 && coords[1] === 0)) {
+            const coords = toValidNonZeroLatLng(d.lat, d.lng);
+            if (coords) {
                 markersMap.set(d.id, {
                     driverId: d.id,
                     lat: coords[0],
@@ -235,8 +156,8 @@ export function LiveMap({
 
         // 2. Override with Real-Time Socket Data (Online)
         locations.forEach((loc, driverId) => {
-            const coords = toValidLatLng(loc.lat, loc.lng);
-            if (!coords || (coords[0] === 0 && coords[1] === 0)) {
+            const coords = toValidNonZeroLatLng(loc.lat, loc.lng);
+            if (!coords) {
                 return;
             }
             markersMap.set(driverId, {
@@ -289,11 +210,11 @@ export function LiveMap({
             >
                 {/* Dark Mode Tiles */}
                 <TileLayer
-                    attribution='&copy; CARTO'
-                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    attribution={DARK_TILE_ATTRIBUTION}
+                    url={DARK_TILE_URL}
                 />
 
-                <FitBounds points={boundsPoints} signature={boundsSignature} />
+                <MapFitBounds points={boundsPoints} signature={boundsSignature} />
 
                 {/* Active Zone Polygons (rendered below markers) */}
                 {activeZonePolygons.map((zone) => (

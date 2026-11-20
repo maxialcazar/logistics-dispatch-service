@@ -8,12 +8,16 @@ import {
   MapPin,
   Package,
   Radio,
+  RefreshCw,
   Search,
   Truck,
   XCircle,
 } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
 import { StatusBadge } from '../components/StatusBadge';
+import { TrackingMap, type TrackingStreamState } from '../components/TrackingMap';
+import { buildApiUrl } from '../services/apiClient';
+import { toValidNonZeroLatLng } from '../utils/mapUtils';
 import { getPackageStatusToken, type PackageStatus } from '../utils/packageStatus';
 
 export type TrackingStatus = PackageStatus;
@@ -34,8 +38,6 @@ interface LiveLocationUpdate {
   lng: number;
   timestamp: string | number;
 }
-
-type StreamState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'closed';
 
 const TIMELINE_STEPS: Array<{
   key: Exclude<TrackingStatus, 'cancelled'>;
@@ -64,12 +66,8 @@ function parseLiveLocationEvent(raw: string): LiveLocationUpdate | null {
     if (typeof parsed !== 'object' || parsed === null) return null;
 
     const record = parsed as Record<string, unknown>;
-    if (
-      typeof record.lat !== 'number' ||
-      !Number.isFinite(record.lat) ||
-      typeof record.lng !== 'number' ||
-      !Number.isFinite(record.lng)
-    ) {
+    const validCoords = toValidNonZeroLatLng(record.lat, record.lng);
+    if (!validCoords) {
       return null;
     }
 
@@ -79,8 +77,8 @@ function parseLiveLocationEvent(raw: string): LiveLocationUpdate | null {
         : Date.now();
 
     return {
-      lat: record.lat,
-      lng: record.lng,
+      lat: validCoords[0],
+      lng: validCoords[1],
       timestamp,
     };
   } catch {
@@ -99,7 +97,7 @@ export function TrackingPage() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [trackingData, setTrackingData] = useState<PublicTrackingData | null>(null);
   const [liveLocation, setLiveLocation] = useState<LiveLocationUpdate | null>(null);
-  const [streamState, setStreamState] = useState<StreamState>('idle');
+  const [streamState, setStreamState] = useState<TrackingStreamState>('idle');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,11 +107,12 @@ export function TrackingPage() {
 
     setLoading(true);
     setError(null);
+    setTrackingData(null);
     setLiveLocation(null);
 
     try {
       const response = await fetch(
-        `/api/public/track/${encodeURIComponent(cleanCode)}`,
+        buildApiUrl(`/api/public/track/${encodeURIComponent(cleanCode)}`),
         { signal }
       );
 
@@ -169,21 +168,24 @@ export function TrackingPage() {
   const activeStatus = trackingData?.status;
 
   useEffect(() => {
-    if (!activeTrackingCode || activeStatus !== 'in_transit') {
+    if (loading || error || !activeTrackingCode || activeStatus !== 'in_transit') {
       setStreamState('idle');
       return;
     }
 
+    let isActive = true;
     setStreamState('connecting');
     const eventSource = new EventSource(
-      `/api/public/track/${encodeURIComponent(activeTrackingCode)}/stream`
+      buildApiUrl(`/api/public/track/${encodeURIComponent(activeTrackingCode)}/stream`)
     );
 
     eventSource.onopen = () => {
+      if (!isActive) return;
       setStreamState('connected');
     };
 
     eventSource.onmessage = (event) => {
+      if (!isActive) return;
       const update = parseLiveLocationEvent(event.data);
       if (update) {
         setStreamState('connected');
@@ -192,6 +194,7 @@ export function TrackingPage() {
     };
 
     eventSource.onerror = () => {
+      if (!isActive) return;
       if (eventSource.readyState === EventSource.CLOSED) {
         setStreamState('closed');
         eventSource.close();
@@ -201,15 +204,22 @@ export function TrackingPage() {
     };
 
     return () => {
+      isActive = false;
       eventSource.close();
       setStreamState('idle');
     };
-  }, [activeTrackingCode, activeStatus, refreshTick]);
+  }, [loading, error, activeTrackingCode, activeStatus]);
+
+  const handleRetryStream = useCallback(() => {
+    setRefreshTick((prev) => prev + 1);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = queryInput.trim();
     if (!trimmed) {
+      setTrackingData(null);
+      setLiveLocation(null);
       setError('Ingresa un código de seguimiento válido para realizar la búsqueda.');
       return;
     }
@@ -227,33 +237,33 @@ export function TrackingPage() {
       : -1;
 
   const statusToken = trackingData ? getPackageStatusToken(trackingData.status) : null;
-  const currentLat = liveLocation?.lat ?? trackingData?.lat ?? null;
-  const currentLng = liveLocation?.lng ?? trackingData?.lng ?? null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur">
-        <div className="mx-auto max-w-4xl px-4 py-4 flex items-center justify-between gap-4">
+        <div className="mx-auto max-w-4xl px-4 py-4 flex items-center justify-between gap-3">
           <Link
             to="/tracking"
-            className="flex items-center gap-3 text-white hover:opacity-90 transition-opacity"
+            className="flex items-center gap-3 text-white hover:opacity-90 transition-opacity min-w-0"
           >
-            <div className="h-10 w-10 rounded-xl bg-brand-500/10 border border-brand-500/25 flex items-center justify-center">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-brand-500/10 border border-brand-500/25 flex items-center justify-center">
               <Package className="h-5 w-5 text-brand-400" />
             </div>
-            <div>
-              <span className="block text-base font-bold tracking-tight">
+            <div className="min-w-0">
+              <span className="block text-base font-bold tracking-tight truncate">
                 Logistics <span className="text-brand-400">OS</span>
               </span>
-              <span className="block text-xs text-slate-400">Seguimiento Público de Envíos</span>
+              <span className="block text-xs text-slate-400 truncate">
+                Seguimiento Público de Envíos
+              </span>
             </div>
           </Link>
 
           <Link
             to="/login"
-            className="inline-flex min-h-[48px] items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+            className="inline-flex min-h-[48px] shrink-0 whitespace-nowrap items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-900 px-3 sm:px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
           >
-            <LogIn className="h-4 w-4 text-slate-400" />
+            <LogIn className="h-4 w-4 text-slate-400 shrink-0" />
             <span>Portal Operadores</span>
           </Link>
         </div>
@@ -454,67 +464,104 @@ export function TrackingPage() {
               </div>
             </div>
 
-            {trackingData.status === 'in_transit' && (
-              <div
-                className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                  streamState === 'closed'
-                    ? 'border-amber-500/30 bg-amber-500/10'
-                    : 'border-brand-500/25 bg-brand-500/5'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Radio
-                    className={`h-5 w-5 shrink-0 ${
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  {trackingData.status === 'in_transit'
+                    ? 'Mapa de seguimiento en vivo'
+                    : 'Ubicación de entrega'}
+                </h3>
+                {trackingData.status === 'in_transit' && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
                       streamState === 'closed'
-                        ? 'text-amber-400'
-                        : 'text-brand-400 animate-pulse'
+                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                        : streamState === 'reconnecting' || streamState === 'connecting'
+                          ? 'border-slate-700/80 bg-slate-800/70 text-slate-300'
+                          : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                     }`}
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-white">
+                  >
+                    <Radio
+                      className={`h-3.5 w-3.5 ${
+                        streamState === 'closed' ? 'text-amber-400' : 'animate-pulse'
+                      }`}
+                    />
+                    <span>
                       {streamState === 'closed'
-                        ? 'Transmisión en vivo interrumpida'
+                        ? 'Desconectado'
                         : streamState === 'reconnecting'
-                          ? 'Reconectando monitoreo en vivo...'
+                          ? 'Reconectando'
                           : streamState === 'connecting'
-                            ? 'Conectando monitoreo en vivo...'
-                            : 'Monitoreo en vivo activo'}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {streamState === 'closed' ? (
-                        'La conexión en tiempo real se cerró. Pulsa "Rastrear Envío" para reintentar.'
-                      ) : currentLat !== null && currentLng !== null ? (
-                        <>
-                          Última posición reportada:{' '}
-                          <span className="font-mono tabular-nums text-slate-200">
-                            {currentLat.toFixed(5)}, {currentLng.toFixed(5)}
-                          </span>
-                        </>
-                      ) : (
-                        'Esperando señal GPS de la unidad asignada...'
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <span
-                  className={`text-xs font-medium self-start sm:self-center ${
+                            ? 'Conectando'
+                            : 'Tiempo real (SSE)'}
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              <TrackingMap
+                trackingCode={trackingData.trackingCode}
+                status={trackingData.status}
+                recipientAddress={trackingData.recipientAddress}
+                deliveryLat={trackingData.lat}
+                deliveryLng={trackingData.lng}
+                driverLat={liveLocation?.lat ?? null}
+                driverLng={liveLocation?.lng ?? null}
+                driverUpdatedLabel={formatDateTime(
+                  liveLocation?.timestamp ?? trackingData.updatedAt
+                )}
+                streamState={streamState}
+                onRetryStream={handleRetryStream}
+              />
+
+              {trackingData.status === 'in_transit' && (
+                <div
+                  className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     streamState === 'closed'
-                      ? 'text-amber-300'
-                      : streamState === 'reconnecting' || streamState === 'connecting'
-                        ? 'text-slate-300'
-                        : 'text-brand-300'
+                      ? 'border-amber-500/30 bg-amber-500/10'
+                      : 'border-brand-500/25 bg-brand-500/5'
                   }`}
                 >
-                  {streamState === 'closed'
-                    ? 'Desconectado'
-                    : streamState === 'reconnecting'
-                      ? 'Reconectando'
-                      : streamState === 'connecting'
-                        ? 'Conectando'
-                        : 'Tiempo real (SSE)'}
-                </span>
-              </div>
-            )}
+                  <div className="flex items-center gap-3">
+                    <Radio
+                      className={`h-5 w-5 shrink-0 ${
+                        streamState === 'closed'
+                          ? 'text-amber-400'
+                          : 'text-brand-400 animate-pulse'
+                      }`}
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {streamState === 'closed'
+                          ? 'Transmisión en vivo interrumpida'
+                          : streamState === 'reconnecting'
+                            ? 'Reconectando monitoreo en vivo...'
+                            : streamState === 'connecting'
+                              ? 'Conectando monitoreo en vivo...'
+                              : 'Monitoreo en vivo activo'}
+                      </p>
+                      <p className="text-xs text-slate-400 tabular-nums">
+                        {streamState === 'closed'
+                          ? 'La conexión en tiempo real se cerró. Puedes reintentar la conexión para seguir el recorrido.'
+                          : liveLocation
+                            ? `Posición GPS de la unidad sincronizada · Actualizado: ${formatDateTime(liveLocation.timestamp)}`
+                            : 'Esperando señal GPS de la unidad asignada para mostrarla en el mapa...'}
+                      </p>
+                    </div>
+                  </div>
+                  {streamState === 'closed' && (
+                    <button
+                      type="button"
+                      onClick={handleRetryStream}
+                      className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3.5 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/25 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>Reintentar</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </section>
         )}
       </main>
