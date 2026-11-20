@@ -259,7 +259,7 @@ export function DriverDashboard() {
   const [podPackage, setPodPackage] = useState<Package | null>(null);
 
   // Enable Real-Time GPS Tracking
-  useDriverLocation();
+  const { getCurrentLocation } = useDriverLocation();
 
   const fetchSeqRef = useRef(0);
   const isMountedRef = useRef(true);
@@ -365,47 +365,70 @@ export function DriverDashboard() {
     setPodPackage(null);
     setUpdating(pkg.id);
 
+    const loadingToast = toast.loading(
+      isOnline ? 'Registrando entrega...' : 'Guardando entrega localmente...'
+    );
+
+    const coords = await getCurrentLocation();
+    const lat = coords?.lat;
+    const lng = coords?.lng;
+    const currentlyOnline =
+      isOnline && (typeof navigator === 'undefined' || navigator.onLine);
+
     // OFFLINE PATH — queue for later sync
-    if (!isOnline) {
+    if (!currentlyOnline) {
       try {
         await enqueueStatusUpdate({
           packageId: pkg.id,
           trackingCode: pkg.trackingCode,
           status: 'delivered',
+          lat,
+          lng,
           signature: signature ?? undefined,
           photo: photo ?? undefined,
         });
         const updatedCount = (await refreshPendingCount()) ?? pendingCount + 1;
         toast.warning('Sin conexión — entrega guardada localmente', {
+          id: loadingToast,
           description: `Se sincronizará cuando vuelva la red (${updatedCount} pendiente/s)`,
           duration: 5000,
         });
-        setPackages(prev => prev.filter(p => p.id !== pkg.id));
+        if (isMountedRef.current) {
+          setPackages(prev => prev.filter(p => p.id !== pkg.id));
+        }
       } catch (err) {
         console.error('Error al guardar entrega offline:', err);
-        toast.error('No se pudo guardar la entrega offline');
+        toast.error('No se pudo guardar la entrega offline', { id: loadingToast });
       } finally {
-        setUpdating(null);
+        if (isMountedRef.current) {
+          setUpdating(null);
+        }
       }
       return;
     }
 
     // ONLINE PATH
-    const loadingToast = toast.loading('Registrando entrega...');
     try {
       await packageService.updateStatus(
-        token, pkg.id, 'delivered',
-        undefined, undefined,
+        token,
+        pkg.id,
+        'delivered',
+        lat,
+        lng,
         signature ?? undefined,
         photo ?? undefined
       );
       toast.success('✅ Entrega confirmada con evidencia', { id: loadingToast });
-      setPackages(prev => prev.filter(p => p.id !== pkg.id));
+      if (isMountedRef.current) {
+        setPackages(prev => prev.filter(p => p.id !== pkg.id));
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al confirmar entrega';
       toast.error(msg, { id: loadingToast });
     } finally {
-      setUpdating(null);
+      if (isMountedRef.current) {
+        setUpdating(null);
+      }
     }
   };
 
