@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Package, MapPin, Phone, Calendar, Search } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Plus, Package, MapPin, Phone, Calendar, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package as IPackage } from '../services/packageService';
@@ -18,9 +18,16 @@ export function PackagesPage() {
   const [error, setError] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>(''); // '' = all
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   
   // New State for Archiving
   const [showArchived, setShowArchived] = useState(false);
+
+  // Explicit row selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   // Confirmation Modal State
   const [confirmState, setConfirmState] = useState<{
@@ -42,35 +49,119 @@ export function PackagesPage() {
   });
 
   useEffect(() => {
-    fetchPackages();
-  }, [token, activeFilter, page, showArchived]);
+    const normalized = searchTerm.trim().slice(0, 200);
+    if (normalized === debouncedSearch) return;
 
-  const fetchPackages = async () => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(normalized);
+      setPage(1);
+      setSelectedIds(new Set());
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchTerm, debouncedSearch]);
+
+  const fetchPackages = useCallback(async () => {
     if (!token) return;
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const requestId = ++requestIdRef.current;
     setLoading(true);
+    setError('');
+
     try {
-      const res = await packageService.getPackages(token, activeFilter || undefined, page, 10, showArchived);
+      const res = await packageService.getPackages(
+        token,
+        activeFilter || undefined,
+        page,
+        10,
+        showArchived,
+        debouncedSearch || undefined,
+        controller.signal
+      );
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return;
+
+      const nextTotalPages = Math.max(1, res.meta.totalPages || 1);
+      setTotalPages(nextTotalPages);
+
+      if (page > nextTotalPages) {
+        setPage(nextTotalPages);
+        setSelectedIds(new Set());
+        return;
+      }
+
       setPackages(res.items);
-      setTotalPages(res.meta.totalPages);
-    } catch (err: any) {
-        console.error(err);
-        setError("Error al cargar paquetes");
+    } catch (err: unknown) {
+      if (
+        controller.signal.aborted ||
+        requestId !== requestIdRef.current ||
+        (err instanceof Error && err.name === 'AbortError')
+      ) {
+        return;
+      }
+      console.error(err);
+      setError('Error al cargar paquetes');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
+  }, [token, activeFilter, page, showArchived, debouncedSearch]);
+
+  useEffect(() => {
+    void fetchPackages();
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, [fetchPackages]);
+
+  const visibleIds = packages.map(p => p.id);
+  const selectedVisibleCount = visibleIds.filter(id => selectedIds.has(id)).length;
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected;
+    }
+  }, [someVisibleSelected, loading, packages.length]);
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleIds.forEach(id => next.delete(id));
+      } else {
+        visibleIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
   };
 
   const handleArchiveClick = () => {
       if (!token) return;
-      const toArchive = packages
-        .filter(p => p.status === 'delivered' || p.status === 'cancelled')
-        .map(p => p.id);
+      const selectedPackages = packages.filter(p => selectedIds.has(p.id));
 
-      if (toArchive.length === 0) {
+      if (selectedPackages.length === 0) {
           setConfirmState({
               isOpen: true,
-              title: 'Información',
-              message: 'No hay paquetes finalizados (Entregados o Cancelados) para limpiar en esta página.',
+              title: 'Sin selección',
+              message: 'Selecciona al menos un paquete finalizado (Entregado o Cancelado) para archivar.',
               variant: 'info',
               isLoading: false,
               hideCancel: true,
@@ -80,22 +171,52 @@ export function PackagesPage() {
           return;
       }
 
+      const toArchive = selectedPackages
+        .filter(p => p.status === 'delivered' || p.status === 'cancelled')
+        .map(p => p.id);
+
+      if (toArchive.length === 0) {
+          setConfirmState({
+              isOpen: true,
+              title: 'Información',
+              message: 'Ninguno de los paquetes seleccionados está finalizado (Entregado o Cancelado) para archivar.',
+              variant: 'info',
+              isLoading: false,
+              hideCancel: true,
+              confirmText: 'Entendido',
+              action: async () => {} // Just close
+          });
+          return;
+      }
+
+      const skippedCount = selectedPackages.length - toArchive.length;
+      const skippedNote =
+        skippedCount > 0
+          ? ` (${skippedCount} ${skippedCount === 1 ? 'paquete activo seleccionado será omitido' : 'paquetes activos seleccionados serán omitidos'})`
+          : '';
+
       setConfirmState({
           isOpen: true,
-          title: 'Limpiar Paquetes Finalizados',
-          message: `Se moverán ${toArchive.length} paquetes (Entregados o Cancelados) a la sección de Expirados. ¿Deseas continuar?`,
+          title: 'Archivar Paquetes Seleccionados',
+          message: `Se moverán ${toArchive.length} ${toArchive.length === 1 ? 'paquete finalizado' : 'paquetes finalizados'} (Entregados o Cancelados) a la sección de Expirados${skippedNote}. ¿Deseas continuar?`,
           variant: 'warning',
           isLoading: false,
+          hideCancel: false,
+          confirmText: 'Archivar',
           action: async () => {
               setConfirmState(prev => ({ ...prev, isLoading: true }));
               try {
                   await packageService.archivePackages(token, toArchive);
-                  await fetchPackages(); 
-                  setConfirmState(prev => ({ ...prev, isOpen: false }));
+                  setSelectedIds(new Set());
+                  toast.success(
+                    `${toArchive.length} ${toArchive.length === 1 ? 'paquete archivado' : 'paquetes archivados'}`
+                  );
+                  await fetchPackages();
+                  setConfirmState(prev => ({ ...prev, isLoading: false, isOpen: false }));
               } catch (e) {
                   console.error(e);
                   setConfirmState(prev => ({ ...prev, isLoading: false, isOpen: false }));
-                  toast.error("Error al archivar paquetes"); 
+                  toast.error("Error al archivar paquetes");
               }
           }
       });
@@ -103,25 +224,45 @@ export function PackagesPage() {
 
   const handleDeleteClick = () => {
       if (!token) return;
-      const toDelete = packages.map(p => p.id);
+      const toDelete = packages
+        .filter(p => selectedIds.has(p.id))
+        .map(p => p.id);
 
-      if (toDelete.length === 0) return;
+      if (toDelete.length === 0) {
+          setConfirmState({
+              isOpen: true,
+              title: 'Sin selección',
+              message: 'Selecciona al menos un paquete archivado para eliminar.',
+              variant: 'info',
+              isLoading: false,
+              hideCancel: true,
+              confirmText: 'Entendido',
+              action: async () => {}
+          });
+          return;
+      }
 
       setConfirmState({
           isOpen: true,
-          title: 'Eliminar Historial Definitivamente',
-          message: `Estás a punto de ELIMINAR PERMANENTEMENTE ${toDelete.length} paquetes archivados de esta página. Esta acción no se puede deshacer.`,
+          title: 'Eliminar Paquetes Seleccionados',
+          message: `Estás a punto de ELIMINAR PERMANENTEMENTE ${toDelete.length} ${toDelete.length === 1 ? 'paquete archivado seleccionado' : 'paquetes archivados seleccionados'}. Esta acción no se puede deshacer.`,
           variant: 'danger',
           isLoading: false,
+          hideCancel: false,
+          confirmText: 'Eliminar Seleccionados',
           action: async () => {
               setConfirmState(prev => ({ ...prev, isLoading: true }));
               try {
                   await packageService.deletePackages(token, toDelete);
+                  setSelectedIds(new Set());
+                  toast.success(
+                    `${toDelete.length} ${toDelete.length === 1 ? 'paquete eliminado' : 'paquetes eliminados'}`
+                  );
                   await fetchPackages();
-                  setConfirmState(prev => ({ ...prev, isOpen: false }));
+                  setConfirmState(prev => ({ ...prev, isLoading: false, isOpen: false }));
               } catch (e) {
                   console.error(e);
-                  setConfirmState(prev => ({ ...prev, isLoading: false })); 
+                  setConfirmState(prev => ({ ...prev, isLoading: false, isOpen: false }));
                   toast.error("Error al eliminar paquetes");
               }
           }
@@ -139,17 +280,8 @@ export function PackagesPage() {
     }
   };
 
-  // Note: filtering is client-side on the current PAGE only for now.
-  // Ideally, search should trigger server-side query, but sticking to simple client filter for visual consistency with current code.
-  const filteredPackages = packages.filter(p => 
-    p.trackingCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.recipientName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
     <div className="space-y-6">
-      {/* ... (Header and Toolbar remain same) ... */}
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -161,9 +293,14 @@ export function PackagesPage() {
               {showArchived ? 'Historial de envíos archivados.' : 'Administra todos los envíos y su estado actual.'}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
             <button
-                onClick={() => { setShowArchived(!showArchived); setPage(1); }}
+                type="button"
+                onClick={() => {
+                  setShowArchived(!showArchived);
+                  setPage(1);
+                  setSelectedIds(new Set());
+                }}
                 className={clsx(
                     "flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-all border",
                     showArchived 
@@ -177,13 +314,20 @@ export function PackagesPage() {
             {!showArchived && (
                 <>
                     <button
+                        type="button"
                         onClick={handleArchiveClick}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:bg-orange-900/40 hover:text-orange-400 hover:border-orange-500/50 text-slate-300 font-medium rounded-lg transition-all"
-                        title="Mover paquetes entregados/cancelados a Expirados"
+                        disabled={selectedIds.size === 0 || loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 hover:bg-orange-900/40 hover:text-orange-400 hover:border-orange-500/50 text-slate-300 font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-slate-300 disabled:hover:border-slate-700"
+                        title={
+                          selectedIds.size === 0
+                            ? 'Selecciona paquetes finalizados para archivar'
+                            : 'Mover paquetes finalizados seleccionados a Expirados'
+                        }
                     >
-                        Limpiar Finalizados
+                        Archivar Seleccionados ({selectedIds.size})
                     </button>
                     <button
+                        type="button"
                         onClick={() => navigate('/packages/new')}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/30 transition-all"
                     >
@@ -195,10 +339,17 @@ export function PackagesPage() {
 
             {showArchived && (
                  <button
+                    type="button"
                     onClick={handleDeleteClick}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600/20 border border-red-500/50 hover:bg-red-600 hover:text-white text-red-500 font-medium rounded-lg transition-all"
+                    disabled={selectedIds.size === 0 || loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600/20 border border-red-500/50 hover:bg-red-600 hover:text-white text-red-500 font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600/20 disabled:hover:text-red-500"
+                    title={
+                      selectedIds.size === 0
+                        ? 'Selecciona paquetes archivados para eliminar'
+                        : 'Eliminar permanentemente los paquetes seleccionados'
+                    }
                 >
-                    Vaciar Lista
+                    Eliminar Seleccionados ({selectedIds.size})
                 </button>
             )}
         </div>
@@ -210,17 +361,38 @@ export function PackagesPage() {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
             <input 
               type="text"
-              placeholder="Buscar por tracking o nombre..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-all text-sm"
+              maxLength={200}
+              placeholder="Buscar por tracking, destinatario, dirección o teléfono..."
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-8 py-2 text-white focus:outline-none focus:border-blue-500 transition-all text-sm"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setDebouncedSearch('');
+                  setPage(1);
+                  setSelectedIds(new Set());
+                }}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
          </div>
          <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
              {['', 'pending', 'assigned', 'in_transit', 'delivered', 'cancelled'].map((status) => (
                <button
+                 type="button"
                  key={status}
-                 onClick={() => { setActiveFilter(status); setPage(1); }} // Reset page on filter change
+                 onClick={() => {
+                   setActiveFilter(status);
+                   setPage(1);
+                   setSelectedIds(new Set());
+                 }}
                  className={clsx(
                    "px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border",
                    activeFilter === status 
@@ -234,6 +406,21 @@ export function PackagesPage() {
          </div>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-blue-950/30 border border-blue-800/50 rounded-xl text-sm">
+          <span className="text-blue-200 font-medium">
+            {selectedIds.size} {selectedIds.size === 1 ? 'paquete seleccionado' : 'paquetes seleccionados'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs text-slate-300 hover:text-white underline underline-offset-2 transition-colors"
+          >
+            Limpiar selección
+          </button>
+        </div>
+      )}
+
       {/* Data Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         {loading ? (
@@ -244,10 +431,14 @@ export function PackagesPage() {
              </div>
         ) : error ? (
              <div className="p-12 text-center text-red-400">Error: {error}</div>
-        ) : filteredPackages.length === 0 ? (
+        ) : packages.length === 0 ? (
              <div className="p-12 text-center text-slate-400 flex flex-col items-center">
                 <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p className="mb-4">No se encontraron paquetes.</p>
+                <p className="mb-4">
+                  {debouncedSearch
+                    ? `No se encontraron paquetes para "${debouncedSearch}".`
+                    : 'No se encontraron paquetes.'}
+                </p>
                 <button
                     type="button"
                     onClick={() => navigate('/packages/new')}
@@ -262,6 +453,17 @@ export function PackagesPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/50 text-xs text-slate-400 uppercase tracking-wider">
+                  <th className="w-12 px-4 py-4">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={handleToggleSelectAll}
+                      disabled={packages.length === 0 || loading}
+                      aria-label="Seleccionar todos los paquetes de la página actual"
+                      className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                  </th>
                   <th className="px-6 py-4 font-semibold">Tracking</th>
                   <th className="px-6 py-4 font-semibold">Destinatario</th>
                   <th className="px-6 py-4 font-semibold">Ubicación</th>
@@ -270,8 +472,25 @@ export function PackagesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-sm">
-                {filteredPackages.map((pkg) => (
-                  <tr key={pkg.id} className="hover:bg-slate-800/30 transition-colors group">
+                {packages.map((pkg) => {
+                  const isSelected = selectedIds.has(pkg.id);
+                  return (
+                  <tr
+                    key={pkg.id}
+                    className={clsx(
+                      "hover:bg-slate-800/30 transition-colors group",
+                      isSelected && "bg-blue-950/20"
+                    )}
+                  >
+                    <td className="w-12 px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectRow(pkg.id)}
+                        aria-label={`Seleccionar paquete ${pkg.trackingCode}`}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="font-mono text-white font-medium">{pkg.trackingCode}</div>
                       <div className="text-xs text-slate-500">ID: {pkg.id.substring(0,8)}...</div>
@@ -303,7 +522,8 @@ export function PackagesPage() {
                        </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -315,14 +535,22 @@ export function PackagesPage() {
            <div>Página {page} de {totalPages}</div>
            <div className="flex gap-2">
                <button 
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                type="button"
+                onClick={() => {
+                  setPage(p => Math.max(1, p - 1));
+                  setSelectedIds(new Set());
+                }}
                 disabled={page === 1 || loading}
                 className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
                >
                  Anterior
                </button>
                <button 
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                type="button"
+                onClick={() => {
+                  setPage(p => Math.min(totalPages, p + 1));
+                  setSelectedIds(new Set());
+                }}
                 disabled={page === totalPages || loading}
                 className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white" 
                >
@@ -334,13 +562,18 @@ export function PackagesPage() {
        {/* Confirm Dialog */}
        <ConfirmDialog
            isOpen={confirmState.isOpen}
-           onClose={() => setConfirmState(prev => ({ ...prev, isOpen: false }))}
+           onClose={() => {
+             if (!confirmState.isLoading) {
+               setConfirmState(prev => ({ ...prev, isOpen: false }));
+             }
+           }}
            onConfirm={confirmState.action}
            title={confirmState.title}
            message={confirmState.message}
            variant={confirmState.variant}
            isLoading={confirmState.isLoading}
-           confirmText={confirmState.variant === 'danger' ? 'Borrar Todo' : 'Confirmar'}
+           confirmText={confirmState.confirmText}
+           hideCancel={confirmState.hideCancel}
        />
     </div>
   );

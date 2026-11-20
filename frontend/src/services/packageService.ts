@@ -82,15 +82,24 @@ export const packageService = {
     status?: string,
     page = 1,
     limit = 10,
-    isArchived = false
+    isArchived = false,
+    search?: string,
+    signal?: AbortSignal
   ): Promise<PaginatedResponse<Package>> {
     const query = new URLSearchParams();
     if (status) query.append('status', status);
     query.append('page', page.toString());
     query.append('limit', limit.toString());
     query.append('isArchived', isArchived.toString());
+    const normalizedSearch = search?.trim();
+    if (normalizedSearch) {
+      query.append('search', normalizedSearch.slice(0, 200));
+    }
 
-    return apiClient.get<PaginatedResponse<Package>>(`/api/packages?${query.toString()}`, { token });
+    return apiClient.get<PaginatedResponse<Package>>(`/api/packages?${query.toString()}`, {
+      token,
+      signal,
+    });
   },
 
   async getDashboardStats(token: string): Promise<DashboardStats> {

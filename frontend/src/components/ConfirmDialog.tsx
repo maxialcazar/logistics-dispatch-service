@@ -45,16 +45,23 @@ export function ConfirmDialog({
         }
     };
 
+    const handleClose = () => {
+        if (!isLoading) {
+            onClose();
+        }
+    };
+
     return (
         <Modal 
             isOpen={isOpen} 
-            onClose={onClose} 
+            onClose={handleClose} 
             title={title}
             footer={(
                 <>
                     {!hideCancel && (
                         <button
-                            onClick={onClose}
+                            type="button"
+                            onClick={handleClose}
                             disabled={isLoading}
                             className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
                         >
@@ -62,7 +69,9 @@ export function ConfirmDialog({
                         </button>
                     )}
                     <button
+                        type="button"
                         onClick={() => {
+                            if (isLoading) return;
                             onConfirm();
                             if (hideCancel) onClose(); // Auto-close if acting as alert
                         }}
@@ -73,7 +82,7 @@ export function ConfirmDialog({
                             isLoading && "opacity-70 cursor-not-allowed"
                         )}
                     >
-                        {isLoading ? 'Procesando...' : confirmText}
+                        {isLoading ? 'Procesando...' : (confirmText || 'Confirmar')}
                     </button>
                 </>
             )}
