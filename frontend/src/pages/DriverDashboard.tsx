@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { packageService, type Package } from '../services/packageService';
-import { MapPin, Truck, Check, X, Navigation, Phone, Route, Camera, PenLine, Trash2, ShieldCheck, WifiOff, RefreshCw } from 'lucide-react';
+import { MapPin, Truck, Check, X, Navigation, Phone, Route, Camera, PenLine, Trash2, ShieldCheck, WifiOff, RefreshCw, ClipboardCheck, CheckCircle2 } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { useDriverLocation } from '../hooks/useDriverLocation';
@@ -10,6 +10,22 @@ import { enqueueStatusUpdate } from '../services/offlineQueue';
 import { Skeleton } from '../components/Skeleton';
 import { StatusBadge } from '../components/StatusBadge';
 import { getPackageStatusToken } from '../utils/packageStatus';
+
+type DriverTab = 'active' | 'completed';
+
+const COMPLETED_STATUSES = new Set<string>(['delivered', 'cancelled']);
+
+function isLocalToday(value?: string | null): boolean {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+}
 
 // ---------- Canvas Signature Pad Hook ----------
 function useSignaturePad(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
@@ -255,7 +271,8 @@ function PODModal({ pkg, onConfirm, onClose }: PODModalProps) {
 // ---------- Main DriverDashboard ----------
 export function DriverDashboard() {
   const { token } = useAuth();
-  const [packages, setPackages] = useState<Package[]>([]);
+  const [allPackages, setAllPackages] = useState<Package[]>([]);
+  const [activeTab, setActiveTab] = useState<DriverTab>('active');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [podPackage, setPodPackage] = useState<Package | null>(null);
@@ -283,9 +300,7 @@ export function DriverDashboard() {
     try {
       const data = await packageService.getMyPackages(token);
       if (!isMountedRef.current || seq !== fetchSeqRef.current) return;
-      // Filter out completed packages from the active list
-      const active = data.filter(p => !['delivered', 'cancelled'].includes(p.status));
-      setPackages(active);
+      setAllPackages(data);
     } catch (err) {
       if (!isMountedRef.current || seq !== fetchSeqRef.current) return;
       console.error(err);
@@ -298,6 +313,29 @@ export function DriverDashboard() {
       }
     }
   }, [token]);
+
+  const activePackages = useMemo(
+    () => allPackages.filter((p) => !COMPLETED_STATUSES.has(p.status)),
+    [allPackages]
+  );
+
+  const completedTodayPackages = useMemo(
+    () =>
+      allPackages
+        .filter((p) => COMPLETED_STATUSES.has(p.status) && isLocalToday(p.updatedAt))
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    [allPackages]
+  );
+
+  const completedCounts = useMemo(() => {
+    let delivered = 0;
+    let cancelled = 0;
+    for (const pkg of completedTodayPackages) {
+      if (pkg.status === 'delivered') delivered += 1;
+      else if (pkg.status === 'cancelled') cancelled += 1;
+    }
+    return { delivered, cancelled };
+  }, [completedTodayPackages]);
 
   const handleSyncComplete = useCallback(() => {
     return fetchMyPackages({ silent: true });
@@ -332,9 +370,14 @@ export function DriverDashboard() {
           duration: 5000,
         });
         // Optimistically update local list so the driver sees the change
-        setPackages(prev => prev.map(p =>
-          p.id === pkg.id ? { ...p, status: newStatus as Package['status'] } : p
-        ));
+        const nowIso = new Date().toISOString();
+        setAllPackages((prev) =>
+          prev.map((p) =>
+            p.id === pkg.id
+              ? { ...p, status: newStatus as Package['status'], updatedAt: nowIso }
+              : p
+          )
+        );
       } catch (err) {
         console.error('Error al guardar actualización offline:', err);
         toast.error('No se pudo guardar la actualización offline');
@@ -396,7 +439,20 @@ export function DriverDashboard() {
           duration: 5000,
         });
         if (isMountedRef.current) {
-          setPackages(prev => prev.filter(p => p.id !== pkg.id));
+          const nowIso = new Date().toISOString();
+          setAllPackages((prev) =>
+            prev.map((p) =>
+              p.id === pkg.id
+                ? {
+                    ...p,
+                    status: 'delivered',
+                    updatedAt: nowIso,
+                    ...(signature ? { signatureUrl: signature } : {}),
+                    ...(photo ? { photoUrl: photo } : {}),
+                  }
+                : p
+            )
+          );
         }
       } catch (err) {
         console.error('Error al guardar entrega offline:', err);
@@ -422,7 +478,21 @@ export function DriverDashboard() {
       );
       toast.success('✅ Entrega confirmada con evidencia', { id: loadingToast });
       if (isMountedRef.current) {
-        setPackages(prev => prev.filter(p => p.id !== pkg.id));
+        const nowIso = new Date().toISOString();
+        setAllPackages((prev) =>
+          prev.map((p) =>
+            p.id === pkg.id
+              ? {
+                  ...p,
+                  status: 'delivered',
+                  updatedAt: nowIso,
+                  ...(signature ? { signatureUrl: signature } : {}),
+                  ...(photo ? { photoUrl: photo } : {}),
+                }
+              : p
+          )
+        );
+        void fetchMyPackages({ silent: true });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al confirmar entrega';
@@ -444,7 +514,7 @@ export function DriverDashboard() {
   };
 
   const handleOptimizeRoute = () => {
-    if (packages.length < 2) {
+    if (activePackages.length < 2) {
       toast.info('No hay suficientes paquetes para optimizar');
       return;
     }
@@ -452,30 +522,38 @@ export function DriverDashboard() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude: startLat, longitude: startLng } = pos.coords;
-        const withGPS = packages.filter(p => p.lat && p.lng);
-        const withoutGPS = packages.filter(p => !p.lat || !p.lng);
+        setAllPackages((prev) => {
+          const currentActive = prev.filter((p) => !COMPLETED_STATUSES.has(p.status));
+          const completedOrOther = prev.filter((p) => COMPLETED_STATUSES.has(p.status));
+          const withGPS = currentActive.filter((p) => p.lat && p.lng);
+          const withoutGPS = currentActive.filter((p) => !p.lat || !p.lng);
 
-        let currentLat = startLat;
-        let currentLng = startLng;
-        const optimized: Package[] = [];
-        const remaining = [...withGPS];
+          let currentLat = startLat;
+          let currentLng = startLng;
+          const optimized: Package[] = [];
+          const remaining = [...withGPS];
 
-        while (remaining.length > 0) {
-          let closestIndex = -1;
-          let minDist = Infinity;
-          remaining.forEach((p, idx) => {
-            const d = Math.pow(p.lat! - currentLat, 2) + Math.pow(p.lng! - currentLng, 2);
-            if (d < minDist) { minDist = d; closestIndex = idx; }
-          });
-          if (closestIndex !== -1) {
-            const next = remaining[closestIndex];
-            optimized.push(next);
-            currentLat = next.lat!;
-            currentLng = next.lng!;
-            remaining.splice(closestIndex, 1);
+          while (remaining.length > 0) {
+            let closestIndex = -1;
+            let minDist = Infinity;
+            remaining.forEach((p, idx) => {
+              const d = Math.pow(p.lat! - currentLat, 2) + Math.pow(p.lng! - currentLng, 2);
+              if (d < minDist) {
+                minDist = d;
+                closestIndex = idx;
+              }
+            });
+            if (closestIndex !== -1) {
+              const next = remaining[closestIndex];
+              optimized.push(next);
+              currentLat = next.lat!;
+              currentLng = next.lng!;
+              remaining.splice(closestIndex, 1);
+            }
           }
-        }
-        setPackages([...optimized, ...withoutGPS]);
+
+          return [...optimized, ...withoutGPS, ...completedOrOther];
+        });
         toast.success('Ruta optimizada por cercanía', { id: toastId });
       },
       () => toast.error('No se pudo obtener ubicación para optimizar', { id: toastId })
@@ -486,6 +564,7 @@ export function DriverDashboard() {
   if (loading) {
     return (
       <div className="p-4 space-y-4 pb-24">
+        <Skeleton className="h-14 w-full rounded-xl" />
         <div className="flex justify-between items-center mb-2">
           <Skeleton className="h-7 w-40" />
           <div className="flex gap-2">
@@ -535,6 +614,7 @@ export function DriverDashboard() {
           </div>
           {pendingCount > 0 && (
             <button
+              type="button"
               onClick={syncNow}
               disabled={!isOnline || isSyncing}
               className="min-h-[48px] px-3 flex items-center gap-1 text-xs text-amber-300 hover:text-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -546,117 +626,339 @@ export function DriverDashboard() {
         </div>
       )}
 
-      {packages.length === 0 ? (
-        <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center h-full gap-4">
-          <div className="h-20 w-20 bg-slate-900 border border-slate-800/80 rounded-full flex items-center justify-center">
-            <Check className="h-10 w-10 text-emerald-400" />
-          </div>
-          <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
-          <p>No tienes paquetes pendientes asignados.</p>
+      <div className="p-4 space-y-4 pb-24 relative">
+        {/* Segmented Shift Tabs (>= 48px touch targets for 390x844 mobile) */}
+        <div
+          role="tablist"
+          aria-label="Vistas del turno del conductor"
+          className="grid grid-cols-2 gap-1.5 bg-slate-900 border border-slate-800/80 p-1.5 rounded-xl"
+        >
           <button
-            onClick={() => void fetchMyPackages()}
-            className="min-h-[48px] px-4 text-brand-400 hover:text-brand-300 underline text-sm flex items-center justify-center"
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'active'}
+            onClick={() => setActiveTab('active')}
+            className={clsx(
+              'min-h-[48px] px-3 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors',
+              activeTab === 'active'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+            )}
           >
-            Actualizar
+            <Truck className="h-4 w-4 flex-shrink-0" />
+            <span>En Ruta</span>
+            <span
+              className={clsx(
+                'px-2 py-0.5 rounded-full text-[11px] font-bold tabular-nums',
+                activeTab === 'active'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700/80'
+              )}
+            >
+              {activePackages.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'completed'}
+            onClick={() => setActiveTab('completed')}
+            className={clsx(
+              'min-h-[48px] px-3 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors',
+              activeTab === 'completed'
+                ? 'bg-slate-800 text-white border border-slate-700/80 shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/70 border border-transparent'
+            )}
+          >
+            <ClipboardCheck className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+            <span>Completados Hoy</span>
+            <span
+              className={clsx(
+                'px-2 py-0.5 rounded-full text-[11px] font-bold tabular-nums',
+                activeTab === 'completed'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700/80'
+              )}
+            >
+              {completedTodayPackages.length}
+            </span>
           </button>
         </div>
-      ) : (
-        <div className="p-4 space-y-4 pb-24 relative">
-          <h2 className="text-lg font-bold text-white mb-2 flex justify-between items-center">
-            <span>Mis Entregas (<span className="tabular-nums">{packages.length}</span>)</span>
-            <div className="flex gap-2">
-              <button
-                onClick={handleOptimizeRoute}
-                className="min-h-[48px] text-xs text-slate-200 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800/80 flex items-center gap-1.5 hover:border-brand-500/40 hover:text-white transition-colors"
-              >
-                <Route size={12} className="text-brand-400" /> Optimizar
-              </button>
-              <button
-                onClick={() => void fetchMyPackages()}
-                className="min-h-[48px] text-xs text-brand-300 bg-brand-500/10 border border-brand-500/25 px-3 py-2 rounded-lg flex items-center justify-center hover:bg-brand-500/20 transition-colors"
-              >
-                Refrescar
-              </button>
-            </div>
-          </h2>
 
-        {packages.map(pkg => {
-          const statusToken = getPackageStatusToken(pkg.status);
-          return (
-          <div key={pkg.id} className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm relative">
-            {/* Status color bar */}
-            <div className={clsx('h-1.5 w-full', statusToken.barClass, statusToken.pulse && 'animate-pulse')} />
-
-            <div className="p-4">
-              {/* Tracking code + status badge */}
-              <div className="flex justify-between items-start gap-2 mb-2">
-                <span className="font-mono tabular-nums text-xs text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800/80">
-                  #{pkg.trackingCode}
-                </span>
-                <StatusBadge status={pkg.status} />
+        {activeTab === 'active' ? (
+          activePackages.length === 0 ? (
+            <div className="p-6 sm:p-8 text-center text-slate-400 bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col items-center justify-center gap-4">
+              <div className="h-20 w-20 bg-slate-950 border border-slate-800/80 rounded-full flex items-center justify-center">
+                <Check className="h-10 w-10 text-emerald-400" />
               </div>
-
-              <h3 className="text-lg font-bold text-white mb-1">{pkg.recipientName}</h3>
-
-              <div className="flex items-start gap-2 text-slate-300 text-sm mb-3">
-                <MapPin className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
-                <span className="leading-tight">{pkg.recipientAddress}</span>
+              <div className="space-y-1">
+                <h2 className="text-xl font-bold text-white">¡Todo Listo!</h2>
+                <p className="text-sm text-slate-400">
+                  No tienes paquetes pendientes asignados en este momento.
+                </p>
               </div>
-
-              {pkg.recipientPhone && (
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-4 tabular-nums">
-                  <Phone className="h-3 w-3" />
-                  <span>{pkg.recipientPhone}</span>
-                </div>
-              )}
-
-              {/* Action buttons */}
-              <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2.5">
                 <button
-                  onClick={() => openNavigation(pkg)}
-                  className="col-span-2 min-h-[48px] bg-slate-950 hover:bg-slate-800 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-800/80 transition-all"
+                  type="button"
+                  onClick={() => void fetchMyPackages()}
+                  className="min-h-[48px] px-5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
                 >
-                  <Navigation className="h-4 w-4 text-brand-400" />
-                  Navegar a Destino
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
                 </button>
-
-                {pkg.status !== 'in_transit' ? (
+                {completedTodayPackages.length > 0 && (
                   <button
-                    onClick={() => handleStatusUpdate(pkg, 'in_transit')}
-                    disabled={!!updating}
-                    className="col-span-2 min-h-[48px] bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-brand-950/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                    type="button"
+                    onClick={() => setActiveTab('completed')}
+                    className="min-h-[48px] px-5 bg-slate-950 hover:bg-slate-800 border border-slate-800/80 text-slate-200 font-medium rounded-xl text-sm flex items-center justify-center gap-2 transition-colors tabular-nums"
                   >
-                    <Truck className="h-5 w-5" />
-                    Iniciar Viaje
+                    <ClipboardCheck className="h-4 w-4 text-emerald-400" />
+                    Ver Completados Hoy ({completedTodayPackages.length})
                   </button>
-                ) : (
-                  <>
-                    {/* Delivery button now opens the POD modal */}
-                    <button
-                      onClick={() => setPodPackage(pkg)}
-                      disabled={!!updating}
-                      className="min-h-[48px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-emerald-950/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
-                    >
-                      <ShieldCheck className="h-5 w-5" />
-                      Entregado
-                    </button>
-                    <button
-                      onClick={() => handleStatusUpdate(pkg, 'cancelled')}
-                      disabled={!!updating}
-                      className="min-h-[48px] bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-300 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
-                    >
-                      <X className="h-5 w-5" />
-                      Fallido
-                    </button>
-                  </>
                 )}
               </div>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-bold text-white">
+                  Mis Entregas (<span className="tabular-nums">{activePackages.length}</span>)
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOptimizeRoute}
+                    className="min-h-[48px] text-xs text-slate-200 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800/80 flex items-center gap-1.5 hover:border-brand-500/40 hover:text-white transition-colors"
+                  >
+                    <Route size={14} className="text-brand-400" /> Optimizar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void fetchMyPackages()}
+                    className="min-h-[48px] text-xs text-brand-300 bg-brand-500/10 border border-brand-500/25 px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 hover:bg-brand-500/20 transition-colors"
+                  >
+                    <RefreshCw size={14} />
+                    Refrescar
+                  </button>
+                </div>
+              </div>
+
+              {activePackages.map((pkg) => {
+                const statusToken = getPackageStatusToken(pkg.status);
+                return (
+                  <div
+                    key={pkg.id}
+                    className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm relative"
+                  >
+                    {/* Status color bar */}
+                    <div
+                      className={clsx(
+                        'h-1.5 w-full',
+                        statusToken.barClass,
+                        statusToken.pulse && 'animate-pulse'
+                      )}
+                    />
+
+                    <div className="p-4">
+                      {/* Tracking code + status badge */}
+                      <div className="flex justify-between items-start gap-2 mb-2">
+                        <span className="font-mono tabular-nums text-xs text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800/80">
+                          #{pkg.trackingCode}
+                        </span>
+                        <StatusBadge status={pkg.status} />
+                      </div>
+
+                      <h3 className="text-lg font-bold text-white mb-1">{pkg.recipientName}</h3>
+
+                      <div className="flex items-start gap-2 text-slate-300 text-sm mb-3">
+                        <MapPin className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                        <span className="leading-tight">{pkg.recipientAddress}</span>
+                      </div>
+
+                      {pkg.recipientPhone && (
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-4 tabular-nums">
+                          <Phone className="h-3 w-3" />
+                          <span>{pkg.recipientPhone}</span>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        <button
+                          type="button"
+                          onClick={() => openNavigation(pkg)}
+                          className="col-span-2 min-h-[48px] bg-slate-950 hover:bg-slate-800 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 border border-slate-800/80 transition-all"
+                        >
+                          <Navigation className="h-4 w-4 text-brand-400" />
+                          Navegar a Destino
+                        </button>
+
+                        {pkg.status !== 'in_transit' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusUpdate(pkg, 'in_transit')}
+                            disabled={!!updating}
+                            className="col-span-2 min-h-[48px] bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-brand-950/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                          >
+                            <Truck className="h-5 w-5" />
+                            Iniciar Viaje
+                          </button>
+                        ) : (
+                          <>
+                            {/* Delivery button opens the POD modal */}
+                            <button
+                              type="button"
+                              onClick={() => setPodPackage(pkg)}
+                              disabled={!!updating}
+                              className="min-h-[48px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-emerald-950/30 flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                            >
+                              <ShieldCheck className="h-5 w-5" />
+                              Entregado
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusUpdate(pkg, 'cancelled')}
+                              disabled={!!updating}
+                              className="min-h-[48px] bg-red-500/10 border border-red-500/30 hover:bg-red-600 hover:text-white text-red-300 font-bold py-3 rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-60"
+                            >
+                              <X className="h-5 w-5" />
+                              Fallido
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          /* Completados Hoy Tab */
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold text-white">
+                  Historial de Hoy (<span className="tabular-nums">{completedTodayPackages.length}</span>)
+                </h2>
+                {completedTodayPackages.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs tabular-nums">
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 font-medium">
+                      {completedCounts.delivered} entregados
+                    </span>
+                    {completedCounts.cancelled > 0 && (
+                      <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/25 text-red-300 font-medium">
+                        {completedCounts.cancelled} cancelados
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void fetchMyPackages()}
+                className="min-h-[48px] text-xs text-brand-300 bg-brand-500/10 border border-brand-500/25 px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 hover:bg-brand-500/20 transition-colors"
+              >
+                <RefreshCw size={14} />
+                Refrescar
+              </button>
+            </div>
+
+            {completedTodayPackages.length === 0 ? (
+              <div className="p-6 sm:p-8 text-center text-slate-400 bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col items-center justify-center gap-4">
+                <div className="h-16 w-16 bg-slate-950 border border-slate-800/80 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="h-8 w-8 text-slate-500" />
+                </div>
+                <div className="space-y-1 max-w-xs">
+                  <h3 className="text-base font-bold text-white">Sin entregas completadas hoy</h3>
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                    Los paquetes que confirmes como entregados o cancelados durante la jornada de hoy aparecerán listados aquí.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => void fetchMyPackages()}
+                    className="min-h-[48px] px-5 bg-slate-950 hover:bg-slate-800 border border-slate-800/80 text-slate-200 font-medium rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Actualizar
+                  </button>
+                  {activePackages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('active')}
+                      className="min-h-[48px] px-5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors tabular-nums"
+                    >
+                      <Truck className="h-4 w-4" />
+                      Ver Entregas Activas ({activePackages.length})
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {completedTodayPackages.map((pkg) => {
+                  const statusToken = getPackageStatusToken(pkg.status);
+                  const completedTime = new Date(pkg.updatedAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+
+                  return (
+                    <div
+                      key={pkg.id}
+                      className="bg-slate-900 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm"
+                    >
+                      <div className={clsx('h-1 w-full', statusToken.barClass)} />
+
+                      <div className="p-4 space-y-2.5">
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="font-mono tabular-nums text-xs text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800/80">
+                            #{pkg.trackingCode}
+                          </span>
+                          <StatusBadge status={pkg.status} />
+                        </div>
+
+                        <div>
+                          <h3 className="text-base font-bold text-white">{pkg.recipientName}</h3>
+                          <div className="flex items-start gap-2 text-slate-300 text-xs sm:text-sm mt-1">
+                            <MapPin className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                            <span className="leading-tight">{pkg.recipientAddress}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                          <span className="tabular-nums font-medium text-slate-300">
+                            Cierre: {completedTime}
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            {pkg.signatureUrl && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-950 border border-slate-800/80 text-slate-300">
+                                <PenLine className="h-3 w-3 text-emerald-400" />
+                                Firma
+                              </span>
+                            )}
+                            {pkg.photoUrl && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-950 border border-slate-800/80 text-slate-300">
+                                <Camera className="h-3 w-3 text-brand-400" />
+                                Foto
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          );
-        })}
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 }

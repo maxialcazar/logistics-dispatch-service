@@ -205,7 +205,12 @@ export interface DashboardStats {
   avgDeliveryTimeMinutes: number;
   zoneDistribution: { name: string; value: number }[];
   weeklyActivity: { date: string; delivered: number; failed: number }[];
-  topDrivers: { name: string; delivered: number; efficiency: number }[];
+  topDrivers: { driverId?: string; name: string; delivered: number; efficiency: number }[];
+}
+
+export interface DashboardStatsParams {
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 interface PaginatedResponse<T> {
@@ -465,8 +470,17 @@ export const packageService = {
     return apiClient.post<BulkImportResult>('/api/packages/bulk', payload, { token });
   },
 
-  async getDashboardStats(token: string): Promise<DashboardStats> {
-    return apiClient.get<DashboardStats>('/api/packages/stats', { token });
+  async getDashboardStats(
+    token: string,
+    params: DashboardStatsParams = {},
+    signal?: AbortSignal
+  ): Promise<DashboardStats> {
+    const query = new URLSearchParams();
+    if (params.dateFrom?.trim()) query.append('dateFrom', params.dateFrom.trim());
+    if (params.dateTo?.trim()) query.append('dateTo', params.dateTo.trim());
+    const qs = query.toString();
+    const endpoint = qs ? `/api/packages/stats?${qs}` : '/api/packages/stats';
+    return apiClient.get<DashboardStats>(endpoint, { token, signal });
   },
 
   async archivePackages(token: string, packageIds: string[]) {
