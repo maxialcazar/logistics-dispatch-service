@@ -25,8 +25,8 @@ export async function createDriver(req: AuthRequest, res: Response) {
     const driver = await DriverService.createDriver(req.user!.companyId, req.body);
     res.status(201).json(driver);
   } catch (error: any) {
-    if (error.message === "username_exists") {
-      return res.status(400).json({ error: "username already exists" });
+    if (error?.message === "username_exists") {
+      return res.status(409).json({ error: "username already exists" });
     }
     res.status(500).json({ error: "Internal Server Error" });
   }

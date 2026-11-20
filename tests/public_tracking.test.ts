@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "crypto";
 import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/prisma";
@@ -10,36 +11,30 @@ describe("GET /api/public/track/:trackingCode", () => {
   let createdCompanyId: string | null = null;
 
   beforeAll(async () => {
-    // Ensure we have a company first
-    let company = await prisma.company.findFirst();
-    if (!company) {
-      company = await prisma.company.create({
-        data: {
-          name: "Test Company",
-          slug: `test-company-${Date.now()}`,
-        }
-      });
-      createdCompanyId = company.id;
-    }
+    const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
 
-    // Ensure we have a zone to link to
-    let zone = await prisma.zone.findFirst({
-      where: { companyId: company.id }
+    // Always create an isolated company so this suite never collides with other suites
+    const company = await prisma.company.create({
+      data: {
+        name: "Public Tracking Test Company",
+        slug: `public-tracking-${suffix}`,
+      },
     });
-    if (!zone) {
-      zone = await prisma.zone.create({
-        data: {
-          name: "Test Zone",
-          companyId: company.id,
-        }
-      });
-      createdZoneId = zone.id;
-    }
+    createdCompanyId = company.id;
+
+    // Create an isolated zone owned by the test company
+    const zone = await prisma.zone.create({
+      data: {
+        name: "Public Tracking Test Zone",
+        companyId: company.id,
+      },
+    });
+    createdZoneId = zone.id;
 
     // Create a temporary package for testing
     testPackage = await prisma.package.create({
       data: {
-        trackingCode: `TEST-${Date.now()}`,
+        trackingCode: `TEST-${suffix}`,
         recipientName: "Test Recipient",
         recipientAddress: "Av. Corrientes 1234, CABA",
         recipientPhone: "123456789",
@@ -55,11 +50,11 @@ describe("GET /api/public/track/:trackingCode", () => {
     if (testPackage) {
       await prisma.package.delete({ where: { id: testPackage.id } }).catch(() => {});
     }
-    // Clean up zone if we created it
+    // Clean up zone created for this suite
     if (createdZoneId) {
       await prisma.zone.delete({ where: { id: createdZoneId } }).catch(() => {});
     }
-    // Clean up company if we created it
+    // Clean up company created for this suite
     if (createdCompanyId) {
       await prisma.company.delete({ where: { id: createdCompanyId } }).catch(() => {});
     }

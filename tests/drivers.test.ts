@@ -79,11 +79,12 @@ describe("POST /api/drivers — Create Driver", () => {
     const existingUsername = `dup_driver_${Date.now()}`;
 
     // First creation
-    await request(app).post("/api/drivers").set("Authorization", `Bearer ${token}`).send({
+    const firstRes = await request(app).post("/api/drivers").set("Authorization", `Bearer ${token}`).send({
       name: "Driver Uno",
       username: existingUsername,
       password: "driverpass123",
     });
+    expect(firstRes.status).toBe(201);
 
     // Second creation with same username
     const res = await request(app)
@@ -117,10 +118,12 @@ describe("PUT /api/drivers/:id/zones — Zone Assignment", () => {
 
   it("should replace existing zones when reassigning", async () => {
     // Reassign: only zone 1
-    await request(app)
+    const res = await request(app)
       .put(`/api/drivers/${driverId}/zones`)
       .set("Authorization", `Bearer ${token}`)
       .send({ zoneIds: [zoneId1] });
+
+    expect(res.status).toBe(200);
 
     const zones = await prisma.zone.findMany({ where: { driverId } });
     expect(zones).toHaveLength(1);

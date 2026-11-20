@@ -65,6 +65,8 @@ router.get("/", requireRole("dispatcher", "admin"), getDrivers);
  *     responses:
  *       201:
  *         description: Created
+ *       409:
+ *         description: Username already exists
  */
 router.post("/", requireRole("dispatcher", "admin"), validate(createDriverSchema), createDriver);
 
@@ -83,8 +85,29 @@ router.post("/", requireRole("dispatcher", "admin"), validate(createDriverSchema
  *     responses:
  *       200:
  *         description: Success
+ *   put:
+ *     summary: Assign or replace zones for a driver
+ *     tags: [Drivers]
+ *     parameters:
+ *       - in: path
+ *         name: driverId
+ *         required: true
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
  */
-router.post("/:driverId/zones", requireRole("dispatcher", "admin"), validate(assignZonesSchema), assignZonesToDriver);
+const assignDriverZonesMiddlewares = [
+  requireRole("dispatcher", "admin"),
+  validate(assignZonesSchema),
+  assignZonesToDriver,
+];
+
+router
+  .route("/:driverId/zones")
+  .post(...assignDriverZonesMiddlewares)
+  .put(...assignDriverZonesMiddlewares);
 
 /**
  * @openapi
