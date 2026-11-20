@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Plus, Map, User, Search, Check, Power, Truck } from 'lucide-react';
+import { Plus, Map, User, UserX, Search, Check, Power, Truck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { zoneService, type Zone } from '../services/zoneService';
 import { driverService, type AppDriver } from '../services/driverService';
@@ -32,6 +32,7 @@ export function ZonesPage() {
       isOpen: boolean;
       title: string;
       message: string;
+      confirmText?: string;
       variant: 'danger' | 'warning' | 'info';
       onConfirm: () => Promise<void>;
   }>({
@@ -127,10 +128,12 @@ export function ZonesPage() {
           
           toast.success('Conductor asignado', { id: toastId });
           setAssignZone(null);
+          setSearchDriver('');
           // Refresh to get full object updates or do manual optimistic
-          fetchData();
+          await fetchData();
       } catch (err: unknown) {
-          toast.error('Error al asignar conductor', { id: toastId });
+          const message = err instanceof Error ? err.message : 'Error al asignar conductor';
+          toast.error(message, { id: toastId });
           console.error(err);
       } finally {
           setActionLoading(false);
@@ -166,19 +169,50 @@ export function ZonesPage() {
     });
   };
 
-  /*
-  const handleUnassignDriver = async (zone: Zone) => {
-      if (!confirm('¿Desasignar conductor de esta zona?')) return;
-      const toastId = toast.loading('Desasignando...');
-      try {
-          await zoneService.updateZone(token!, zone.id, { driverId: undefined });
-          toast.success('Conductor desasignado', { id: toastId });
-          setZones(prev => prev.map(z => z.id === zone.id ? { ...z, driver: undefined, isActive: false } : z));
-      } catch (err) {
-          toast.error('Error al desasignar');
-      }
+  const handleUnassignDriver = (zone: Zone) => {
+      if (!zone.driver) return;
+
+      setConfirmConfig({
+          isOpen: true,
+          title: 'Desasignar Conductor',
+          message: zone.isActive
+              ? `¿Deseas desasignar a ${zone.driver.name} de la zona "${zone.name}"? La zona pasará a estado inactivo.`
+              : `¿Deseas desasignar a ${zone.driver.name} de la zona "${zone.name}"?`,
+          confirmText: 'Desasignar',
+          variant: zone.isActive ? 'warning' : 'info',
+          onConfirm: async () => {
+              if (!token) {
+                  toast.error('Sesión expirada. Inicia sesión nuevamente.');
+                  return;
+              }
+              setConfirmLoading(true);
+              setActionLoading(true);
+              const toastId = toast.loading('Desasignando conductor...');
+              try {
+                  await zoneService.updateZone(token, zone.id, {
+                      driverId: null,
+                      ...(zone.isActive ? { isActive: false } : {}),
+                  });
+                  setZones(prev =>
+                      prev.map(z =>
+                          z.id === zone.id ? { ...z, driver: undefined, isActive: false } : z
+                      )
+                  );
+                  setAssignZone(prev => (prev?.id === zone.id ? null : prev));
+                  toast.success('Conductor desasignado', { id: toastId });
+                  setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                  await fetchData();
+              } catch (err: unknown) {
+                  const message = err instanceof Error ? err.message : 'Error al desasignar conductor';
+                  toast.error(message, { id: toastId });
+                  console.error(err);
+              } finally {
+                  setConfirmLoading(false);
+                  setActionLoading(false);
+              }
+          }
+      });
   };
-  */
 
   // Filter drivers for modal
   const modalDrivers = drivers.filter(d => 
@@ -270,22 +304,35 @@ export function ZonesPage() {
                    <div className="pt-4 mt-2 border-t border-slate-800/50 flex flex-col gap-4">
                        
                        {/* Driver Section */}
-                       <div className="flex items-center justify-between">
+                       <div className="flex items-center justify-between gap-2">
                            {zone.driver ? (
-                               <div className="flex items-center gap-3 flex-1 min-w-0">
-                                   <div className="h-10 w-10 shrink-0 rounded-full bg-blue-900/20 text-blue-400 flex items-center justify-center border border-blue-900/30">
-                                       <User className="h-5 w-5" />
+                               <>
+                                   <div className="flex items-center gap-3 flex-1 min-w-0">
+                                       <div className="h-10 w-10 shrink-0 rounded-full bg-blue-900/20 text-blue-400 flex items-center justify-center border border-blue-900/30">
+                                           <User className="h-5 w-5" />
+                                       </div>
+                                       <div className="flex flex-col min-w-0">
+                                           <span className="text-sm font-semibold text-slate-200 truncate">{zone.driver.name}</span>
+                                           <button 
+                                               type="button"
+                                               onClick={() => setAssignZone(zone)}
+                                               className="text-xs text-blue-400 hover:text-blue-300 text-left hover:underline truncate"
+                                           >
+                                               Cambiar conductor
+                                           </button>
+                                       </div>
                                    </div>
-                                   <div className="flex flex-col truncate">
-                                       <span className="text-sm font-semibold text-slate-200 truncate">{zone.driver.name}</span>
-                                       <button 
-                                           onClick={() => setAssignZone(zone)}
-                                           className="text-xs text-blue-400 hover:text-blue-300 text-left hover:underline truncate"
-                                       >
-                                           Cambiar conductor
-                                       </button>
-                                   </div>
-                               </div>
+                                   <button
+                                       type="button"
+                                       onClick={() => handleUnassignDriver(zone)}
+                                       disabled={actionLoading}
+                                       title="Desasignar conductor"
+                                       aria-label={`Desasignar conductor de ${zone.name}`}
+                                       className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-950/40 border border-transparent hover:border-red-900/40 transition-colors shrink-0 disabled:opacity-50"
+                                   >
+                                       <UserX className="h-4 w-4" />
+                                   </button>
+                               </>
                            ) : (
                                <button 
                                    onClick={() => setAssignZone(zone)}
@@ -358,7 +405,12 @@ export function ZonesPage() {
       {/* Assign Driver Modal */}
       <Modal
         isOpen={!!assignZone}
-        onClose={() => setAssignZone(null)}
+        onClose={() => {
+            if (!actionLoading) {
+                setAssignZone(null);
+                setSearchDriver('');
+            }
+        }}
         title={`Asignar Conductor a ${assignZone?.name}`}
       >
           <div className="space-y-4">
@@ -373,6 +425,30 @@ export function ZonesPage() {
                       autoFocus
                   />
               </div>
+
+              {assignZone?.driver && (
+                  <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={() => {
+                          const targetZone = assignZone;
+                          setAssignZone(null);
+                          setSearchDriver('');
+                          handleUnassignDriver(targetZone);
+                      }}
+                      className="w-full flex items-center justify-between p-3 rounded-lg bg-slate-950/60 hover:bg-red-950/30 border border-slate-800 hover:border-red-900/50 transition-all group text-left disabled:opacity-50"
+                  >
+                      <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-slate-800 group-hover:bg-red-950/60 flex items-center justify-center text-slate-400 group-hover:text-red-400 transition-colors">
+                              <UserX className="h-4 w-4" />
+                          </div>
+                          <div>
+                              <div className="text-sm font-medium text-slate-200 group-hover:text-red-300">Sin asignar</div>
+                              <div className="text-xs text-slate-500">Quitar conductor actual ({assignZone.driver.name})</div>
+                          </div>
+                      </div>
+                  </button>
+              )}
 
               <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
                   {modalDrivers.map(driver => (
@@ -411,6 +487,7 @@ export function ZonesPage() {
           onConfirm={confirmConfig.onConfirm}
           title={confirmConfig.title}
           message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
           variant={confirmConfig.variant}
           isLoading={confirmLoading}
       />

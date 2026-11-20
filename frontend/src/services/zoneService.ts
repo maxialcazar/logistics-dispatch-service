@@ -32,7 +32,7 @@ export const zoneService = {
   async updateZone(
     token: string,
     id: string,
-    data: { isActive?: boolean; driverId?: string; description?: string }
+    data: { isActive?: boolean; driverId?: string | null; description?: string }
   ): Promise<Zone> {
     return apiClient.patch<Zone>(`/api/zones/${encodeURIComponent(id)}`, data, { token });
   },
