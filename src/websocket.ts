@@ -164,15 +164,28 @@ export function isDriverOnline(companyId: string, driverId: string): boolean {
 	return false;
 }
 
-export function disconnectDriverSockets(companyId: string, driverId: string): void {
-	if (!io || !companyId?.trim() || !driverId?.trim()) return;
+function disconnectSocketsWhere(companyId: string, predicate: (sock: any) => boolean): void {
+	if (!io || !companyId?.trim()) return;
 	const room = io.sockets?.adapter?.rooms?.get(`company-${companyId.trim()}`);
 	if (!room || room.size === 0) return;
 
 	for (const socketId of [...room]) {
 		const sock = io.sockets.sockets.get(socketId);
-		if (sock?.data?.role === "driver" && sock?.data?.driverId === driverId) {
+		if (sock && predicate(sock)) {
 			sock.disconnect(true);
 		}
 	}
+}
+
+export function disconnectDriverSockets(companyId: string, driverId: string): void {
+	if (!driverId?.trim()) return;
+	disconnectSocketsWhere(
+		companyId,
+		(sock) => sock?.data?.role === "driver" && sock?.data?.driverId === driverId
+	);
+}
+
+export function disconnectUserSockets(companyId: string, userId: string): void {
+	if (!userId?.trim()) return;
+	disconnectSocketsWhere(companyId, (sock) => sock?.data?.userId === userId);
 }

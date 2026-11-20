@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
-import { login, registerCompany } from "../controllers/auth.controller";
+import { getMe, login, registerCompany } from "../controllers/auth.controller";
+import { auth } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import { loginSchema, registerCompanySchema } from "../schemas/auth.schema";
 
@@ -72,7 +73,20 @@ const loginLimiter = createAuthRateLimiter({
  *                 type: string
  *     responses:
  *       201:
- *         description: Company created successfully
+ *         description: Company and admin user created successfully with JWT token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 company:
+ *                   type: object
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: Validation failed
  *       409:
  *         description: Username or Slug already taken
  *       429:
@@ -127,5 +141,25 @@ router.post(
  *         description: Too many login attempts
  */
 router.post("/login", loginLimiter, validate(loginSchema), login);
+
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     summary: Get the authenticated user profile and associated company details
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Authenticated user profile with company details (without password)
+ *       401:
+ *         description: Unauthorized or user no longer exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get("/me", auth, getMe);
 
 export default router;

@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
+import { AuthRequest } from "../middlewares/auth.middleware";
+import logger from "../utils/logger";
 
 export async function registerCompany(req: Request, res: Response) {
   const { companyName, companySlug, username, password } = req.body;
@@ -14,6 +16,10 @@ export async function registerCompany(req: Request, res: Response) {
     if (error.message === "company_slug_taken") {
       return res.status(409).json({ error: "Company URL/Slug already exists" });
     }
+    if (error.message === "jwt_config_error") {
+      return res.status(500).json({ error: "Internal configuration error" });
+    }
+    logger.error("Register company error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
@@ -31,7 +37,20 @@ export async function login(req: Request, res: Response) {
     if (error.message === "jwt_config_error") {
       return res.status(500).json({ error: "Internal configuration error" });
     }
-    console.error("Login error:", error);
+    logger.error("Login error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+export async function getMe(req: AuthRequest, res: Response) {
+  try {
+    const user = await AuthService.getMe(req.user!.id, req.user!.companyId);
+    res.json(user);
+  } catch (error: any) {
+    if (error?.message === "user_not_found") {
+      return res.status(401).json({ error: "User not found or session invalid" });
+    }
+    logger.error("GetMe error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 }

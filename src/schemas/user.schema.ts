@@ -1,4 +1,28 @@
 import { z } from "zod";
+import { Role } from "@prisma/client";
+
+const validUserRoles = new Set<string>(Object.values(Role));
+
+export const getUsersSchema = z.object({
+  query: z.object({
+    search: z.string().trim().max(100).optional(),
+    role: z
+      .string()
+      .trim()
+      .refine((val) => val === "" || validUserRoles.has(val), {
+        message: "Invalid role value. Allowed: dispatcher, driver, admin",
+      })
+      .optional(),
+    page: z.unknown().optional(),
+    limit: z.unknown().optional(),
+  }),
+});
+
+export const deleteUserSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid user ID format"),
+  }),
+});
 
 export const createUserSchema = z.object({
   body: z.object({
