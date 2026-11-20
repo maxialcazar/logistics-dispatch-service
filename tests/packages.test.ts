@@ -1638,3 +1638,501 @@ describe("Task 2.1.2 — GET /api/packages/:id, PATCH /api/packages/:id & POST /
     expect(paths["/api/packages/unarchive"]?.post).toBeDefined();
   });
 });
+
+// ─── Task 2.1.3 — Package Address/Window Fields & Status Notes/Reason ─────────
+describe("Task 2.1.3 — Package address/deliveryWindow fields, update geocoding & status notes/reason", () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  let companyId: string;
+  let adminToken: string;
+  let driverToken: string;
+  let driverId: string;
+  let activeZoneId: string;
+  const createdPackageIdsForFileCleanup: string[] = [];
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  beforeAll(async () => {
+    const reg = await request(app).post("/api/auth/register-company").send({
+      companyName: "Fields Notes Co",
+      companySlug: `fields-notes-${suffix}`,
+      username: `fields_admin_${suffix}`,
+      password: "securepassword123",
+    });
+    expect(reg.status).toBe(201);
+    companyId = reg.body.company.id;
+
+    const loginAdmin = await request(app).post("/api/auth/login").send({
+      username: `fields_admin_${suffix}`,
+      password: "securepassword123",
+    });
+    adminToken = loginAdmin.body.token;
+
+    const drvRes = await request(app)
+      .post("/api/drivers")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Notes Driver",
+        username: `fields_drv_${suffix}`,
+        password: "driverpass123",
+      });
+    expect(drvRes.status).toBe(201);
+    driverId = drvRes.body.id;
+
+    const loginDrv = await request(app).post("/api/auth/login").send({
+      username: `fields_drv_${suffix}`,
+      password: "driverpass123",
+    });
+    driverToken = loginDrv.body.token;
+
+    const zone = await prisma.zone.create({
+      data: {
+        name: "Fields Zone",
+        companyId,
+        driverId,
+        isActive: true,
+      },
+    });
+    activeZoneId = zone.id;
+  });
+
+  afterAll(async () => {
+    if (companyId) {
+      if (createdPackageIdsForFileCleanup.length > 0) {
+        await PackageService.deletePackages(companyId, createdPackageIdsForFileCleanup);
+      }
+      await prisma.packageHistory.deleteMany({ where: { package: { companyId } } });
+      await prisma.package.deleteMany({ where: { companyId } });
+      await prisma.zone.deleteMany({ where: { companyId } });
+      await prisma.user.deleteMany({ where: { companyId } });
+      await prisma.driver.deleteMany({ where: { companyId } });
+      await prisma.company.deleteMany({ where: { id: companyId } });
+    }
+  });
+
+  describe("createPackage & updatePackage with addressFloor, addressCity, addressZip, deliveryWindowStart, deliveryWindowEnd", () => {
+    it("persists all new fields on POST /api/packages and uses addressCity for geocoding when coords are missing", async () => {
+      const axiosSpy = jest.spyOn(axios, "get").mockResolvedValueOnce({
+        data: [{ lat: "-32.9468", lon: "-60.6531" }],
+      } as any);
+
+      const res = await request(app)
+        .post("/api/packages")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          trackingCode: `PKG-FIELDS-${suffix}`,
+          recipientName: "Valentina Ríos",
+          recipientAddress: "Bv. Orono 500",
+          recipientPhone: "3415551122",
+          addressFloor: "  7C ",
+          addressCity: " Rosario ",
+          addressZip: " 2000 ",
+          deliveryWindowStart: "2026-10-05T09:00:00-03:00",
+          deliveryWindowEnd: "2026-10-05T13:00:00-03:00",
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.addressFloor).toBe("7C");
+      expect(res.body.addressCity).toBe("Rosario");
+      expect(res.body.addressZip).toBe("2000");
+      expect(new Date(res.body.deliveryWindowStart).toISOString()).toBe("2026-10-05T12:00:00.000Z");
+      expect(new Date(res.body.deliveryWindowEnd).toISOString()).toBe("2026-10-05T16:00:00.000Z");
+      expect(res.body.lat).toBeCloseTo(-32.9468, 4);
+      expect(res.body.lng).toBeCloseTo(-60.6531, 4);
+
+      expect(axiosSpy).toHaveBeenCalledWith(
+        "https://nominatim.openstreetmap.org/search",
+        expect.objectContaining({
+          params: expect.objectContaining({ q: "Bv. Orono 500, Rosario" }),
+        })
+      );
+
+      const dbPkg = await prisma.package.findUnique({ where: { id: res.body.id } });
+      expect(dbPkg?.addressFloor).toBe("7C");
+      expect(dbPkg?.addressCity).toBe("Rosario");
+      expect(dbPkg?.addressZip).toBe("2000");
+      expect(dbPkg?.deliveryWindowStart?.toISOString()).toBe("2026-10-05T12:00:00.000Z");
+      expect(dbPkg?.deliveryWindowEnd?.toISOString()).toBe("2026-10-05T16:00:00.000Z");
+    });
+
+    it("validates deliveryWindow dates and logical ordering on POST /api/packages and service createPackage", async () => {
+      const invalidPayloads = [
+        {
+          trackingCode: `PKG-BADWIN1-${suffix}`,
+          recipientName: "Bad Window",
+          recipientAddress: "Av. Colon 100",
+          recipientPhone: "3515550001",
+          deliveryWindowStart: "2026-10-05T15:00:00Z",
+          deliveryWindowEnd: "2026-10-05T10:00:00Z",
+        },
+        {
+          trackingCode: `PKG-BADWIN2-${suffix}`,
+          recipientName: "Bad Format",
+          recipientAddress: "Av. Colon 100",
+          recipientPhone: "3515550001",
+          deliveryWindowStart: "2026-10-05",
+        },
+        {
+          trackingCode: `PKG-BADWIN3-${suffix}`,
+          recipientName: "Bad Calendar",
+          recipientAddress: "Av. Colon 100",
+          recipientPhone: "3515550001",
+          deliveryWindowEnd: "2026-02-30T10:00:00Z",
+        },
+      ];
+
+      for (const payload of invalidPayloads) {
+        const res = await request(app)
+          .post("/api/packages")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send(payload);
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe("Validation failed");
+      }
+
+      const adminUser = await prisma.user.findFirst({ where: { companyId, role: "admin" } });
+      await expect(
+        PackageService.createPackage(companyId, {
+          trackingCode: `PKG-SVC-BADWIN-${suffix}`,
+          recipientName: "Service Bad Window",
+          recipientAddress: "Av. Colon 100",
+          recipientPhone: "3515550002",
+          userId: adminUser!.id,
+          lat: -31.41,
+          lng: -64.18,
+          deliveryWindowStart: new Date("2026-10-05T18:00:00Z"),
+          deliveryWindowEnd: new Date("2026-10-05T12:00:00Z"),
+        })
+      ).rejects.toThrow("invalid_delivery_window");
+    });
+
+    it("allows clearing fields with null on PATCH /api/packages/:id and geocodes using addressCity when coords are missing", async () => {
+      const pkg = await prisma.package.create({
+        data: {
+          trackingCode: `PKG-UPDCLEAR-${suffix}`,
+          recipientName: "Martín Clear",
+          recipientAddress: "Av. Libertador 100",
+          recipientPhone: "3514440000",
+          addressFloor: "3D",
+          addressCity: "Córdoba",
+          addressZip: "5000",
+          deliveryWindowStart: new Date("2026-10-10T09:00:00.000Z"),
+          deliveryWindowEnd: new Date("2026-10-10T12:00:00.000Z"),
+          lat: null,
+          lng: null,
+          companyId,
+        },
+      });
+
+      const axiosSpy = jest.spyOn(axios, "get").mockResolvedValue({
+        data: [{ lat: "-32.8895", lon: "-68.8458" }],
+      } as any);
+
+      // 1. Clearing fields with null must NOT fire geocoding
+      const clearRes = await request(app)
+        .patch(`/api/packages/${pkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          addressFloor: null,
+          addressCity: null,
+          addressZip: null,
+          deliveryWindowStart: null,
+          deliveryWindowEnd: null,
+        });
+
+      expect(clearRes.status).toBe(200);
+      expect(clearRes.body.addressFloor).toBeNull();
+      expect(clearRes.body.addressCity).toBeNull();
+      expect(clearRes.body.addressZip).toBeNull();
+      expect(clearRes.body.deliveryWindowStart).toBeNull();
+      expect(clearRes.body.deliveryWindowEnd).toBeNull();
+      expect(axiosSpy).not.toHaveBeenCalled();
+
+      // 2. Updating address + addressCity when coords are missing (null in DB) geocodes with addressCity
+      const geoUpdateRes = await request(app)
+        .patch(`/api/packages/${pkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          recipientAddress: "Av. San Martin 900",
+          addressCity: "Mendoza",
+          addressZip: "5500",
+          addressFloor: "PB",
+        });
+
+      expect(geoUpdateRes.status).toBe(200);
+      expect(geoUpdateRes.body.addressCity).toBe("Mendoza");
+      expect(geoUpdateRes.body.addressZip).toBe("5500");
+      expect(geoUpdateRes.body.addressFloor).toBe("PB");
+      expect(geoUpdateRes.body.lat).toBeCloseTo(-32.8895, 4);
+      expect(geoUpdateRes.body.lng).toBeCloseTo(-68.8458, 4);
+      expect(axiosSpy).toHaveBeenCalledTimes(1);
+      expect(axiosSpy).toHaveBeenCalledWith(
+        "https://nominatim.openstreetmap.org/search",
+        expect.objectContaining({
+          params: expect.objectContaining({ q: "Av. San Martin 900, Mendoza" }),
+        })
+      );
+
+      // 3. Updating address when explicit coords already exist preserves coords (backward compatibility)
+      axiosSpy.mockClear();
+      const preserveCoordsRes = await request(app)
+        .patch(`/api/packages/${pkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          recipientAddress: "Av. San Martin 950",
+          addressCity: "Mendoza",
+        });
+      expect(preserveCoordsRes.status).toBe(200);
+      expect(preserveCoordsRes.body.lat).toBeCloseTo(-32.8895, 4);
+      expect(axiosSpy).not.toHaveBeenCalled();
+
+      // 4. Clearing lat/lng with null alongside address update triggers re-geocoding
+      axiosSpy.mockResolvedValueOnce({
+        data: [{ lat: "-34.6037", lon: "-58.3816" }],
+      } as any);
+      const reGeoRes = await request(app)
+        .patch(`/api/packages/${pkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          recipientAddress: "Av. Corrientes 1234",
+          addressCity: "CABA",
+          lat: null,
+          lng: null,
+        });
+      expect(reGeoRes.status).toBe(200);
+      expect(reGeoRes.body.lat).toBeCloseTo(-34.6037, 4);
+      expect(reGeoRes.body.lng).toBeCloseTo(-58.3816, 4);
+      expect(axiosSpy).toHaveBeenCalledWith(
+        "https://nominatim.openstreetmap.org/search",
+        expect.objectContaining({
+          params: expect.objectContaining({ q: "Av. Corrientes 1234, CABA" }),
+        })
+      );
+    });
+  });
+
+  describe("PATCH /api/packages/:packageId/status — notes, reason & deliveryNotes in PackageHistory", () => {
+    it("records real cancellation reason and notes in PackageHistory and business-event", async () => {
+      const [pkgReasonOnly, pkgNotesOnly, pkgBoth] = await Promise.all([
+        prisma.package.create({
+          data: {
+            trackingCode: `STS-RSN-${suffix}`,
+            recipientName: "Reason Only",
+            recipientAddress: "Calle 1",
+            recipientPhone: "3511110001",
+            status: "assigned",
+            companyId,
+            zoneId: activeZoneId,
+            driverId,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `STS-NTS-${suffix}`,
+            recipientName: "Notes Only",
+            recipientAddress: "Calle 2",
+            recipientPhone: "3511110002",
+            status: "pending",
+            companyId,
+            zoneId: activeZoneId,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `STS-BTH-${suffix}`,
+            recipientName: "Both Reason Notes",
+            recipientAddress: "Calle 3",
+            recipientPhone: "3511110003",
+            status: "assigned",
+            companyId,
+            zoneId: activeZoneId,
+            driverId,
+          },
+        }),
+      ]);
+
+      const emitSpy = jest.spyOn(websocketModule, "emitToRoom");
+
+      // Driver cancels with reason
+      const resReason = await request(app)
+        .patch(`/api/packages/${pkgReasonOnly.id}/status`)
+        .set("Authorization", `Bearer ${driverToken}`)
+        .send({ status: "cancelled", reason: "  Cliente ausente en domicilio  " });
+      expect(resReason.status).toBe(200);
+      expect(resReason.body.status).toBe("cancelled");
+
+      const histReason = await request(app)
+        .get(`/api/packages/${pkgReasonOnly.id}/history`)
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(histReason.status).toBe(200);
+      expect(histReason.body[0].notes).toBe("Cliente ausente en domicilio");
+
+      expect(emitSpy).toHaveBeenCalledWith(
+        `company-${companyId}`,
+        "business-event",
+        expect.objectContaining({
+          type: "ISSUE",
+          description: expect.stringContaining("Cliente ausente en domicilio"),
+        })
+      );
+
+      // Admin/dispatcher cancels with notes
+      const resNotes = await request(app)
+        .patch(`/api/packages/${pkgNotesOnly.id}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "cancelled", notes: "Dirección inexistente" });
+      expect(resNotes.status).toBe(200);
+
+      const histNotes = await prisma.packageHistory.findFirst({
+        where: { packageId: pkgNotesOnly.id },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(histNotes?.notes).toBe("Dirección inexistente");
+
+      // Driver cancels with both reason and notes
+      const resBoth = await request(app)
+        .patch(`/api/packages/${pkgBoth.id}/status`)
+        .set("Authorization", `Bearer ${driverToken}`)
+        .send({
+          status: "cancelled",
+          reason: "Incidencia de acceso",
+          notes: "Portón cerrado con candado",
+        });
+      expect(resBoth.status).toBe(200);
+
+      const histBoth = await prisma.packageHistory.findFirst({
+        where: { packageId: pkgBoth.id },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(histBoth?.notes).toBe("Incidencia de acceso: Portón cerrado con candado");
+    });
+
+    it("supports deliveryNotes compatibility, preserves POD evidence notes, and keeps default messages when empty", async () => {
+      const [pkgDeliveryNotes, pkgWithSig, pkgDefault] = await Promise.all([
+        prisma.package.create({
+          data: {
+            trackingCode: `STS-DN-${suffix}`,
+            recipientName: "Delivery Notes User",
+            recipientAddress: "Calle 4",
+            recipientPhone: "3511110004",
+            status: "in_transit",
+            companyId,
+            zoneId: activeZoneId,
+            driverId,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `STS-POD-${suffix}`,
+            recipientName: "POD Notes User",
+            recipientAddress: "Calle 5",
+            recipientPhone: "3511110005",
+            status: "in_transit",
+            companyId,
+            zoneId: activeZoneId,
+            driverId,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `STS-DEF-${suffix}`,
+            recipientName: "Default Notes User",
+            recipientAddress: "Calle 6",
+            recipientPhone: "3511110006",
+            status: "pending",
+            companyId,
+            zoneId: activeZoneId,
+          },
+        }),
+      ]);
+      createdPackageIdsForFileCleanup.push(pkgWithSig.id);
+
+      // 1. deliveryNotes without POD attachments
+      const resDN = await request(app)
+        .patch(`/api/packages/${pkgDeliveryNotes.id}/status`)
+        .set("Authorization", `Bearer ${driverToken}`)
+        .send({ status: "delivered", deliveryNotes: "Dejado en recepción" });
+      expect(resDN.status).toBe(200);
+      const histDN = await prisma.packageHistory.findFirst({
+        where: { packageId: pkgDeliveryNotes.id },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(histDN?.notes).toBe("Dejado en recepción");
+
+      // 2. notes + base64 PNG signature keeps both custom note and evidence summary
+      const tinyPng =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+      const resSig = await request(app)
+        .patch(`/api/packages/${pkgWithSig.id}/status`)
+        .set("Authorization", `Bearer ${driverToken}`)
+        .send({
+          status: "delivered",
+          notes: "Entregado en mano",
+          signature: tinyPng,
+        });
+      expect(resSig.status).toBe(200);
+      expect(resSig.body.signatureUrl).toMatch(/^\/uploads\/signature_/);
+      const histSig = await prisma.packageHistory.findFirst({
+        where: { packageId: pkgWithSig.id },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(histSig?.notes).toContain("Entregado en mano");
+      expect(histSig?.notes).toContain("firma=true");
+
+      // 3. Whitespace/null notes fall back to default messages
+      const resInTransit = await request(app)
+        .patch(`/api/packages/${pkgDefault.id}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "in_transit", notes: "   ", reason: null });
+      expect(resInTransit.status).toBe(200);
+      const histInTransit = await prisma.packageHistory.findFirst({
+        where: { packageId: pkgDefault.id, status: "in_transit" },
+      });
+      expect(histInTransit?.notes).toBe("Status updated to in_transit");
+
+      const resDeliveredDefault = await request(app)
+        .patch(`/api/packages/${pkgDefault.id}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "delivered" });
+      expect(resDeliveredDefault.status).toBe(200);
+      const histDelivDefault = await prisma.packageHistory.findFirst({
+        where: { packageId: pkgDefault.id, status: "delivered" },
+      });
+      expect(histDelivDefault?.notes).toBe("Entregado con evidencia: firma=false, foto=false");
+
+      // 4. Zod validation rejects invalid types / oversized notes
+      const badType = await request(app)
+        .patch(`/api/packages/${pkgDefault.id}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "delivered", notes: 12345 });
+      expect(badType.status).toBe(400);
+      expect(badType.body.error).toBe("Validation failed");
+
+      const oversized = await request(app)
+        .patch(`/api/packages/${pkgDefault.id}/status`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ status: "delivered", reason: "x".repeat(1001) });
+      expect(oversized.status).toBe(400);
+      expect(oversized.body.error).toBe("Validation failed");
+    });
+  });
+
+  it("documents new createPackage fields and status notes/reason fields in Swagger spec", () => {
+    const paths = (swaggerSpec as any).paths ?? {};
+    const createProps =
+      paths["/api/packages"]?.post?.requestBody?.content?.["application/json"]?.schema?.properties ?? {};
+    expect(createProps.addressFloor).toBeDefined();
+    expect(createProps.addressCity).toBeDefined();
+    expect(createProps.addressZip).toBeDefined();
+    expect(createProps.deliveryWindowStart).toBeDefined();
+    expect(createProps.deliveryWindowEnd).toBeDefined();
+
+    const statusProps =
+      paths["/api/packages/{packageId}/status"]?.patch?.requestBody?.content?.["application/json"]?.schema
+        ?.properties ?? {};
+    expect(statusProps.notes).toBeDefined();
+    expect(statusProps.reason).toBeDefined();
+    expect(statusProps.deliveryNotes).toBeDefined();
+  });
+});

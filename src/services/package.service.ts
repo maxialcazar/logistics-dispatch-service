@@ -9,6 +9,33 @@ import { ZoneService } from "./zone.service";
 import { parseDateBoundary } from "../schemas/package.schema";
 import { redis } from "../redis";
 
+export interface CreatePackageInput {
+  trackingCode: string;
+  recipientName: string;
+  recipientAddress: string;
+  recipientPhone: string;
+  recipientEmail?: string | null;
+  addressStreet?: string | null;
+  addressNumber?: string | null;
+  addressFloor?: string | null;
+  addressCity?: string | null;
+  addressZip?: string | null;
+  addressCountry?: string | null;
+  addressReferences?: string | null;
+  senderName?: string | null;
+  senderAddress?: string | null;
+  senderPhone?: string | null;
+  weight?: number | null;
+  volume?: number | null;
+  zoneId?: string;
+  userId: string;
+  lat?: number | null;
+  lng?: number | null;
+  estimatedDeliveryAt?: Date | null;
+  deliveryWindowStart?: Date | null;
+  deliveryWindowEnd?: Date | null;
+}
+
 export interface UpdatePackageInput {
   recipientName?: string;
   recipientAddress?: string;
@@ -34,6 +61,125 @@ export interface UpdatePackageInput {
 }
 
 export class PackageService {
+  private static normalizeNullableText(val: string | null | undefined): string | null | undefined {
+    if (val === undefined) return undefined;
+    if (val === null) return null;
+    const trimmed = val.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private static assertValidOptionalDate(val: Date | null | undefined): void {
+    if (val instanceof Date && Number.isNaN(val.getTime())) {
+      throw new Error("invalid_date_filter");
+    }
+  }
+
+  private static validateDeliveryWindow(
+    start: Date | null | undefined,
+    end: Date | null | undefined
+  ): void {
+    if (start && end && start > end) {
+      throw new Error("invalid_delivery_window");
+    }
+  }
+
+  private static buildGeocodeQuery(input: {
+    recipientAddress?: string | null;
+    addressStreet?: string | null;
+    addressNumber?: string | null;
+    addressCity?: string | null;
+    addressCountry?: string | null;
+  }): string | null {
+    const trimmedRecipient = input.recipientAddress?.trim();
+    if (!trimmedRecipient) return null;
+
+    const street = input.addressStreet?.trim();
+    const number = input.addressNumber?.trim();
+    const hasStreetAndNumber = Boolean(street && number);
+    const baseStreet = hasStreetAndNumber ? `${street} ${number}` : trimmedRecipient;
+
+    const normalizeText = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    const normalizedRecipient = normalizeText(trimmedRecipient);
+
+    const recipientParts = trimmedRecipient
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const localityTerms = [input.addressCity?.trim(), input.addressCountry?.trim()].filter(
+      (term): term is string => Boolean(term)
+    );
+    const missingLocalityTerms = hasStreetAndNumber
+      ? localityTerms
+      : localityTerms.filter((term) => !normalizedRecipient.includes(normalizeText(term)));
+    const explicitLocalityFromField = missingLocalityTerms.join(", ");
+    const explicitLocalityFromAddress =
+      recipientParts.length >= 2 ? recipientParts.slice(1).join(", ") : "";
+    const hasInlineCountryOrCity =
+      /\b(argentina|cordoba|buenos aires|caba|rosario|mendoza|chile|uruguay|brasil|brazil|mexico|colombia|peru|espana|spain|usa)\b/i.test(
+        normalizedRecipient
+      );
+
+    if (explicitLocalityFromField) {
+      return `${baseStreet}, ${explicitLocalityFromField}`;
+    }
+    if (localityTerms.length > 0) {
+      return trimmedRecipient;
+    }
+    if (explicitLocalityFromAddress) {
+      return hasStreetAndNumber
+        ? `${baseStreet}, ${explicitLocalityFromAddress}`
+        : trimmedRecipient;
+    }
+    if (hasInlineCountryOrCity) {
+      return trimmedRecipient;
+    }
+    return `${baseStreet}, Cordoba, Argentina`;
+  }
+
+  private static resolveStatusHistoryNote(params: {
+    status: PackageStatus;
+    signatureUrl?: string;
+    photoUrl?: string;
+    notes?: string | null;
+    reason?: string | null;
+    deliveryNotes?: string | null;
+  }): { customNote: string | null; historyNotes: string } {
+    const normalizedNotes = PackageService.normalizeNullableText(params.notes);
+    const normalizedDeliveryNotes = PackageService.normalizeNullableText(params.deliveryNotes);
+    const normalizedReason = PackageService.normalizeNullableText(params.reason);
+
+    const noteBody =
+      normalizedNotes && normalizedDeliveryNotes && normalizedNotes !== normalizedDeliveryNotes
+        ? `${normalizedNotes}; ${normalizedDeliveryNotes}`
+        : (normalizedNotes ?? normalizedDeliveryNotes ?? null);
+
+    let customNote: string | null = null;
+    if (normalizedReason && noteBody) {
+      customNote =
+        normalizedReason === noteBody ? normalizedReason : `${normalizedReason}: ${noteBody}`;
+    } else {
+      customNote = normalizedReason ?? noteBody ?? null;
+    }
+
+    if (customNote) {
+      const historyNotes =
+        params.status === "delivered" && (params.signatureUrl || params.photoUrl)
+          ? `${customNote} (evidencia: firma=${!!params.signatureUrl}, foto=${!!params.photoUrl})`
+          : customNote;
+      return { customNote, historyNotes };
+    }
+
+    const defaultNotes =
+      params.status === "delivered"
+        ? `Entregado con evidencia: firma=${!!params.signatureUrl}, foto=${!!params.photoUrl}`
+        : `Status updated to ${params.status}`;
+    return { customNote: null, historyNotes: defaultNotes };
+  }
+
   private static resolveDateFilter(
     value: Date | string | undefined,
     boundary: "start" | "end"
@@ -262,39 +408,39 @@ export class PackageService {
     return result;
   }
 // ...
-  static async createPackage(companyId: string, data: {
-    // ... params
-    trackingCode: string;
-    recipientName: string;
-    recipientAddress: string;
-    recipientPhone: string;
-    recipientEmail?: string;
-    addressStreet?: string;
-    addressNumber?: string;
-    addressCity?: string;
-    addressCountry?: string;
-    addressReferences?: string;
-    senderName?: string;
-    senderAddress?: string;
-    senderPhone?: string;
-    weight?: number;
-    volume?: number;
-    zoneId?: string; // Optional now? No, kept required for logic
-    userId: string;
-    lat?: number | null;
-    lng?: number | null;
-    estimatedDeliveryAt?: Date;
-  }) {
-    // ... logic ...
-    const { 
-      trackingCode, 
-      recipientName, recipientAddress, recipientPhone, recipientEmail,
-      addressStreet, addressNumber, addressCity, addressCountry, addressReferences,
-      senderName, senderAddress, senderPhone,
-      weight, volume,
-      zoneId, userId, lat, lng, estimatedDeliveryAt 
+  static async createPackage(companyId: string, data: CreatePackageInput) {
+    const {
+      trackingCode,
+      recipientName,
+      recipientAddress,
+      recipientPhone,
+      recipientEmail,
+      addressStreet,
+      addressNumber,
+      addressFloor,
+      addressCity,
+      addressZip,
+      addressCountry,
+      addressReferences,
+      senderName,
+      senderAddress,
+      senderPhone,
+      weight,
+      volume,
+      zoneId,
+      userId,
+      lat,
+      lng,
+      estimatedDeliveryAt,
+      deliveryWindowStart,
+      deliveryWindowEnd,
     } = data;
-    
+
+    PackageService.assertValidOptionalDate(estimatedDeliveryAt);
+    PackageService.assertValidOptionalDate(deliveryWindowStart);
+    PackageService.assertValidOptionalDate(deliveryWindowEnd);
+    PackageService.validateDeliveryWindow(deliveryWindowStart, deliveryWindowEnd);
+
     // Validate Zone (if provided manually)
     let resolvedZoneId = zoneId;
     if (resolvedZoneId) {
@@ -308,58 +454,21 @@ export class PackageService {
     let finalLat = lat;
     let finalLng = lng;
 
-    const trimmedRecipient = recipientAddress?.trim();
-    if ((finalLat == null || finalLng == null) && trimmedRecipient) {
-        const street = addressStreet?.trim();
-        const number = addressNumber?.trim();
-        const hasStreetAndNumber = Boolean(street && number);
-        const baseStreet = hasStreetAndNumber ? `${street} ${number}` : trimmedRecipient;
-
-        const normalizeText = (value: string) =>
-          value
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase();
-        const normalizedRecipient = normalizeText(trimmedRecipient);
-
-        const recipientParts = trimmedRecipient
-          .split(",")
-          .map((part) => part.trim())
-          .filter(Boolean);
-        const localityTerms = [addressCity?.trim(), addressCountry?.trim()].filter(
-          (term): term is string => Boolean(term)
-        );
-        const missingLocalityTerms = hasStreetAndNumber
-          ? localityTerms
-          : localityTerms.filter((term) => !normalizedRecipient.includes(normalizeText(term)));
-        const explicitLocalityFromField = missingLocalityTerms.join(", ");
-        const explicitLocalityFromAddress =
-          recipientParts.length >= 2 ? recipientParts.slice(1).join(", ") : "";
-        const hasInlineCountryOrCity =
-          /\b(argentina|cordoba|buenos aires|caba|rosario|mendoza|chile|uruguay|brasil|brazil|mexico|colombia|peru|espana|spain|usa)\b/i.test(
-            normalizedRecipient
-          );
-
-        let queryAddr: string;
-        if (explicitLocalityFromField) {
-          queryAddr = `${baseStreet}, ${explicitLocalityFromField}`;
-        } else if (localityTerms.length > 0) {
-          queryAddr = trimmedRecipient;
-        } else if (explicitLocalityFromAddress) {
-          queryAddr = hasStreetAndNumber
-            ? `${baseStreet}, ${explicitLocalityFromAddress}`
-            : trimmedRecipient;
-        } else if (hasInlineCountryOrCity) {
-          queryAddr = trimmedRecipient;
-        } else {
-          queryAddr = `${baseStreet}, Cordoba, Argentina`;
-        }
-
+    if (finalLat == null || finalLng == null) {
+      const queryAddr = PackageService.buildGeocodeQuery({
+        recipientAddress,
+        addressStreet,
+        addressNumber,
+        addressCity,
+        addressCountry,
+      });
+      if (queryAddr) {
         const geo = await geocodeAddress(queryAddr);
         if (geo) {
-            finalLat = geo.lat;
-            finalLng = geo.lng;
+          finalLat = geo.lat;
+          finalLng = geo.lng;
         }
+      }
     }
     // -----------------------
 
@@ -376,6 +485,10 @@ export class PackageService {
         }
     }
     // ----------------------------------------------------
+
+    const normalizedAddressFloor = PackageService.normalizeNullableText(addressFloor);
+    const normalizedAddressCity = PackageService.normalizeNullableText(addressCity);
+    const normalizedAddressZip = PackageService.normalizeNullableText(addressZip);
 
     const pkg = await prisma.$transaction(async (tx) => {
       let initialStatus: PackageStatus = "pending";
@@ -409,7 +522,9 @@ export class PackageService {
           recipientEmail,
           addressStreet,
           addressNumber,
-          addressCity: addressCity?.trim() || undefined,
+          addressFloor: normalizedAddressFloor,
+          addressCity: normalizedAddressCity,
+          addressZip: normalizedAddressZip,
           addressReferences,
           senderName,
           senderAddress,
@@ -419,6 +534,8 @@ export class PackageService {
           lat: finalLat,
           lng: finalLng,
           estimatedDeliveryAt,
+          deliveryWindowStart,
+          deliveryWindowEnd,
           zoneId: targetZoneId,
           driverId: initialDriverId,
           companyId,
@@ -527,8 +644,25 @@ export class PackageService {
     estimatedDeliveryAt?: Date;
     signature?: string; // Base64 data URI of recipient's signature
     photo?: string;     // Base64 data URI of delivery photo evidence
+    notes?: string | null;
+    reason?: string | null;
+    deliveryNotes?: string | null;
   }) {
-    const { packageId, status, userId, userRole, userDriverId, lat, lng, estimatedDeliveryAt, signature, photo } = params;
+    const {
+      packageId,
+      status,
+      userId,
+      userRole,
+      userDriverId,
+      lat,
+      lng,
+      estimatedDeliveryAt,
+      signature,
+      photo,
+      notes,
+      reason,
+      deliveryNotes,
+    } = params;
     
     // Initial check before processing Proof of Delivery uploads
     const pkg = await prisma.package.findFirst({ 
@@ -582,6 +716,15 @@ export class PackageService {
     }
     // --------------------------------
 
+    const { customNote, historyNotes } = PackageService.resolveStatusHistoryNote({
+      status,
+      signatureUrl,
+      photoUrl,
+      notes,
+      reason,
+      deliveryNotes,
+    });
+
     let txResult: { updated: any; trackingCode: string };
     try {
       txResult = await prisma.$transaction(async (tx) => {
@@ -627,9 +770,7 @@ export class PackageService {
             packageId,
             status,
             userId,
-            notes: status === 'delivered'
-              ? `Entregado con evidencia: firma=${!!signatureUrl}, foto=${!!photoUrl}`
-              : `Status updated to ${status}`
+            notes: historyNotes,
           }
         });
 
@@ -653,6 +794,7 @@ export class PackageService {
       estimatedDeliveryAt,
       signatureUrl,
       photoUrl,
+      ...(customNote ? { notes: historyNotes } : {}),
     });
 
     // Emit Business Event
@@ -674,7 +816,9 @@ export class PackageService {
       id: `evt-${Date.now()}`,
       type: eventType,
       title: title,
-      description: `El paquete #${trackingCode} ha cambiado a estado: ${status.replace('_', ' ')}`,
+      description: customNote
+        ? `El paquete #${trackingCode} ha cambiado a estado: ${status.replace('_', ' ')} (${customNote})`
+        : `El paquete #${trackingCode} ha cambiado a estado: ${status.replace('_', ' ')}`,
       timestamp: Date.now()
     });
 
@@ -809,27 +953,92 @@ export class PackageService {
     userId: string,
     data: UpdatePackageInput
   ) {
-    const normalizeNullableText = (val: string | null | undefined): string | null | undefined => {
-      if (val === undefined) return undefined;
-      if (val === null) return null;
-      const trimmed = val.trim();
-      return trimmed.length > 0 ? trimmed : null;
-    };
-
     const normalizeRequiredText = (val: string | undefined): string | undefined => {
       if (val === undefined) return undefined;
       return val.trim();
     };
 
-    const assertValidOptionalDate = (val: Date | null | undefined) => {
-      if (val instanceof Date && Number.isNaN(val.getTime())) {
-        throw new Error("invalid_date_filter");
-      }
-    };
+    PackageService.assertValidOptionalDate(data.estimatedDeliveryAt);
+    PackageService.assertValidOptionalDate(data.deliveryWindowStart);
+    PackageService.assertValidOptionalDate(data.deliveryWindowEnd);
 
-    assertValidOptionalDate(data.estimatedDeliveryAt);
-    assertValidOptionalDate(data.deliveryWindowStart);
-    assertValidOptionalDate(data.deliveryWindowEnd);
+    let resolvedLatUpdate: number | null | undefined = data.lat;
+    let resolvedLngUpdate: number | null | undefined = data.lng;
+
+    const hasNonEmptyAddressUpdate = Boolean(
+      data.recipientAddress?.trim() ||
+        data.addressStreet?.trim() ||
+        data.addressNumber?.trim() ||
+        data.addressCity?.trim()
+    );
+
+    if (hasNonEmptyAddressUpdate && (data.lat == null || data.lng == null)) {
+      const existingPkg = await prisma.package.findFirst({
+        where: { id: packageId, companyId },
+        select: {
+          status: true,
+          zoneId: true,
+          recipientAddress: true,
+          addressStreet: true,
+          addressNumber: true,
+          addressCity: true,
+          lat: true,
+          lng: true,
+          deliveryWindowStart: true,
+          deliveryWindowEnd: true,
+        },
+      });
+      if (!existingPkg) {
+        throw new Error("package_not_found");
+      }
+      if (existingPkg.status === "delivered" || existingPkg.status === "cancelled") {
+        throw new Error(`cannot_update_terminal_package:${existingPkg.status}`);
+      }
+      if (
+        existingPkg.status === "in_transit" &&
+        data.zoneId !== undefined &&
+        data.zoneId !== existingPkg.zoneId
+      ) {
+        throw new Error("cannot_reassign_zone_in_transit");
+      }
+      PackageService.validateDeliveryWindow(
+        data.deliveryWindowStart !== undefined
+          ? data.deliveryWindowStart
+          : existingPkg.deliveryWindowStart,
+        data.deliveryWindowEnd !== undefined ? data.deliveryWindowEnd : existingPkg.deliveryWindowEnd
+      );
+
+      const effectiveLat = data.lat !== undefined ? data.lat : existingPkg.lat;
+      const effectiveLng = data.lng !== undefined ? data.lng : existingPkg.lng;
+
+      if (effectiveLat == null || effectiveLng == null) {
+        const queryAddr = PackageService.buildGeocodeQuery({
+          recipientAddress:
+            data.recipientAddress !== undefined
+              ? normalizeRequiredText(data.recipientAddress)
+              : existingPkg.recipientAddress,
+          addressStreet:
+            data.addressStreet !== undefined
+              ? PackageService.normalizeNullableText(data.addressStreet)
+              : existingPkg.addressStreet,
+          addressNumber:
+            data.addressNumber !== undefined
+              ? PackageService.normalizeNullableText(data.addressNumber)
+              : existingPkg.addressNumber,
+          addressCity:
+            data.addressCity !== undefined
+              ? PackageService.normalizeNullableText(data.addressCity)
+              : existingPkg.addressCity,
+        });
+        if (queryAddr) {
+          const geo = await geocodeAddress(queryAddr);
+          if (geo) {
+            if (resolvedLatUpdate == null) resolvedLatUpdate = geo.lat;
+            if (resolvedLngUpdate == null) resolvedLngUpdate = geo.lng;
+          }
+        }
+      }
+    }
 
     const txResult = await prisma.$transaction(async (tx) => {
       const initialPkg = await tx.package.findFirst({
@@ -916,9 +1125,7 @@ export class PackageService {
           ? data.deliveryWindowEnd
           : lockedPkg.deliveryWindowEnd;
 
-      if (effectiveWindowStart && effectiveWindowEnd && effectiveWindowStart > effectiveWindowEnd) {
-        throw new Error("invalid_delivery_window");
-      }
+      PackageService.validateDeliveryWindow(effectiveWindowStart, effectiveWindowEnd);
 
       const zoneChanged = data.zoneId !== undefined && data.zoneId !== lockedPkg.zoneId;
       let nextStatus: PackageStatus = lockedPkg.status;
@@ -949,16 +1156,16 @@ export class PackageService {
       const recipientName = normalizeRequiredText(data.recipientName);
       const recipientAddress = normalizeRequiredText(data.recipientAddress);
       const recipientPhone = normalizeRequiredText(data.recipientPhone);
-      const recipientEmail = normalizeNullableText(data.recipientEmail);
-      const addressStreet = normalizeNullableText(data.addressStreet);
-      const addressNumber = normalizeNullableText(data.addressNumber);
-      const addressFloor = normalizeNullableText(data.addressFloor);
-      const addressCity = normalizeNullableText(data.addressCity);
-      const addressZip = normalizeNullableText(data.addressZip);
-      const addressReferences = normalizeNullableText(data.addressReferences);
-      const senderName = normalizeNullableText(data.senderName);
-      const senderAddress = normalizeNullableText(data.senderAddress);
-      const senderPhone = normalizeNullableText(data.senderPhone);
+      const recipientEmail = PackageService.normalizeNullableText(data.recipientEmail);
+      const addressStreet = PackageService.normalizeNullableText(data.addressStreet);
+      const addressNumber = PackageService.normalizeNullableText(data.addressNumber);
+      const addressFloor = PackageService.normalizeNullableText(data.addressFloor);
+      const addressCity = PackageService.normalizeNullableText(data.addressCity);
+      const addressZip = PackageService.normalizeNullableText(data.addressZip);
+      const addressReferences = PackageService.normalizeNullableText(data.addressReferences);
+      const senderName = PackageService.normalizeNullableText(data.senderName);
+      const senderAddress = PackageService.normalizeNullableText(data.senderAddress);
+      const senderPhone = PackageService.normalizeNullableText(data.senderPhone);
 
       const updateData: Prisma.PackageUncheckedUpdateInput = {
         ...(recipientName !== undefined ? { recipientName } : {}),
@@ -976,8 +1183,8 @@ export class PackageService {
         ...(senderPhone !== undefined ? { senderPhone } : {}),
         ...(data.weight !== undefined ? { weight: data.weight } : {}),
         ...(data.volume !== undefined ? { volume: data.volume } : {}),
-        ...(data.lat !== undefined ? { lat: data.lat } : {}),
-        ...(data.lng !== undefined ? { lng: data.lng } : {}),
+        ...(resolvedLatUpdate !== undefined ? { lat: resolvedLatUpdate } : {}),
+        ...(resolvedLngUpdate !== undefined ? { lng: resolvedLngUpdate } : {}),
         ...(data.estimatedDeliveryAt !== undefined
           ? { estimatedDeliveryAt: data.estimatedDeliveryAt }
           : {}),
@@ -1013,8 +1220,8 @@ export class PackageService {
         ["senderPhone", senderPhone],
         ["weight", data.weight],
         ["volume", data.volume],
-        ["lat", data.lat],
-        ["lng", data.lng],
+        ["lat", resolvedLatUpdate],
+        ["lng", resolvedLngUpdate],
         ["estimatedDeliveryAt", data.estimatedDeliveryAt],
         ["deliveryWindowStart", data.deliveryWindowStart],
         ["deliveryWindowEnd", data.deliveryWindowEnd],

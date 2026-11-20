@@ -44,13 +44,30 @@ export async function getPackages(req: AuthRequest, res: Response) {
 }
 
 export async function createPackage(req: AuthRequest, res: Response) {
-  const { 
-    trackingCode, 
-    recipientName, recipientAddress, recipientPhone, recipientEmail,
-    addressStreet, addressNumber, addressCity, addressCountry, addressReferences,
-    senderName, senderAddress, senderPhone,
-    weight, volume,
-    zoneId, lat, lng, estimatedDeliveryAt 
+  const {
+    trackingCode,
+    recipientName,
+    recipientAddress,
+    recipientPhone,
+    recipientEmail,
+    addressStreet,
+    addressNumber,
+    addressFloor,
+    addressCity,
+    addressZip,
+    addressCountry,
+    addressReferences,
+    senderName,
+    senderAddress,
+    senderPhone,
+    weight,
+    volume,
+    zoneId,
+    lat,
+    lng,
+    estimatedDeliveryAt,
+    deliveryWindowStart,
+    deliveryWindowEnd,
   } = req.body;
 
   try {
@@ -62,7 +79,9 @@ export async function createPackage(req: AuthRequest, res: Response) {
       recipientEmail,
       addressStreet,
       addressNumber,
+      addressFloor,
       addressCity,
+      addressZip,
       addressCountry,
       addressReferences,
       senderName,
@@ -74,13 +93,23 @@ export async function createPackage(req: AuthRequest, res: Response) {
       userId: req.user!.id,
       lat,
       lng,
-      estimatedDeliveryAt: estimatedDeliveryAt ? new Date(estimatedDeliveryAt) : undefined,
+      estimatedDeliveryAt: parseOptionalNullableDate(estimatedDeliveryAt),
+      deliveryWindowStart: parseOptionalNullableDate(deliveryWindowStart),
+      deliveryWindowEnd: parseOptionalNullableDate(deliveryWindowEnd),
     });
     res.status(201).json(pkg);
   } catch (error: any) {
     console.error(error);
     if (error.message === "zone_not_found") {
       return res.status(400).json({ error: "zone not found" });
+    }
+    if (error?.message === "invalid_delivery_window" || error?.message === "invalid_date_filter") {
+      return res.status(400).json({
+        error:
+          error.message === "invalid_date_filter"
+            ? "Invalid date filter"
+            : "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
+      });
     }
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
@@ -101,7 +130,8 @@ export async function getPackagesByDriver(req: AuthRequest, res: Response) {
 
 export async function updatePackageStatus(req: AuthRequest, res: Response) {
   const { packageId } = req.params;
-  const { status, lat, lng, estimatedDeliveryAt, signature, photo } = req.body;
+  const { status, lat, lng, estimatedDeliveryAt, signature, photo, notes, reason, deliveryNotes } =
+    req.body;
 
   try {
     const updated = await PackageService.updateStatus(req.user!.companyId, {
@@ -115,6 +145,9 @@ export async function updatePackageStatus(req: AuthRequest, res: Response) {
       estimatedDeliveryAt: estimatedDeliveryAt ? new Date(estimatedDeliveryAt) : undefined,
       signature,
       photo,
+      notes,
+      reason,
+      deliveryNotes,
     });
     res.json(updated);
   } catch (error: any) {

@@ -114,38 +114,57 @@ export const getPackagesSchema = z.object({
     ),
 });
 
+const optionalNoteSchema = z.string().trim().max(1000).nullable().optional();
+
+function hasValidDeliveryWindow(body: {
+  deliveryWindowStart?: string | null;
+  deliveryWindowEnd?: string | null;
+}): boolean {
+  if (!body.deliveryWindowStart || !body.deliveryWindowEnd) return true;
+  return new Date(body.deliveryWindowStart) <= new Date(body.deliveryWindowEnd);
+}
+
 export const createPackageSchema = z.object({
-  body: z.object({
-    trackingCode: z.string().min(5),
-    
-    // Recipient Info
-    recipientName: z.string().min(2),
-    recipientAddress: z.string().min(5),
-    recipientPhone: z.string().min(3),
-    recipientEmail: z.string().email().optional(),
-    
-    // Delivery Details
-    addressReferences: z.string().optional(),
-    addressStreet: z.string().optional(),
-    addressNumber: z.string().optional(),
-    addressCity: z.string().optional(),
-    addressCountry: z.string().optional(),
+  body: z
+    .object({
+      trackingCode: z.string().min(5),
 
-    // Sender Info (Optional)
-    senderName: z.string().optional().or(z.literal("")),
-    senderAddress: z.string().optional().or(z.literal("")),
-    senderPhone: z.string().optional().or(z.literal("")),
+      // Recipient Info
+      recipientName: z.string().min(2),
+      recipientAddress: z.string().min(5),
+      recipientPhone: z.string().min(3),
+      recipientEmail: z.string().email().optional(),
 
-    // Logistics
-    weight: z.number().optional().nullable(),
-    volume: z.number().optional().nullable(),
-    zoneId: z.string().uuid().optional(), // Make optional if auto-zone logic exists? No, keep required for now as per controller logic.
-    
-    // Coordinates
-    lat: z.number().nullable().optional(),
-    lng: z.number().nullable().optional(),
-    estimatedDeliveryAt: z.string().datetime().optional(),
-  }),
+      // Delivery Details
+      addressReferences: z.string().optional(),
+      addressStreet: z.string().optional(),
+      addressNumber: z.string().optional(),
+      addressFloor: z.string().trim().nullable().optional(),
+      addressCity: z.string().trim().nullable().optional(),
+      addressZip: z.string().trim().nullable().optional(),
+      addressCountry: z.string().optional(),
+
+      // Sender Info (Optional)
+      senderName: z.string().optional().or(z.literal("")),
+      senderAddress: z.string().optional().or(z.literal("")),
+      senderPhone: z.string().optional().or(z.literal("")),
+
+      // Logistics
+      weight: z.number().optional().nullable(),
+      volume: z.number().optional().nullable(),
+      zoneId: z.string().uuid().optional(),
+
+      // Coordinates & Windows
+      lat: z.number().nullable().optional(),
+      lng: z.number().nullable().optional(),
+      estimatedDeliveryAt: isoDateTimeSchema.nullable().optional(),
+      deliveryWindowStart: isoDateTimeSchema.nullable().optional(),
+      deliveryWindowEnd: isoDateTimeSchema.nullable().optional(),
+    })
+    .refine(hasValidDeliveryWindow, {
+      message: "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
+      path: ["deliveryWindowStart"],
+    }),
 });
 
 export const updatePackageStatusSchema = z.object({
@@ -156,10 +175,13 @@ export const updatePackageStatusSchema = z.object({
     status: z.enum(["pending", "assigned", "in_transit", "delivered", "cancelled"]),
     lat: z.number().optional(),
     lng: z.number().optional(),
-    estimatedDeliveryAt: z.string().datetime().optional(),
+    estimatedDeliveryAt: isoDateTimeSchema.optional(),
     // Proof of Delivery (POD) - only relevant when status is 'delivered'
     signature: z.string().optional(), // Base64 data URI of the recipient's signature
     photo: z.string().optional(),     // Base64 data URI of the delivery photo evidence
+    notes: optionalNoteSchema,
+    reason: optionalNoteSchema,
+    deliveryNotes: optionalNoteSchema,
   }),
 });
 
@@ -215,16 +237,10 @@ export const updatePackageSchema = z.object({
     .refine((body) => Object.values(body).some((val) => val !== undefined), {
       message: "At least one editable field must be provided",
     })
-    .refine(
-      (body) => {
-        if (!body.deliveryWindowStart || !body.deliveryWindowEnd) return true;
-        return new Date(body.deliveryWindowStart) <= new Date(body.deliveryWindowEnd);
-      },
-      {
-        message: "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
-        path: ["deliveryWindowStart"],
-      }
-    ),
+    .refine(hasValidDeliveryWindow, {
+      message: "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
+      path: ["deliveryWindowStart"],
+    }),
 });
 
 export const unarchivePackagesSchema = z.object({

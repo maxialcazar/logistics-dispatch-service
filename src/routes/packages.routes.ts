@@ -152,9 +152,78 @@ router.get("/", requireRole("dispatcher", "admin"), validate(getPackagesSchema),
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [trackingCode, recipientName, recipientAddress, recipientPhone]
+ *             properties:
+ *               trackingCode:
+ *                 type: string
+ *               recipientName:
+ *                 type: string
+ *               recipientAddress:
+ *                 type: string
+ *               recipientPhone:
+ *                 type: string
+ *               recipientEmail:
+ *                 type: string
+ *                 format: email
+ *               addressStreet:
+ *                 type: string
+ *               addressNumber:
+ *                 type: string
+ *               addressFloor:
+ *                 type: string
+ *                 nullable: true
+ *               addressCity:
+ *                 type: string
+ *                 nullable: true
+ *               addressZip:
+ *                 type: string
+ *                 nullable: true
+ *               addressCountry:
+ *                 type: string
+ *               addressReferences:
+ *                 type: string
+ *               senderName:
+ *                 type: string
+ *               senderAddress:
+ *                 type: string
+ *               senderPhone:
+ *                 type: string
+ *               weight:
+ *                 type: number
+ *                 nullable: true
+ *               volume:
+ *                 type: number
+ *                 nullable: true
+ *               zoneId:
+ *                 type: string
+ *                 format: uuid
+ *               lat:
+ *                 type: number
+ *                 nullable: true
+ *               lng:
+ *                 type: number
+ *                 nullable: true
+ *               estimatedDeliveryAt:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               deliveryWindowStart:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               deliveryWindowEnd:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
  *     responses:
  *       201:
  *         description: Created
+ *       400:
+ *         description: Validation failed or zone not found
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
 router.post("/", requireRole("dispatcher", "admin"), validate(createPackageSchema), createPackage);
 
@@ -387,17 +456,64 @@ router.patch("/:id", requireRole("dispatcher", "admin"), validate(updatePackageS
  * @openapi
  * /api/packages/{packageId}/status:
  *   patch:
- *     summary: Update package status
+ *     summary: Update package status and record optional notes or reason in PackageHistory
  *     tags: [Packages]
  *     parameters:
  *       - in: path
  *         name: packageId
  *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, assigned, in_transit, delivered, cancelled]
+ *               lat:
+ *                 type: number
+ *               lng:
+ *                 type: number
+ *               estimatedDeliveryAt:
+ *                 type: string
+ *                 format: date-time
+ *               signature:
+ *                 type: string
+ *               photo:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional incident, cancellation, or delivery notes stored in PackageHistory
+ *               reason:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional cancellation or incident reason stored in PackageHistory
+ *               deliveryNotes:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional delivery notes alias maintained for compatibility
  *     responses:
  *       200:
  *         description: Success
+ *       400:
+ *         description: Validation failed
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Driver not authorized for this package
+ *       404:
+ *         description: Package not found
+ *       422:
+ *         description: Invalid status transition
  */
 router.patch("/:packageId/status", requireRole("dispatcher", "driver", "admin"), validate(updatePackageStatusSchema), updatePackageStatus);
 
