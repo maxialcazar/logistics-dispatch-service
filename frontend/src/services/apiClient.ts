@@ -38,6 +38,45 @@ function normalizeBaseUrl(rawUrl: string | undefined): string {
 
 const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
 
+export interface BlobDownloadResult {
+  blob: Blob;
+  filename: string | null;
+}
+
+export function resolveApiAssetUrl(assetPath?: string | null): string | null {
+  if (!assetPath) {
+    return null;
+  }
+
+  const trimmed = assetPath.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^(https?:|data:|blob:)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const normalizedPath = `/${trimmed.replace(/^\/+/, '')}`;
+  if (!API_BASE_URL) {
+    return normalizedPath;
+  }
+
+  if (
+    normalizedPath === '/api' ||
+    normalizedPath.startsWith('/api/') ||
+    normalizedPath.startsWith('/api?')
+  ) {
+    return buildApiUrl(normalizedPath);
+  }
+
+  const originBase = API_BASE_URL.endsWith('/api')
+    ? API_BASE_URL.slice(0, -4)
+    : API_BASE_URL;
+
+  return `${originBase}${normalizedPath}`;
+}
+
 export function buildApiUrl(endpoint: string): string {
   if (/^https?:\/\//i.test(endpoint)) {
     return endpoint;
@@ -170,10 +209,31 @@ function extractErrorMessage(data: unknown, status: number, statusText: string):
   return statusText ? `Error ${status}: ${statusText}` : `Error ${status}`;
 }
 
-async function request<T = unknown>(
+function extractFilenameFromDisposition(headerValue: string | null): string | null {
+  if (!headerValue) return null;
+
+  const utf8Match = /filename\*=UTF-8''([^;\s]+)/i.exec(headerValue);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1].replace(/["']/g, ''));
+    } catch {
+      return utf8Match[1].replace(/["']/g, '');
+    }
+  }
+
+  const quotedMatch = /filename="([^"]+)"/i.exec(headerValue);
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1];
+  }
+
+  const plainMatch = /filename=([^;\s]+)/i.exec(headerValue);
+  return plainMatch?.[1]?.replace(/["']/g, '') ?? null;
+}
+
+async function performFetch(
   endpoint: string,
   options: ApiRequestOptions = {}
-): Promise<T> {
+): Promise<Response> {
   const { body, token, skipAuthHandler = false, ...fetchOptions } = options;
   const url = buildApiUrl(endpoint);
   const headers = new Headers(fetchOptions.headers);
@@ -213,6 +273,14 @@ async function request<T = unknown>(
     handleUnauthorized();
   }
 
+  return response;
+}
+
+async function request<T = unknown>(
+  endpoint: string,
+  options: ApiRequestOptions = {}
+): Promise<T> {
+  const response = await performFetch(endpoint, options);
   const data = await parseResponseBody(response);
 
   if (!response.ok) {
@@ -223,8 +291,26 @@ async function request<T = unknown>(
   return data as T;
 }
 
+async function getBlob(
+  endpoint: string,
+  options: Omit<ApiRequestOptions, 'method' | 'body'> = {}
+): Promise<BlobDownloadResult> {
+  const response = await performFetch(endpoint, { ...options, method: 'GET' });
+
+  if (!response.ok) {
+    const data = await parseResponseBody(response);
+    const message = extractErrorMessage(data, response.status, response.statusText);
+    throw new ApiError(message, response.status, data);
+  }
+
+  const blob = await response.blob();
+  const filename = extractFilenameFromDisposition(response.headers.get('content-disposition'));
+  return { blob, filename };
+}
+
 export const apiClient = {
   request,
+  getBlob,
 
   get<T = unknown>(
     endpoint: string,
