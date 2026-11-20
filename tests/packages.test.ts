@@ -2136,3 +2136,764 @@ describe("Task 2.1.3 — Package address/deliveryWindow fields, update geocoding
     expect(statusProps.deliveryNotes).toBeDefined();
   });
 });
+
+// ─── Task 2.2.3 — Dashboard Stats (dateFrom/dateTo, real efficiency, 7-day non-overlap, topDrivers) ─
+describe("Task 2.2.3 — GET /api/packages/stats date filters, real efficiency & consolidated topDrivers", () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  let mainCompanyId: string;
+  let emptyCompanyId: string;
+  let adminToken: string;
+  let emptyAdminToken: string;
+  let driverToken: string;
+
+  let driverMultiId: string;
+  let driverBetaId: string;
+  let driverGammaId: string;
+  let extraDriverIds: string[] = [];
+
+  let zoneNorthId: string;
+  let zoneEastId: string;
+  let zoneSouthId: string;
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  beforeAll(async () => {
+    const [regMain, regEmpty] = await Promise.all([
+      request(app).post("/api/auth/register-company").send({
+        companyName: "Stats Main Co",
+        companySlug: `stats-main-${suffix}`,
+        username: `stats_admin_${suffix}`,
+        password: "securepassword123",
+      }),
+      request(app).post("/api/auth/register-company").send({
+        companyName: "Stats Empty Co",
+        companySlug: `stats-empty-${suffix}`,
+        username: `stats_empty_${suffix}`,
+        password: "securepassword123",
+      }),
+    ]);
+    expect(regMain.status).toBe(201);
+    expect(regEmpty.status).toBe(201);
+
+    mainCompanyId = regMain.body.company.id;
+    emptyCompanyId = regEmpty.body.company.id;
+    adminToken = regMain.body.token;
+    emptyAdminToken = regEmpty.body.token;
+
+    const [dMultiRes, dBetaRes, dGammaRes] = await Promise.all([
+      request(app)
+        .post("/api/drivers")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ name: "Driver MultiZone", username: `stats_dmulti_${suffix}`, password: "driverpass123" }),
+      request(app)
+        .post("/api/drivers")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ name: "Driver Beta", username: `stats_dbeta_${suffix}`, password: "driverpass123" }),
+      request(app)
+        .post("/api/drivers")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ name: "Driver Gamma", username: `stats_dgamma_${suffix}`, password: "driverpass123" }),
+    ]);
+    expect(dMultiRes.status).toBe(201);
+    expect(dBetaRes.status).toBe(201);
+    expect(dGammaRes.status).toBe(201);
+
+    driverMultiId = dMultiRes.body.id;
+    driverBetaId = dBetaRes.body.id;
+    driverGammaId = dGammaRes.body.id;
+
+    const loginDriverRes = await request(app).post("/api/auth/login").send({
+      username: `stats_dmulti_${suffix}`,
+      password: "driverpass123",
+    });
+    driverToken = loginDriverRes.body.token;
+
+    const extraDrivers = await Promise.all(
+      [1, 2, 3, 4].map((idx) =>
+        prisma.driver.create({
+          data: { name: `Extra Driver ${idx}`, companyId: mainCompanyId },
+        })
+      )
+    );
+    extraDriverIds = extraDrivers.map((d) => d.id);
+
+    // Driver Multi owns TWO active zones (North & East); Driver Beta owns South
+    const [zNorth, zEast, zSouth] = await Promise.all([
+      prisma.zone.create({
+        data: { name: "Stats North", companyId: mainCompanyId, driverId: driverMultiId, isActive: true },
+      }),
+      prisma.zone.create({
+        data: { name: "Stats East", companyId: mainCompanyId, driverId: driverMultiId, isActive: true },
+      }),
+      prisma.zone.create({
+        data: { name: "Stats South", companyId: mainCompanyId, driverId: driverBetaId, isActive: true },
+      }),
+    ]);
+    zoneNorthId = zNorth.id;
+    zoneEastId = zEast.id;
+    zoneSouthId = zSouth.id;
+
+    const now = new Date();
+    const utcDayAt = (daysOffset: number, hour = 12, minute = 0) =>
+      new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysOffset, hour, minute, 0, 0)
+      );
+
+    // Recent 7-day & day -7 fixtures
+    await Promise.all([
+      // Today (day 0): 2 delivered (one 30m, one 90m => avg 60m), 1 cancelled
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-TODAY-1-${suffix}`,
+          recipientName: "Today One",
+          recipientAddress: "Av. Colón 100",
+          recipientPhone: "3510000001",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneNorthId,
+          driverId: null, // fallback to driverMulti via zoneNorth
+          createdAt: utcDayAt(0, 10, 0),
+          updatedAt: utcDayAt(0, 10, 30),
+          deliveryWindowEnd: utcDayAt(0, 12, 0), // on time
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-TODAY-2-${suffix}`,
+          recipientName: "Today Two",
+          recipientAddress: "Av. Colón 200",
+          recipientPhone: "3510000002",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneEastId,
+          driverId: null, // fallback to driverMulti via zoneEast
+          createdAt: utcDayAt(0, 10, 0),
+          updatedAt: utcDayAt(0, 11, 30),
+          deliveryWindowEnd: utcDayAt(0, 11, 0), // late!
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-TODAY-CANC-${suffix}`,
+          recipientName: "Today Cancelled",
+          recipientAddress: "Av. Colón 300",
+          recipientPhone: "3510000003",
+          status: "cancelled",
+          companyId: mainCompanyId,
+          zoneId: zoneSouthId,
+          driverId: driverBetaId,
+          createdAt: utcDayAt(0, 9, 0),
+          updatedAt: utcDayAt(0, 12, 0),
+        },
+      }),
+      // Day -3: 1 delivered directly by driverMulti (no zone)
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-D3-DIRECT-${suffix}`,
+          recipientName: "Day Minus 3",
+          recipientAddress: "Bv. San Juan 10",
+          recipientPhone: "3510000004",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: null,
+          driverId: driverMultiId,
+          createdAt: utcDayAt(-3, 9, 0),
+          updatedAt: utcDayAt(-3, 10, 0),
+        },
+      }),
+      // Day -6: 1 delivered by driverMulti historically in zoneSouth (must credit driverMulti, NOT driverBeta)
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-D6-HIST-${suffix}`,
+          recipientName: "Day Minus 6",
+          recipientAddress: "Bv. San Juan 20",
+          recipientPhone: "3510000005",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneSouthId,
+          driverId: driverMultiId,
+          createdAt: utcDayAt(-6, 8, 0),
+          updatedAt: utcDayAt(-6, 9, 0),
+        },
+      }),
+      // Day -6: 2 delivered by driverBeta
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-D6-BETA1-${suffix}`,
+          recipientName: "Beta One",
+          recipientAddress: "Av. Fuerza Aérea 1",
+          recipientPhone: "3510000006",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneSouthId,
+          driverId: driverBetaId,
+          createdAt: utcDayAt(-6, 8, 0),
+          updatedAt: utcDayAt(-6, 9, 0),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-D6-BETA2-${suffix}`,
+          recipientName: "Beta Two",
+          recipientAddress: "Av. Fuerza Aérea 2",
+          recipientPhone: "3510000007",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneSouthId,
+          driverId: driverBetaId,
+          createdAt: utcDayAt(-6, 10, 0),
+          updatedAt: utcDayAt(-6, 11, 0),
+        },
+      }),
+      // Day -7 (same weekday as today!): 3 delivered + 2 cancelled — MUST NOT overlap into today or enter default 7-day window
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-D7-OLD1-${suffix}`,
+          recipientName: "Day Minus 7 One",
+          recipientAddress: "Calle Vieja 1",
+          recipientPhone: "3510000008",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneNorthId,
+          driverId: driverMultiId,
+          createdAt: utcDayAt(-7, 10, 0),
+          updatedAt: utcDayAt(-7, 11, 0),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-D7-OLD2-${suffix}`,
+          recipientName: "Day Minus 7 Two",
+          recipientAddress: "Calle Vieja 2",
+          recipientPhone: "3510000009",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneNorthId,
+          driverId: driverMultiId,
+          createdAt: utcDayAt(-7, 12, 0),
+          updatedAt: utcDayAt(-7, 13, 0),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-D7-OLDCANC-${suffix}`,
+          recipientName: "Day Minus 7 Cancelled",
+          recipientAddress: "Calle Vieja 3",
+          recipientPhone: "3510000010",
+          status: "cancelled",
+          companyId: mainCompanyId,
+          zoneId: zoneNorthId,
+          driverId: driverMultiId,
+          createdAt: utcDayAt(-7, 14, 0),
+          updatedAt: utcDayAt(-7, 15, 0),
+        },
+      }),
+      // Active packages (in_transit & pending) today
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-ACTIVE-INT-${suffix}`,
+          recipientName: "Active InTransit",
+          recipientAddress: "Av. Vélez 1",
+          recipientPhone: "3510000011",
+          status: "in_transit",
+          companyId: mainCompanyId,
+          zoneId: zoneNorthId,
+          driverId: driverMultiId,
+          createdAt: utcDayAt(0, 7, 0),
+          updatedAt: utcDayAt(0, 8, 0),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-ACTIVE-PEND-${suffix}`,
+          recipientName: "Active Pending",
+          recipientAddress: "Av. Vélez 2",
+          recipientPhone: "3510000012",
+          status: "pending",
+          companyId: mainCompanyId,
+          zoneId: null,
+          driverId: null,
+          createdAt: utcDayAt(0, 7, 0),
+          updatedAt: utcDayAt(0, 8, 0),
+        },
+      }),
+      // Historical May 2026 range fixtures (for dateFrom / dateTo tests)
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-MAY-10-${suffix}`,
+          recipientName: "May 10",
+          recipientAddress: "Av. Mayo 10",
+          recipientPhone: "3510000020",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneNorthId,
+          driverId: null, // zoneNorth -> driverMulti
+          createdAt: new Date("2026-05-10T08:00:00.000Z"),
+          updatedAt: new Date("2026-05-10T09:00:00.000Z"), // 60 mins
+          deliveryWindowEnd: new Date("2026-05-10T10:00:00.000Z"), // on time
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-MAY-12-A-${suffix}`,
+          recipientName: "May 12 A",
+          recipientAddress: "Av. Mayo 12",
+          recipientPhone: "3510000021",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneEastId,
+          driverId: null, // zoneEast -> driverMulti
+          createdAt: new Date("2026-05-12T10:00:00.000Z"),
+          updatedAt: new Date("2026-05-12T10:30:00.000Z"), // 30 mins
+          deliveryWindowEnd: new Date("2026-05-12T12:00:00.000Z"), // on time
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-MAY-12-B-${suffix}`,
+          recipientName: "May 12 B",
+          recipientAddress: "Av. Mayo 13",
+          recipientPhone: "3510000022",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: null,
+          driverId: driverMultiId, // direct assignment
+          createdAt: new Date("2026-05-12T14:00:00.000Z"),
+          updatedAt: new Date("2026-05-12T15:30:00.000Z"), // 90 mins
+          deliveryWindowEnd: new Date("2026-05-12T15:00:00.000Z"), // late!
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-MAY-12-C-${suffix}`,
+          recipientName: "May 12 C",
+          recipientAddress: "Av. Mayo 14",
+          recipientPhone: "3510000023",
+          status: "cancelled",
+          companyId: mainCompanyId,
+          zoneId: zoneEastId,
+          driverId: driverMultiId, // 4 resolved total for driverMulti in May 10..14: 2 on-time, 1 late, 1 cancelled => 50%
+          createdAt: new Date("2026-05-12T16:00:00.000Z"),
+          updatedAt: new Date("2026-05-12T18:00:00.000Z"),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-MAY-12-INT-${suffix}`,
+          recipientName: "May 12 InTransit",
+          recipientAddress: "Av. Mayo 15",
+          recipientPhone: "3510000024",
+          status: "in_transit",
+          companyId: mainCompanyId,
+          zoneId: zoneSouthId,
+          driverId: driverBetaId,
+          createdAt: new Date("2026-05-12T08:00:00.000Z"),
+          updatedAt: new Date("2026-05-12T11:00:00.000Z"),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-MAY-12-GAMMA-CANC-${suffix}`,
+          recipientName: "May 12 Gamma Only Cancelled",
+          recipientAddress: "Av. Mayo 16",
+          recipientPhone: "3510000025",
+          status: "cancelled",
+          companyId: mainCompanyId,
+          zoneId: null,
+          driverId: driverGammaId, // 0 delivered => excluded from topDrivers
+          createdAt: new Date("2026-05-12T08:00:00.000Z"),
+          updatedAt: new Date("2026-05-12T09:00:00.000Z"),
+        },
+      }),
+      // Outside May 10..14 range (May 16)
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-MAY-16-${suffix}`,
+          recipientName: "May 16 Beta",
+          recipientAddress: "Av. Mayo 160",
+          recipientPhone: "3510000026",
+          status: "delivered",
+          companyId: mainCompanyId,
+          zoneId: zoneSouthId,
+          driverId: driverBetaId,
+          createdAt: new Date("2026-05-16T08:00:00.000Z"),
+          updatedAt: new Date("2026-05-16T09:00:00.000Z"),
+        },
+      }),
+      // Extra drivers in May 2025 to verify top-5 limit
+      ...extraDrivers.map((drv, idx) =>
+        prisma.package.create({
+          data: {
+            trackingCode: `ST-TOP5-${idx}-${suffix}`,
+            recipientName: `Top5 ${idx}`,
+            recipientAddress: `Calle ${idx}`,
+            recipientPhone: `351000010${idx}`,
+            status: "delivered",
+            companyId: mainCompanyId,
+            driverId: drv.id,
+            createdAt: new Date("2025-02-01T10:00:00.000Z"),
+            updatedAt: new Date("2025-02-01T11:00:00.000Z"),
+          },
+        })
+      ),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-TOP5-BETA-${suffix}`,
+          recipientName: "Top5 Beta",
+          recipientAddress: "Calle Beta",
+          recipientPhone: "3510000110",
+          status: "delivered",
+          companyId: mainCompanyId,
+          driverId: driverBetaId,
+          createdAt: new Date("2025-02-01T10:00:00.000Z"),
+          updatedAt: new Date("2025-02-01T11:00:00.000Z"),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-TOP5-MULTI-1-${suffix}`,
+          recipientName: "Top5 Multi 1",
+          recipientAddress: "Calle Multi 1",
+          recipientPhone: "3510000111",
+          status: "delivered",
+          companyId: mainCompanyId,
+          driverId: driverMultiId,
+          createdAt: new Date("2025-02-01T10:00:00.000Z"),
+          updatedAt: new Date("2025-02-01T11:00:00.000Z"),
+        },
+      }),
+      prisma.package.create({
+        data: {
+          trackingCode: `ST-TOP5-MULTI-2-${suffix}`,
+          recipientName: "Top5 Multi 2",
+          recipientAddress: "Calle Multi 2",
+          recipientPhone: "3510000112",
+          status: "delivered",
+          companyId: mainCompanyId,
+          driverId: driverMultiId,
+          createdAt: new Date("2025-02-01T10:00:00.000Z"),
+          updatedAt: new Date("2025-02-01T11:00:00.000Z"),
+        },
+      }),
+    ]);
+  });
+
+  afterAll(async () => {
+    const ids = [mainCompanyId, emptyCompanyId].filter(Boolean);
+    if (ids.length > 0) {
+      await Promise.all(ids.map((cId) => redis.delPrefix(`packages:${cId}:`).catch(() => {})));
+      await prisma.packageHistory.deleteMany({ where: { package: { companyId: { in: ids } } } });
+      await prisma.package.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.zone.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.user.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.driver.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.company.deleteMany({ where: { id: { in: ids } } });
+    }
+  });
+
+  it("documents dateFrom and dateTo parameters and response schema in Swagger for /api/packages/stats", () => {
+    const statsOp = (swaggerSpec as any).paths?.["/api/packages/stats"]?.get;
+    expect(statsOp).toBeDefined();
+    const paramNames = (statsOp.parameters ?? []).map((p: any) => p.name);
+    expect(paramNames).toEqual(expect.arrayContaining(["dateFrom", "dateTo"]));
+    expect(statsOp.responses?.["400"]).toBeDefined();
+    const schemaProps =
+      statsOp.responses?.["200"]?.content?.["application/json"]?.schema?.properties ?? {};
+    expect(Object.keys(schemaProps)).toEqual(
+      expect.arrayContaining([
+        "deliveredToday",
+        "inTransit",
+        "avgDeliveryTimeMinutes",
+        "zoneDistribution",
+        "weeklyActivity",
+        "topDrivers",
+      ])
+    );
+  });
+
+  it("enforces authentication and dispatcher/admin role on GET /api/packages/stats", async () => {
+    const unauth = await request(app).get("/api/packages/stats");
+    expect(unauth.status).toBe(401);
+
+    const driverRes = await request(app)
+      .get("/api/packages/stats")
+      .set("Authorization", `Bearer ${driverToken}`);
+    expect(driverRes.status).toBe(403);
+  });
+
+  it("groups exact 7 distinct calendar days without overlapping day -7 with today and consolidates topDrivers across multiple zones", async () => {
+    const res = await request(app)
+      .get("/api/packages/stats")
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.deliveredToday).toBe(2);
+    expect(res.body.avgDeliveryTimeMinutes).toBe(60); // (30 + 90) / 2
+    expect(res.body.inTransit).toBe(2); // ST-ACTIVE-INT + ST-MAY-12-INT (all current non-archived in_transit)
+
+    // Exact 7 distinct calendar dates ending today UTC
+    expect(res.body.weeklyActivity).toHaveLength(7);
+    const dates = res.body.weeklyActivity.map((d: any) => d.date);
+    expect(new Set(dates).size).toBe(7);
+
+    const now = new Date();
+    const expectedDayKey = (offset: number) =>
+      new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offset))
+        .toISOString()
+        .slice(0, 10);
+
+    expect(dates).toEqual([
+      expectedDayKey(-6),
+      expectedDayKey(-5),
+      expectedDayKey(-4),
+      expectedDayKey(-3),
+      expectedDayKey(-2),
+      expectedDayKey(-1),
+      expectedDayKey(0),
+    ]);
+
+    // Today's bucket MUST NOT include day -7 (2 delivered, 1 cancelled)
+    expect(res.body.weeklyActivity[6]).toEqual({
+      date: expectedDayKey(0),
+      delivered: 2,
+      failed: 1,
+    });
+    expect(res.body.weeklyActivity[3]).toEqual({
+      date: expectedDayKey(-3),
+      delivered: 1,
+      failed: 0,
+    });
+    expect(res.body.weeklyActivity[0]).toEqual({
+      date: expectedDayKey(-6),
+      delivered: 3, // 1 historical driverMulti + 2 driverBeta
+      failed: 0,
+    });
+
+    // topDrivers consolidated by real driver (driverMulti owns North + East + direct + historical in South = 4 delivered, 3 on-time/no-window => 75%)
+    expect(res.body.topDrivers).toHaveLength(2);
+    const multiEntries = res.body.topDrivers.filter((d: any) => d.driverId === driverMultiId);
+    expect(multiEntries).toHaveLength(1);
+    expect(multiEntries[0]).toEqual({
+      driverId: driverMultiId,
+      name: "Driver MultiZone",
+      delivered: 4,
+      efficiency: 75,
+    });
+
+    // driverBeta: 2 delivered (day -6) + 1 cancelled (today) => 2/3 => 67%
+    expect(res.body.topDrivers[1]).toEqual({
+      driverId: driverBetaId,
+      name: "Driver Beta",
+      delivered: 2,
+      efficiency: 67,
+    });
+  });
+
+  it("filters deterministically by dateFrom/dateTo, calculates real efficiency without Math.random(), and caps topDrivers at 5", async () => {
+    const randomSpy = jest.spyOn(Math, "random");
+
+    const res1 = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-10&dateTo=2026-05-14")
+      .set("Authorization", `Bearer ${adminToken}`);
+    const res2 = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-10&dateTo=2026-05-14")
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(randomSpy).not.toHaveBeenCalled();
+    expect(res1.body).toEqual(res2.body);
+
+    // 3 delivered in May 10..14 (60m, 30m, 90m => avg 60m), 1 in_transit (May 12)
+    expect(res1.body.deliveredToday).toBe(3);
+    expect(res1.body.avgDeliveryTimeMinutes).toBe(60);
+    expect(res1.body.inTransit).toBe(1);
+    expect(res1.body.zoneDistribution).toEqual([{ name: "Stats South", value: 1 }]);
+
+    expect(res1.body.weeklyActivity).toEqual([
+      { date: "2026-05-10", delivered: 1, failed: 0 },
+      { date: "2026-05-11", delivered: 0, failed: 0 },
+      { date: "2026-05-12", delivered: 2, failed: 2 },
+      { date: "2026-05-13", delivered: 0, failed: 0 },
+      { date: "2026-05-14", delivered: 0, failed: 0 },
+    ]);
+
+    // driverMulti has 3 delivered (2 on-time, 1 late) + 1 cancelled => efficiency = 2/4 = 50%
+    // driverGamma has 0 delivered + 1 cancelled => excluded from topDrivers
+    expect(res1.body.topDrivers).toEqual([
+      {
+        driverId: driverMultiId,
+        name: "Driver MultiZone",
+        delivered: 3,
+        efficiency: 50,
+      },
+    ]);
+
+    // Single-day filter & outside range (May 16)
+    const may16 = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-16&dateTo=2026-05-16")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(may16.status).toBe(200);
+    expect(may16.body.deliveredToday).toBe(1);
+    expect(may16.body.weeklyActivity).toEqual([{ date: "2026-05-16", delivered: 1, failed: 0 }]);
+    expect(may16.body.topDrivers).toEqual([
+      {
+        driverId: driverBetaId,
+        name: "Driver Beta",
+        delivered: 1,
+        efficiency: 100,
+      },
+    ]);
+
+    // Top 5 cap check on 2025-02-01 (6 drivers delivered, driverMulti delivered 2)
+    const top5Res = await request(app)
+      .get("/api/packages/stats?dateFrom=2025-02-01&dateTo=2025-02-01")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(top5Res.status).toBe(200);
+    expect(top5Res.body.topDrivers).toHaveLength(5);
+    expect(top5Res.body.topDrivers[0]).toEqual({
+      driverId: driverMultiId,
+      name: "Driver MultiZone",
+      delivered: 2,
+      efficiency: 100,
+    });
+  });
+
+  it("handles empty companies/ranges with 0 metrics (no division-by-zero NaN) and preserves tenant isolation", async () => {
+    const emptyRes = await request(app)
+      .get("/api/packages/stats")
+      .set("Authorization", `Bearer ${emptyAdminToken}`);
+
+    expect(emptyRes.status).toBe(200);
+    expect(emptyRes.body.deliveredToday).toBe(0);
+    expect(emptyRes.body.inTransit).toBe(0);
+    expect(emptyRes.body.avgDeliveryTimeMinutes).toBe(0);
+    expect(emptyRes.body.zoneDistribution).toEqual([]);
+    expect(emptyRes.body.topDrivers).toEqual([]);
+    expect(emptyRes.body.weeklyActivity).toHaveLength(7);
+    for (const day of emptyRes.body.weeklyActivity) {
+      expect(day.delivered).toBe(0);
+      expect(day.failed).toBe(0);
+    }
+
+    // Empty tenant querying May 2026 sees zero data from main tenant
+    const emptyFiltered = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-01&dateTo=2026-05-31")
+      .set("Authorization", `Bearer ${emptyAdminToken}`);
+    expect(emptyFiltered.status).toBe(200);
+    expect(emptyFiltered.body.deliveredToday).toBe(0);
+    expect(emptyFiltered.body.topDrivers).toEqual([]);
+  });
+
+  it("isolates Redis cache keys by dateFrom and dateTo so different ranges never collide", async () => {
+    const memoryCache = new Map<string, string>();
+    const getSpy = jest.spyOn(redis, "get").mockImplementation(async (key: string) => {
+      return memoryCache.get(key) ?? null;
+    });
+    const setSpy = jest.spyOn(redis, "set").mockImplementation(async (key: string, value: string) => {
+      memoryCache.set(key, value);
+    });
+
+    const rangeA = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-10&dateTo=2026-05-14")
+      .set("Authorization", `Bearer ${adminToken}`);
+    const rangeB = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-16&dateTo=2026-05-16")
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    expect(rangeA.status).toBe(200);
+    expect(rangeB.status).toBe(200);
+    expect(rangeA.body.deliveredToday).toBe(3);
+    expect(rangeB.body.deliveredToday).toBe(1);
+
+    expect(setSpy).toHaveBeenCalledTimes(2);
+    const keyA = setSpy.mock.calls[0][0];
+    const keyB = setSpy.mock.calls[1][0];
+    expect(keyA).not.toBe(keyB);
+    expect(keyA).toContain(mainCompanyId);
+    expect(keyA).toContain("2026-05-10");
+    expect(keyA).toContain("2026-05-14");
+    expect(keyB).toContain("2026-05-16");
+
+    // Second call for rangeA serves from cache without losing range isolation
+    const rangeACached = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-10&dateTo=2026-05-14")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(rangeACached.status).toBe(200);
+    expect(rangeACached.body).toEqual(rangeA.body);
+    expect(getSpy).toHaveBeenCalledWith(keyA);
+    expect(setSpy).toHaveBeenCalledTimes(2);
+
+    // Package mutation invalidates tenant package/stats cache prefix
+    const delPrefixSpy = jest.spyOn(redis, "delPrefix").mockResolvedValue(undefined);
+    const createdPkg = await request(app)
+      .post("/api/packages")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        trackingCode: `ST-CACHE-INV-${suffix}`,
+        recipientName: "Cache Test",
+        recipientAddress: "Av. Cache 100, Córdoba",
+        recipientPhone: "3519998888",
+        lat: -31.41,
+        lng: -64.18,
+      });
+    expect(createdPkg.status).toBe(201);
+    expect(delPrefixSpy).toHaveBeenCalledWith(`packages:${mainCompanyId}:`);
+  });
+
+  it("supports open-ended dateFrom / dateTo and ISO datetime boundaries", async () => {
+    const onlyTo = await request(app)
+      .get("/api/packages/stats?dateTo=2026-05-12T11:00:00Z")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(onlyTo.status).toBe(200);
+    // 2026-05-10 (1), 2026-05-12T10:30 (1), plus 7 packages from 2025-02-01 = 9 delivered
+    expect(onlyTo.body.deliveredToday).toBe(9);
+    // weeklyActivity covers 7 days ending on 2026-05-12 (2026-05-06 .. 2026-05-12)
+    expect(onlyTo.body.weeklyActivity).toHaveLength(7);
+    expect(onlyTo.body.weeklyActivity[0].date).toBe("2026-05-06");
+    expect(onlyTo.body.weeklyActivity[6].date).toBe("2026-05-12");
+    expect(onlyTo.body.weeklyActivity[6]).toEqual({
+      date: "2026-05-12",
+      delivered: 1,
+      failed: 1, // ST-MAY-12-GAMMA-CANC updatedAt=09:00Z <= 11:00Z
+    });
+
+    const onlyFromFuture = await request(app)
+      .get("/api/packages/stats?dateFrom=2026-05-16")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(onlyFromFuture.status).toBe(200);
+    expect(onlyFromFuture.body.deliveredToday).toBeGreaterThanOrEqual(5);
+  });
+
+  it("validates dateFrom/dateTo with Zod (400) and rejects invalid dates in PackageService.getDashboardStats", async () => {
+    const invalidUrls = [
+      "/api/packages/stats?dateFrom=not-a-date",
+      "/api/packages/stats?dateTo=2026-02-29",
+      "/api/packages/stats?dateFrom=2026-05-20&dateTo=2026-05-10",
+      "/api/packages/stats?dateFrom=2026-05-12T18:00:00Z&dateTo=2026-05-12T10:00:00Z",
+    ];
+
+    for (const url of invalidUrls) {
+      const res = await request(app)
+        .get(url)
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe("Validation failed");
+    }
+
+    await expect(
+      PackageService.getDashboardStats(mainCompanyId, {
+        dateFrom: new Date("invalid"),
+      })
+    ).rejects.toThrow("invalid_date_filter");
+
+    await expect(
+      PackageService.getDashboardStats(mainCompanyId, {
+        dateFrom: "2026-05-20",
+        dateTo: "2026-05-10",
+      })
+    ).rejects.toThrow("invalid_date_range");
+  });
+});

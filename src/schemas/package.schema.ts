@@ -63,6 +63,16 @@ const optionalDateFilterSchema = z
   })
   .optional();
 
+function hasValidDateRange(query: { dateFrom?: string; dateTo?: string }): boolean {
+  const from = query.dateFrom?.trim();
+  const to = query.dateTo?.trim();
+  if (!from || !to) return true;
+  const fromDate = parseDateBoundary(from, "start");
+  const toDate = parseDateBoundary(to, "end");
+  if (!fromDate || !toDate) return true;
+  return fromDate <= toDate;
+}
+
 export const getPackagesSchema = z.object({
   query: z
     .object({
@@ -97,21 +107,22 @@ export const getPackagesSchema = z.object({
       page: z.unknown().optional(),
       limit: z.unknown().optional(),
     })
-    .refine(
-      (query) => {
-        const from = query.dateFrom?.trim();
-        const to = query.dateTo?.trim();
-        if (!from || !to) return true;
-        const fromDate = parseDateBoundary(from, "start");
-        const toDate = parseDateBoundary(to, "end");
-        if (!fromDate || !toDate) return true;
-        return fromDate <= toDate;
-      },
-      {
-        message: "dateFrom must be earlier than or equal to dateTo",
-        path: ["dateFrom"],
-      }
-    ),
+    .refine(hasValidDateRange, {
+      message: "dateFrom must be earlier than or equal to dateTo",
+      path: ["dateFrom"],
+    }),
+});
+
+export const getDashboardStatsSchema = z.object({
+  query: z
+    .object({
+      dateFrom: optionalDateFilterSchema,
+      dateTo: optionalDateFilterSchema,
+    })
+    .refine(hasValidDateRange, {
+      message: "dateFrom must be earlier than or equal to dateTo",
+      path: ["dateFrom"],
+    }),
 });
 
 const optionalNoteSchema = z.string().trim().max(1000).nullable().optional();

@@ -19,6 +19,7 @@ import { requireRole } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   getPackagesSchema,
+  getDashboardStatsSchema,
   createPackageSchema,
   getPackageByIdSchema,
   updatePackageSchema,
@@ -278,15 +279,79 @@ router.post("/delete", requireRole("dispatcher", "admin"), deletePackages);
  * @openapi
  * /api/packages/stats:
  *   get:
- *     summary: Get dashboard statistics (delivered today, in transit, avg time)
+ *     summary: Get dashboard statistics with optional date range filter
  *     tags: [Packages]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter stats starting from this date/time (YYYY-MM-DD at 00:00:00.000Z or ISO 8601 datetime)
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Filter stats up to this date/time (YYYY-MM-DD inclusive until 23:59:59.999Z or ISO 8601 datetime)
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 deliveredToday:
+ *                   type: integer
+ *                 inTransit:
+ *                   type: integer
+ *                 avgDeliveryTimeMinutes:
+ *                   type: integer
+ *                 zoneDistribution:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       value:
+ *                         type: integer
+ *                 weeklyActivity:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                       delivered:
+ *                         type: integer
+ *                       failed:
+ *                         type: integer
+ *                 topDrivers:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       driverId:
+ *                         type: string
+ *                         format: uuid
+ *                       name:
+ *                         type: string
+ *                       delivered:
+ *                         type: integer
+ *                       efficiency:
+ *                         type: integer
+ *       400:
+ *         description: Validation failed for date query parameters
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
-router.get("/stats", requireRole("dispatcher", "admin"), getDashboardStats);
+router.get("/stats", requireRole("dispatcher", "admin"), validate(getDashboardStatsSchema), getDashboardStats);
 
 /**
  * @openapi

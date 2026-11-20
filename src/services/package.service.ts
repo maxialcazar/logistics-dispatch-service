@@ -60,7 +60,19 @@ export interface UpdatePackageInput {
   deliveryWindowEnd?: Date | null;
 }
 
+export interface DashboardStatsFilters {
+  dateFrom?: Date | string;
+  dateTo?: Date | string;
+}
+
+const MAX_DENSE_WEEKLY_DAYS = 366;
+const STATS_CACHE_TTL_SECONDS = 60;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export class PackageService {
+  private static async invalidatePackageCache(companyId: string): Promise<void> {
+    await redis.delPrefix(`packages:${companyId}:`);
+  }
   private static normalizeNullableText(val: string | null | undefined): string | null | undefined {
     if (val === undefined) return undefined;
     if (val === null) return null;
@@ -336,13 +348,15 @@ export class PackageService {
   }
 
   static async archivePackages(companyId: string, packageIds: string[]) {
-    return prisma.package.updateMany({
+    const result = await prisma.package.updateMany({
       where: {
         companyId,
         id: { in: packageIds }
       },
       data: { isArchived: true }
     });
+    await PackageService.invalidatePackageCache(companyId);
+    return result;
   }
 
   static async unarchivePackages(companyId: string, packageIds: string[]) {
@@ -356,7 +370,7 @@ export class PackageService {
       data: { isArchived: false },
     });
 
-    await redis.delPrefix(`packages:${companyId}:`);
+    await PackageService.invalidatePackageCache(companyId);
 
     if (result.count > 0) {
       emitToRoom(`company-${companyId}`, "packages-unarchived", {
@@ -404,6 +418,8 @@ export class PackageService {
     if (filesToRemove.length > 0) {
       await Promise.allSettled(filesToRemove.map((url) => deleteUploadedFile(url)));
     }
+
+    await PackageService.invalidatePackageCache(companyId);
 
     return result;
   }
@@ -558,6 +574,8 @@ export class PackageService {
         },
       });
     });
+
+    await PackageService.invalidatePackageCache(companyId);
 
     emitToRoom(`company-${companyId}`, "package-created", pkg);
 
@@ -786,6 +804,8 @@ export class PackageService {
 
     const { updated, trackingCode } = txResult;
 
+    await PackageService.invalidatePackageCache(companyId);
+
     emitToRoom(`company-${companyId}`, "package-status-updated", { 
       packageId, 
       status, 
@@ -864,6 +884,8 @@ export class PackageService {
 
       return { updated: saved, driverName: driver.name, trackingCode: lockedPkg.trackingCode };
     });
+
+    await PackageService.invalidatePackageCache(companyId);
 
     emitToRoom(`company-${companyId}`, "package-assigned", { packageId, driverId, driverName });
     
@@ -1275,7 +1297,7 @@ export class PackageService {
       };
     });
 
-    await redis.delPrefix(`packages:${companyId}:`);
+    await PackageService.invalidatePackageCache(companyId);
 
     const { updated, previousStatus, previousDriverId, zoneChanged } = txResult;
 
@@ -1413,143 +1435,331 @@ export class PackageService {
     return { driverId: typedPkg.driverId ?? typedPkg.zone?.driverId ?? null };
   }
 
-  static async getDashboardStats(companyId: string) {
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Local server time 00:00
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - 7);
+  private static startOfUtcDay(date: Date): Date {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0)
+    );
+  }
 
-    // 1. Delivered Today
-    const deliveredTodayCount = await prisma.package.count({
-        where: {
-            companyId,
-            status: 'delivered',
-            updatedAt: { gte: startOfDay }
-        }
-    });
+  private static endOfUtcDay(date: Date): Date {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999)
+    );
+  }
 
-    // 2. In Transit Now
-    const inTransitCount = await prisma.package.count({
-        where: {
-            companyId,
-            status: 'in_transit'
-        }
-    });
+  private static addUtcDays(date: Date, days: number): Date {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days, 0, 0, 0, 0)
+    );
+  }
 
-    // 3. Average Delivery Time (Simplification: Time from Created to Delivered for packages delivered today)
-    // For more precision, we would check History, but this is a good MVP proxy.
-    const deliveredPackages = await prisma.package.findMany({
-        where: {
-            companyId,
-            status: 'delivered',
-            updatedAt: { gte: startOfDay }
-        },
-        select: { createdAt: true, updatedAt: true }
-    });
+  private static formatUtcDateKey(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
 
-    let avgTimeMinutes = 0;
-    if (deliveredPackages.length > 0) {
-        const totalTimeMs = deliveredPackages.reduce((acc, pkg) => {
-            return acc + (pkg.updatedAt.getTime() - pkg.createdAt.getTime());
-        }, 0);
-        avgTimeMinutes = Math.floor((totalTimeMs / deliveredPackages.length) / 1000 / 60);
+  private static resolveStatsWindows(now: Date, parsedDateFrom?: Date, parsedDateTo?: Date) {
+    const todayStart = PackageService.startOfUtcDay(now);
+    const todayEnd = PackageService.endOfUtcDay(now);
+    const todayKey = PackageService.formatUtcDateKey(now);
+    const hasDateFilter = Boolean(parsedDateFrom || parsedDateTo);
+
+    if (!hasDateFilter) {
+      const sevenDayStart = PackageService.addUtcDays(todayStart, -6);
+      return {
+        todayKey,
+        hasDateFilter: false,
+        deliveredRange: { gte: todayStart, lte: todayEnd } satisfies Prisma.DateTimeFilter,
+        activeUpdatedAtFilter: undefined as Prisma.DateTimeFilter | undefined,
+        activityUpdatedAtFilter: { gte: sevenDayStart, lte: todayEnd } satisfies Prisma.DateTimeFilter,
+        bucketStartDay: sevenDayStart,
+        bucketEndDay: todayStart,
+      };
     }
 
-    // 4. Zone Distribution (Active Packages)
-    const activeDistribution = await prisma.package.groupBy({
-        by: ['zoneId'],
-        where: {
-            companyId,
-            status: { in: ['pending', 'assigned', 'in_transit'] }
-        },
-        _count: {
-            _all: true
-        }
-    });
+    const explicitRange: Prisma.DateTimeFilter = {
+      ...(parsedDateFrom ? { gte: parsedDateFrom } : {}),
+      ...(parsedDateTo ? { lte: parsedDateTo } : {}),
+    };
 
-    // Get Zone Names
-    const zones = await prisma.zone.findMany({
-        where: { companyId },
-        select: { id: true, name: true, driver: { select: { id: true, name: true } } }
-    });
+    let bucketStartDay: Date;
+    let bucketEndDay: Date;
 
-    const zoneStats = activeDistribution.map(item => {
-        const zone = zones.find(z => z.id === item.zoneId);
-        return {
-            name: zone?.name || 'Sin Zona',
-            value: item._count._all
-        };
-    });
-
-    // 5. Weekly Activity (Last 7 Days)
-    // Fetch all Delivered/Cancelled in last 7 days to aggregate in memory
-    const recentActivity = await prisma.package.findMany({
-        where: {
-            companyId,
-            status: { in: ['delivered', 'cancelled'] },
-            updatedAt: { gte: startOfWeek }
-        },
-        select: { status: true, updatedAt: true }
-    });
-
-    const weeklyMap = new Map<string, { delivered: number, failed: number }>();
-    
-    // Initialize last 7 days
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const key = d.toLocaleDateString([], { weekday: 'short' }); // e.g., "Mon", "Tue"
-        weeklyMap.set(key, { delivered: 0, failed: 0 });
+    if (parsedDateFrom && parsedDateTo) {
+      bucketStartDay = PackageService.startOfUtcDay(parsedDateFrom);
+      bucketEndDay = PackageService.startOfUtcDay(parsedDateTo);
+    } else if (parsedDateFrom) {
+      bucketStartDay = PackageService.startOfUtcDay(parsedDateFrom);
+      bucketEndDay = todayStart >= bucketStartDay ? todayStart : bucketStartDay;
+    } else {
+      bucketEndDay = PackageService.startOfUtcDay(parsedDateTo!);
+      bucketStartDay = PackageService.addUtcDays(bucketEndDay, -6);
     }
-
-    recentActivity.forEach(pkg => {
-        const key = pkg.updatedAt.toLocaleDateString([], { weekday: 'short' });
-        if (weeklyMap.has(key)) {
-            const entry = weeklyMap.get(key)!;
-            if (pkg.status === 'delivered') entry.delivered++;
-            if (pkg.status === 'cancelled') entry.failed++;
-        }
-    });
-
-    const weeklyActivity = Array.from(weeklyMap.entries()).map(([date, stats]) => ({
-        date,
-        delivered: stats.delivered,
-        failed: stats.failed
-    }));
-
-    // 6. Top Drivers (Efficiency)
-    // Find drivers with most deliveries in last 7 days
-    const deliveredByZone = await prisma.package.groupBy({
-        by: ['zoneId'],
-        where: {
-            companyId,
-            status: 'delivered',
-            updatedAt: { gte: startOfWeek }
-        },
-        _count: { _all: true },
-    });
-
-    // Sort and Take Top 5 in Memory (Safe for TS)
-    const topDrivers = deliveredByZone
-        .sort((a, b) => (b._count as any)._all - (a._count as any)._all)
-        .slice(0, 5)
-        .map(item => {
-            const zone = zones.find(z => z.id === item.zoneId);
-            return {
-                name: zone?.driver?.name || zone?.name || 'Desconocido',
-                delivered: (item._count as any)._all,
-                efficiency: 95 + Math.floor(Math.random() * 5) 
-            };
-        })
-        .filter(d => d.name !== 'Desconocido');
 
     return {
-        deliveredToday: deliveredTodayCount,
-        inTransit: inTransitCount,
-        avgDeliveryTimeMinutes: avgTimeMinutes,
-        zoneDistribution: zoneStats,
-        weeklyActivity,
-        topDrivers
+      todayKey,
+      hasDateFilter: true,
+      deliveredRange: explicitRange,
+      activeUpdatedAtFilter: explicitRange,
+      activityUpdatedAtFilter: explicitRange,
+      bucketStartDay,
+      bucketEndDay,
     };
+  }
+
+  private static buildWeeklyActivity(
+    resolvedPackages: Array<{ status: PackageStatus; updatedAt: Date }>,
+    bucketStartDay: Date,
+    bucketEndDay: Date
+  ) {
+    const totalDays =
+      Math.floor((bucketEndDay.getTime() - bucketStartDay.getTime()) / MS_PER_DAY) + 1;
+    const weeklyMap = new Map<string, { delivered: number; failed: number }>();
+
+    if (totalDays <= MAX_DENSE_WEEKLY_DAYS) {
+      for (let offset = 0; offset < totalDays; offset++) {
+        const day = PackageService.addUtcDays(bucketStartDay, offset);
+        weeklyMap.set(PackageService.formatUtcDateKey(day), { delivered: 0, failed: 0 });
+      }
+    }
+
+    const bucketStartMs = bucketStartDay.getTime();
+    const bucketEndMs = bucketEndDay.getTime();
+
+    for (const pkg of resolvedPackages) {
+      const dayKey = PackageService.formatUtcDateKey(pkg.updatedAt);
+      let entry = weeklyMap.get(dayKey);
+      if (!entry && totalDays > MAX_DENSE_WEEKLY_DAYS) {
+        const dayMs = PackageService.startOfUtcDay(pkg.updatedAt).getTime();
+        if (dayMs >= bucketStartMs && dayMs <= bucketEndMs) {
+          entry = { delivered: 0, failed: 0 };
+          weeklyMap.set(dayKey, entry);
+        }
+      }
+      if (!entry) continue;
+      if (pkg.status === "delivered") entry.delivered += 1;
+      if (pkg.status === "cancelled") entry.failed += 1;
+    }
+
+    const entries =
+      totalDays > MAX_DENSE_WEEKLY_DAYS
+        ? Array.from(weeklyMap.entries()).sort(([a], [b]) => a.localeCompare(b))
+        : Array.from(weeklyMap.entries());
+
+    return entries.map(([date, stats]) => ({
+      date,
+      delivered: stats.delivered,
+      failed: stats.failed,
+    }));
+  }
+
+  private static buildTopDrivers(
+    resolvedPackages: Array<{
+      status: PackageStatus;
+      updatedAt: Date;
+      deliveryWindowEnd: Date | null;
+      driver: { id: string; name: string } | null;
+      zone: { driver: { id: string; name: string } | null } | null;
+    }>
+  ) {
+    const driverStatsMap = new Map<
+      string,
+      {
+        driverId: string;
+        name: string;
+        delivered: number;
+        cancelled: number;
+        onTimeDelivered: number;
+      }
+    >();
+
+    for (const pkg of resolvedPackages) {
+      const effectiveDriver = pkg.driver ?? pkg.zone?.driver ?? null;
+      if (!effectiveDriver) continue;
+
+      let entry = driverStatsMap.get(effectiveDriver.id);
+      if (!entry) {
+        entry = {
+          driverId: effectiveDriver.id,
+          name: effectiveDriver.name,
+          delivered: 0,
+          cancelled: 0,
+          onTimeDelivered: 0,
+        };
+        driverStatsMap.set(effectiveDriver.id, entry);
+      }
+
+      if (pkg.status === "delivered") {
+        entry.delivered += 1;
+        const isOnTime =
+          pkg.deliveryWindowEnd == null || pkg.updatedAt <= pkg.deliveryWindowEnd;
+        if (isOnTime) {
+          entry.onTimeDelivered += 1;
+        }
+      } else if (pkg.status === "cancelled") {
+        entry.cancelled += 1;
+      }
+    }
+
+    return Array.from(driverStatsMap.values())
+      .filter((d) => d.delivered > 0)
+      .map((d) => {
+        const resolvedTotal = d.delivered + d.cancelled;
+        const efficiency =
+          resolvedTotal > 0 ? Math.round((d.onTimeDelivered / resolvedTotal) * 100) : 0;
+        return {
+          driverId: d.driverId,
+          name: d.name,
+          delivered: d.delivered,
+          efficiency,
+        };
+      })
+      .sort((a, b) => {
+        if (b.delivered !== a.delivered) return b.delivered - a.delivered;
+        if (b.efficiency !== a.efficiency) return b.efficiency - a.efficiency;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 5);
+  }
+
+  /**
+   * Computes tenant-scoped dashboard KPIs, zone distribution, daily activity,
+   * and consolidated top drivers with optional dateFrom/dateTo filtering.
+   */
+  static async getDashboardStats(companyId: string, filters: DashboardStatsFilters = {}) {
+    const parsedDateFrom = PackageService.resolveDateFilter(filters.dateFrom, "start");
+    const parsedDateTo = PackageService.resolveDateFilter(filters.dateTo, "end");
+
+    if (parsedDateFrom && parsedDateTo && parsedDateFrom > parsedDateTo) {
+      throw new Error("invalid_date_range");
+    }
+
+    const now = new Date();
+    const {
+      todayKey,
+      deliveredRange,
+      activeUpdatedAtFilter,
+      activityUpdatedAtFilter,
+      bucketStartDay,
+      bucketEndDay,
+    } = PackageService.resolveStatsWindows(now, parsedDateFrom, parsedDateTo);
+
+    const fromCachePart = parsedDateFrom ? parsedDateFrom.toISOString() : "default";
+    const toCachePart = parsedDateTo ? parsedDateTo.toISOString() : "default";
+    const dayScope = !parsedDateFrom || !parsedDateTo ? `:${todayKey}` : "";
+    const cacheKey = `packages:${companyId}:stats:${fromCachePart}:${toCachePart}${dayScope}`;
+
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      // Fall back to database on cache read/parse failure
+    }
+
+    const activeWhere: Prisma.PackageWhereInput = {
+      companyId,
+      isArchived: false,
+      ...(activeUpdatedAtFilter ? { updatedAt: activeUpdatedAtFilter } : {}),
+    };
+
+    const [deliveredPackages, inTransitCount, activeDistribution, zones, resolvedPackages] =
+      await Promise.all([
+        prisma.package.findMany({
+          where: {
+            companyId,
+            status: "delivered",
+            updatedAt: deliveredRange,
+          },
+          select: { createdAt: true, updatedAt: true },
+        }),
+        prisma.package.count({
+          where: {
+            ...activeWhere,
+            status: "in_transit",
+          },
+        }),
+        prisma.package.groupBy({
+          by: ["zoneId"],
+          where: {
+            ...activeWhere,
+            status: { in: ["pending", "assigned", "in_transit"] },
+          },
+          _count: { _all: true },
+        }),
+        prisma.zone.findMany({
+          where: { companyId },
+          select: { id: true, name: true },
+        }),
+        prisma.package.findMany({
+          where: {
+            companyId,
+            status: { in: ["delivered", "cancelled"] },
+            updatedAt: activityUpdatedAtFilter,
+          },
+          select: {
+            status: true,
+            updatedAt: true,
+            deliveryWindowEnd: true,
+            driver: { select: { id: true, name: true } },
+            zone: {
+              select: {
+                driver: { select: { id: true, name: true } },
+              },
+            },
+          },
+        }),
+      ]);
+
+    const deliveredTodayCount = deliveredPackages.length;
+    let avgTimeMinutes = 0;
+    if (deliveredPackages.length > 0) {
+      const totalTimeMs = deliveredPackages.reduce((acc, pkg) => {
+        return acc + Math.max(0, pkg.updatedAt.getTime() - pkg.createdAt.getTime());
+      }, 0);
+      avgTimeMinutes = Math.floor(totalTimeMs / deliveredPackages.length / 1000 / 60);
+    }
+
+    const zoneNameMap = new Map(zones.map((z) => [z.id, z.name]));
+    const zoneDistribution = activeDistribution
+      .map((item) => ({
+        name: (item.zoneId ? zoneNameMap.get(item.zoneId) : undefined) || "Sin Zona",
+        value: item._count._all,
+      }))
+      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+
+    let effectiveBucketEndDay = bucketEndDay;
+    if (parsedDateFrom && !parsedDateTo && resolvedPackages.length > 0) {
+      for (const pkg of resolvedPackages) {
+        const pkgDay = PackageService.startOfUtcDay(pkg.updatedAt);
+        if (pkgDay > effectiveBucketEndDay) {
+          effectiveBucketEndDay = pkgDay;
+        }
+      }
+    }
+
+    const weeklyActivity = PackageService.buildWeeklyActivity(
+      resolvedPackages,
+      bucketStartDay,
+      effectiveBucketEndDay
+    );
+    const topDrivers = PackageService.buildTopDrivers(resolvedPackages);
+
+    const result = {
+      deliveredToday: deliveredTodayCount,
+      inTransit: inTransitCount,
+      avgDeliveryTimeMinutes: avgTimeMinutes,
+      zoneDistribution,
+      weeklyActivity,
+      topDrivers,
+    };
+
+    try {
+      await redis.set(cacheKey, JSON.stringify(result), STATS_CACHE_TTL_SECONDS);
+    } catch {
+      // Cache write failure is non-fatal
+    }
+
+    return result;
   }
 }

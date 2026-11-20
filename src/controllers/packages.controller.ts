@@ -11,6 +11,19 @@ function normalizeOptionalQueryString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function handlePackageDateError(res: Response, error: any): boolean {
+  if (error?.message === "invalid_date_filter" || error?.message === "invalid_date_range") {
+    res.status(400).json({
+      error:
+        error.message === "invalid_date_range"
+          ? "dateFrom must be earlier than or equal to dateTo"
+          : "Invalid date filter",
+    });
+    return true;
+  }
+  return false;
+}
+
 export async function getPackages(req: AuthRequest, res: Response) {
   try {
     const { search, status, zoneId, driverId, trackingCode, dateFrom, dateTo, isArchived } = req.query;
@@ -30,14 +43,7 @@ export async function getPackages(req: AuthRequest, res: Response) {
     });
     res.json(result);
   } catch (error: any) {
-    if (error?.message === "invalid_date_filter" || error?.message === "invalid_date_range") {
-      return res.status(400).json({
-        error:
-          error.message === "invalid_date_range"
-            ? "dateFrom must be earlier than or equal to dateTo"
-            : "Invalid date filter",
-      });
-    }
+    if (handlePackageDateError(res, error)) return;
     logger.error("Error in getPackages:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
@@ -239,13 +245,18 @@ export async function getPackageHistory(req: AuthRequest, res: Response) {
 }
 
 export async function getDashboardStats(req: AuthRequest, res: Response) {
-    try {
-        const stats = await PackageService.getDashboardStats(req.user!.companyId);
-        res.json(stats);
-    } catch (error) {
-        console.error("Stats Error:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const stats = await PackageService.getDashboardStats(req.user!.companyId, {
+      dateFrom: normalizeOptionalQueryString(dateFrom),
+      dateTo: normalizeOptionalQueryString(dateTo),
+    });
+    res.json(stats);
+  } catch (error) {
+    if (handlePackageDateError(res, error)) return;
+    logger.error("Stats Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 }
 
 function parseOptionalNullableDate(value: unknown): Date | null | undefined {
