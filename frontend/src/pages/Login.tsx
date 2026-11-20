@@ -5,17 +5,17 @@ import { Lock, User } from 'lucide-react';
 import { ApiError, apiClient } from '../services/apiClient';
 
 interface LoginResponse {
-  token: string;
+  token?: string;
   user?: {
-    id: string;
-    username: string;
-    role: string;
+    id?: string | number;
+    username?: string;
+    role?: string;
   };
 }
 
 export function Login() {
-  const [username, setUsername] = useState('adminA');
-  const [password, setPassword] = useState('123456');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -33,9 +33,30 @@ export function Login() {
         { username, password },
         { skipAuthHandler: true, token: null }
       );
-      const user = data.user || { id: '1', username, role: 'dispatcher' };
-      
-      login(data.token, user);
+      const user = data?.user;
+      const hasValidUserId =
+        (typeof user?.id === 'string' && user.id.trim().length > 0) ||
+        (typeof user?.id === 'number' && Number.isFinite(user.id));
+
+      if (
+        typeof data?.token !== 'string' ||
+        !data.token.trim() ||
+        !user ||
+        !hasValidUserId ||
+        typeof user.username !== 'string' ||
+        !user.username.trim() ||
+        typeof user.role !== 'string' ||
+        !user.role.trim()
+      ) {
+        setError('Respuesta inválida del servidor al iniciar sesión');
+        return;
+      }
+
+      login(data.token, {
+        id: String(user.id),
+        username: user.username,
+        role: user.role,
+      });
       navigate('/');
       
     } catch (err: unknown) {
@@ -111,10 +132,6 @@ export function Login() {
             {loading ? 'Autenticando...' : 'Ingresar'}
           </button>
         </form>
-
-        <div className="text-center text-xs text-slate-400">
-          <p>Credenciales Demo: adminA / 123456</p>
-        </div>
       </div>
     </div>
   );
