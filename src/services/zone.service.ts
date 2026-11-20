@@ -7,6 +7,15 @@ import { detectZone as geoDetectZone } from "../utils/geofencing";
 
 type Coord = [number, number];
 
+const SAFE_USER_SELECT = {
+  id: true,
+  username: true,
+  role: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 export class ZoneService {
   static async getAllZones(companyId: string, filters: { name?: string; page?: number; limit?: number } = {}) {
     const cacheKey = `zones:${companyId}:${JSON.stringify(filters)}`;
@@ -47,6 +56,56 @@ export class ZoneService {
 
     await redis.set(cacheKey, JSON.stringify(result), 3600); // 1 hour cache
     return result;
+  }
+
+  /**
+   * Returns complete tenant-scoped zone details including polygon, assigned driver
+   * (without user password), and non-archived package counts grouped by status.
+   */
+  static async getZoneById(companyId: string, zoneId: string) {
+    if (!companyId) throw new Error("company_id_required");
+
+    const zone = await prisma.zone.findFirst({
+      where: { id: zoneId, companyId },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: SAFE_USER_SELECT,
+            },
+          },
+        },
+      },
+    });
+
+    if (!zone) {
+      throw new Error("Zone not found");
+    }
+
+    const groupedCounts = await prisma.package.groupBy({
+      by: ["status"],
+      where: { companyId, zoneId, isArchived: false },
+      _count: { _all: true },
+    });
+
+    const packageCounts = {
+      pending: 0,
+      assigned: 0,
+      in_transit: 0,
+      delivered: 0,
+      cancelled: 0,
+      total: 0,
+    };
+    for (const row of groupedCounts) {
+      const count = row._count._all;
+      packageCounts[row.status] = count;
+      packageCounts.total += count;
+    }
+
+    return {
+      ...zone,
+      packageCounts,
+    };
   }
 
   static async createZone(
@@ -490,6 +549,144 @@ export class ZoneService {
     );
 
     return { count };
+  }
+
+  /**
+   * Deletes a zone inside a tenant-scoped transaction: reverts any `assigned` packages
+   * in that zone back to `pending` (clearing `zoneId` and `driverId`) with `PackageHistory`
+   * entries, deletes the zone (letting `onDelete: SetNull` unlink `zoneId` on packages in
+   * other states without altering their status or `driverId`), invalidates Redis caches,
+   * and emits Socket.IO notifications.
+   */
+  static async deleteZone(companyId: string, zoneId: string, userId?: string) {
+    if (!companyId) throw new Error("company_id_required");
+
+    let txResult: {
+      zoneName: string;
+      driverId: string | null;
+      revertedPackages: { id: string; trackingCode: string; zoneId: string | null }[];
+    };
+
+    try {
+      txResult = await prisma.$transaction(async (tx) => {
+        const lockedZones = await tx.$queryRaw<{ id: string; name: string; driverId: string | null }[]>`
+          SELECT "id", "name", "driverId"
+          FROM "Zone"
+          WHERE "id" = ${zoneId} AND "companyId" = ${companyId}
+          FOR UPDATE
+        `;
+        if (lockedZones.length === 0) {
+          throw new Error("Zone not found");
+        }
+        const zone = lockedZones[0];
+
+        // Lock all packages in this zone in deterministic order before updating/deleting
+        // so concurrent package updates cannot deadlock with ON DELETE SET NULL.
+        const lockedPackages = await tx.$queryRaw<
+          { id: string; trackingCode: string; status: PackageStatus }[]
+        >`
+          SELECT "id", "trackingCode", "status"
+          FROM "Package"
+          WHERE "companyId" = ${companyId}
+            AND "zoneId" = ${zoneId}
+          ORDER BY "id" ASC
+          FOR UPDATE
+        `;
+
+        const assignedPackages = lockedPackages
+          .filter((pkg) => pkg.status === "assigned")
+          .map(({ id, trackingCode }) => ({
+            id,
+            trackingCode,
+            zoneId: null as string | null,
+          }));
+
+        if (assignedPackages.length > 0) {
+          const actorUserId = await ZoneService.resolveActorUserIdTx(tx, companyId, userId);
+
+          await tx.package.updateMany({
+            where: {
+              id: { in: assignedPackages.map((p) => p.id) },
+              companyId,
+              status: "assigned",
+            },
+            data: {
+              status: "pending",
+              zoneId: null,
+              driverId: null,
+              updatedAt: new Date(),
+            },
+          });
+
+          if (actorUserId) {
+            await tx.packageHistory.createMany({
+              data: assignedPackages.map((pkg) => ({
+                packageId: pkg.id,
+                status: "pending",
+                userId: actorUserId,
+                notes: `Reverted to pending: zone ${zone.name} deleted`,
+              })),
+            });
+          }
+        }
+
+        await tx.zone.delete({
+          where: { id: zoneId },
+        });
+
+        return {
+          zoneName: zone.name,
+          driverId: zone.driverId,
+          revertedPackages: assignedPackages,
+        };
+      });
+    } catch (error: any) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new Error("Zone not found");
+      }
+      throw error;
+    }
+
+    const { zoneName, driverId, revertedPackages } = txResult;
+
+    await Promise.all([
+      redis.delPrefix(`zones:${companyId}:`),
+      redis.delPrefix(`packages:${companyId}:`),
+      redis.delPrefix(`drivers:${companyId}:`),
+    ]);
+
+    if (revertedPackages.length > 0) {
+      ZoneService.emitPackageTransitionEvents(
+        companyId,
+        revertedPackages,
+        "pending",
+        "Zona Eliminada",
+        `${revertedPackages.length} paquete(s) revertido(s) a pendiente al eliminar la zona ${zoneName}`
+      );
+    } else {
+      emitToRoom(`company-${companyId}`, "business-event", {
+        id: `evt-${Date.now()}-${randomUUID()}`,
+        type: "SYSTEM",
+        title: "Zona Eliminada",
+        description: `Se eliminó la zona ${zoneName}`,
+        timestamp: Date.now(),
+      });
+    }
+
+    const revertedPackageIds = revertedPackages.map((p) => p.id);
+    emitToRoom(`company-${companyId}`, "zone-deleted", {
+      zoneId,
+      name: zoneName,
+      driverId,
+      revertedPackageIds,
+    });
+
+    return {
+      ok: true,
+      deletedZoneId: zoneId,
+      revertedPackageIds,
+      revertedCount: revertedPackages.length,
+    };
   }
 
   /**

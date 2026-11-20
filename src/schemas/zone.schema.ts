@@ -3,6 +3,10 @@ import { z } from "zod";
 // A coordinate pair: [longitude, latitude]
 const coordSchema = z.tuple([z.number(), z.number()]);
 
+const zoneIdParamsSchema = z.object({
+  id: z.string().uuid(),
+});
+
 export const createZoneSchema = z.object({
   body: z.object({
     name: z.string().min(2),
@@ -12,10 +16,12 @@ export const createZoneSchema = z.object({
   }),
 });
 
+export const getZoneByIdSchema = z.object({
+  params: zoneIdParamsSchema,
+});
+
 export const updateZoneSchema = z.object({
-  params: z.object({
-    id: z.string().uuid(),
-  }),
+  params: zoneIdParamsSchema,
   body: z.object({
     name: z.string().min(2).optional(),
     description: z.string().optional(),
@@ -24,6 +30,10 @@ export const updateZoneSchema = z.object({
     // null to clear the polygon, array to set it
     polygon: z.array(coordSchema).min(3).nullable().optional(),
   }),
+});
+
+export const deleteZoneSchema = z.object({
+  params: zoneIdParamsSchema,
 });
 
 export const bulkZoneStatusSchema = z.object({

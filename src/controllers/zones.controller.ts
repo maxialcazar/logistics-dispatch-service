@@ -21,6 +21,20 @@ export async function getZones(req: AuthRequest, res: Response) {
   }
 }
 
+export async function getZoneById(req: AuthRequest, res: Response) {
+  const id = String(req.params.id);
+  try {
+    const zone = await ZoneService.getZoneById(req.user!.companyId, id);
+    res.json(zone);
+  } catch (error: any) {
+    if (error?.message === "Zone not found") {
+      return res.status(404).json({ error: error.message });
+    }
+    logger.error("Error in getZoneById:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
 export async function createZone(req: AuthRequest, res: Response) {
   const name = req.body.name as string;
   const description = req.body.description as string | undefined;
@@ -57,6 +71,20 @@ export async function updateZone(req: AuthRequest, res: Response) {
       }
       console.error(error);
       res.status(500).json({ error: 'Failed to update zone' });
+  }
+}
+
+export async function deleteZone(req: AuthRequest, res: Response) {
+  const id = String(req.params.id);
+  try {
+    const result = await ZoneService.deleteZone(req.user!.companyId, id, req.user!.id);
+    res.json(result);
+  } catch (error: any) {
+    if (error?.message === "Zone not found") {
+      return res.status(404).json({ error: error.message });
+    }
+    logger.error("Error in deleteZone:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
 
