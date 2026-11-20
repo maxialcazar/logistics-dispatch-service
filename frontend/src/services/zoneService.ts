@@ -1,13 +1,62 @@
 import { apiClient } from './apiClient';
 
+/** GeoJSON coordinate pair in backend [longitude, latitude] order */
+export type GeoJsonCoord = [number, number];
+
+export interface ZoneCoordinate {
+  lat: number;
+  lng: number;
+}
+
+export interface ZonePackageCounts {
+  pending: number;
+  assigned: number;
+  in_transit: number;
+  delivered: number;
+  cancelled: number;
+  total: number;
+}
+
 export interface Zone {
   id: string;
   name: string;
-  coordinates: { lat: number; lng: number }[]; // Array of points forming a polygon
-  description?: string;
+  polygon?: GeoJsonCoord[] | null;
+  coordinates?: ZoneCoordinate[] | null;
+  description?: string | null;
   isActive: boolean;
-  driver?: { id: string; name: string };
+  driverId?: string | null;
+  driver?: {
+    id: string;
+    name: string;
+    user?: { username: string };
+  } | null;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ZoneDetail extends Zone {
+  packageCounts?: ZonePackageCounts;
+}
+
+export interface CreateZonePayload {
+  name: string;
+  description?: string;
+  polygon?: GeoJsonCoord[];
+}
+
+export interface UpdateZonePayload {
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+  driverId?: string | null;
+  polygon?: GeoJsonCoord[] | null;
+}
+
+export interface DeleteZoneResponse {
+  ok: boolean;
+  deletedZoneId: string;
+  revertedPackageIds: string[];
+  revertedCount: number;
 }
 
 interface PaginatedResponse<T> {
@@ -37,24 +86,33 @@ export const zoneService = {
     });
   },
 
+  async getZoneById(
+    token: string,
+    id: string,
+    signal?: AbortSignal
+  ): Promise<ZoneDetail> {
+    return apiClient.get<ZoneDetail>(`/api/zones/${encodeURIComponent(id)}`, {
+      token,
+      signal,
+    });
+  },
+
   async updateZone(
     token: string,
     id: string,
-    data: { isActive?: boolean; driverId?: string | null; description?: string }
+    data: UpdateZonePayload
   ): Promise<Zone> {
     return apiClient.patch<Zone>(`/api/zones/${encodeURIComponent(id)}`, data, { token });
   },
 
-  async createZone(
-    token: string,
-    data: { name: string; coordinates: { lat: number; lng: number }[]; description?: string }
-  ): Promise<Zone> {
+  async createZone(token: string, data: CreateZonePayload): Promise<Zone> {
     return apiClient.post<Zone>('/api/zones', data, { token });
   },
 
-  async deleteZone(token: string, id: string): Promise<boolean> {
-    await apiClient.delete(`/api/zones/${encodeURIComponent(id)}`, { token });
-    return true;
+  async deleteZone(token: string, id: string): Promise<DeleteZoneResponse> {
+    return apiClient.delete<DeleteZoneResponse>(`/api/zones/${encodeURIComponent(id)}`, {
+      token,
+    });
   },
 
   async setAllZonesStatus(token: string, isActive: boolean) {

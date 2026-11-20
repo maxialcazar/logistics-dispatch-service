@@ -2,18 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { driverService, type AppDriver } from '../services/driverService';
-import { zoneService } from '../services/zoneService';
+import { zoneService, type Zone } from '../services/zoneService';
 import { MapPin, Truck, Search, GripVertical, CheckCircle, AlertTriangle, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Skeleton } from '../components/Skeleton';
-
-interface Zone {
-    id: string;
-    name: string;
-    description?: string;
-}
 
 export function DispatchPage() {
     const { token } = useAuth();

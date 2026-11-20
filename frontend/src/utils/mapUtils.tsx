@@ -40,6 +40,104 @@ export function toValidNonZeroLatLng(
   return coords;
 }
 
+const COORD_EPSILON = 1e-9;
+
+function areLatLngEqual(a: [number, number], b: [number, number]): boolean {
+  return (
+    Math.abs(a[0] - b[0]) < COORD_EPSILON && Math.abs(a[1] - b[1]) < COORD_EPSILON
+  );
+}
+
+function parseZonePointToLatLng(point: unknown): [number, number] | null {
+  if (Array.isArray(point) && point.length >= 2) {
+    // Backend GeoJSON ring pairs are ordered [lng, lat]
+    return toValidLatLng(point[1], point[0]);
+  }
+  if (point && typeof point === 'object') {
+    const candidate = point as { lat?: unknown; lng?: unknown };
+    return toValidLatLng(candidate.lat, candidate.lng);
+  }
+  return null;
+}
+
+function normalizeOpenLatLngVertices(rawPoints: [number, number][]): [number, number][] {
+  const deduped: [number, number][] = [];
+  for (const pt of rawPoints) {
+    const prev = deduped[deduped.length - 1];
+    if (!prev || !areLatLngEqual(prev, pt)) {
+      deduped.push(pt);
+    }
+  }
+  if (deduped.length >= 2 && areLatLngEqual(deduped[0], deduped[deduped.length - 1])) {
+    deduped.pop();
+  }
+  return deduped;
+}
+
+/**
+ * Extracts Leaflet-ordered [lat, lng] vertices from a zone's backend GeoJSON
+ * `polygon` ([lng, lat][]) or legacy `coordinates` ({ lat, lng }[]), stripping
+ * any duplicate closing vertex so editing handles represent distinct corners.
+ */
+export function extractZoneLatLngVertices(
+  zone?: { polygon?: unknown; coordinates?: unknown } | null
+): [number, number][] {
+  if (!zone) return [];
+
+  const source = Array.isArray(zone.polygon)
+    ? zone.polygon
+    : Array.isArray(zone.coordinates)
+      ? zone.coordinates
+      : null;
+
+  if (!source) return [];
+
+  const parsed = source
+    .map(parseZonePointToLatLng)
+    .filter((pt): pt is [number, number] => pt !== null);
+
+  return normalizeOpenLatLngVertices(parsed);
+}
+
+/**
+ * Converts Leaflet-ordered [lat, lng] vertices into a closed GeoJSON ring of
+ * [lng, lat] tuples for POST/PATCH /api/zones. Returns null when fewer than 3
+ * distinct valid vertices exist.
+ */
+export function toGeoJsonPolygonRing(
+  vertices: [number, number][]
+): [number, number][] | null {
+  const validVertices = vertices
+    .map((pt) => toValidLatLng(pt[0], pt[1]))
+    .filter((pt): pt is [number, number] => pt !== null);
+
+  const distinct = normalizeOpenLatLngVertices(validVertices);
+  if (distinct.length < 3) {
+    return null;
+  }
+
+  const ring: [number, number][] = distinct.map(([lat, lng]) => [lng, lat]);
+  ring.push([ring[0][0], ring[0][1]]);
+  return ring;
+}
+
+/**
+ * Creates a touch-friendly numbered vertex marker icon for the zone polygon editor.
+ */
+export function createZoneVertexIcon(index: number, isFirst: boolean): L.DivIcon {
+  const ringStyle = isFirst
+    ? 'bg-emerald-700 border-emerald-200 ring-2 ring-emerald-400/50'
+    : 'bg-brand-700 border-white ring-2 ring-brand-400/40';
+
+  return L.divIcon({
+    className: 'custom-zone-vertex-icon',
+    html: `<div class="w-11 h-11 flex items-center justify-center cursor-grab active:cursor-grabbing"><div class="w-6 h-6 rounded-full border-2 ${ringStyle} text-white font-mono text-[11px] font-bold flex items-center justify-center shadow-lg">${index + 1}</div></div>`,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    popupAnchor: [0, -16],
+  });
+}
+
 /**
  * Creates a memoizable Leaflet DivIcon representing a fleet or delivery driver.
  */

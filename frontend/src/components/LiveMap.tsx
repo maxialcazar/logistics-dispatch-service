@@ -16,7 +16,7 @@ import {
     DEFAULT_MAP_CENTER,
     createDriverIcon,
     createPackageIcon,
-    toValidLatLng,
+    extractZoneLatLngVertices,
     toValidNonZeroLatLng,
 } from '../utils/mapUtils';
 import { MapFitBounds } from './MapFitBounds';
@@ -61,8 +61,9 @@ export interface ZoneCoordinate {
 export interface MapZone {
     id: string;
     name: string;
+    polygon?: [number, number][] | null;
     coordinates?: ZoneCoordinate[] | null;
-    description?: string;
+    description?: string | null;
     isActive?: boolean;
     driver?: { id: string; name: string } | null;
 }
@@ -111,19 +112,17 @@ export function LiveMap({
         return packages.filter((p) => toValidNonZeroLatLng(p.lat, p.lng) !== null);
     }, [packages]);
 
-    // Filter active zones with valid polygon vertices (>= 3 points in [lat, lng] order)
+    // Filter active zones with valid polygon vertices (>= 3 points in Leaflet [lat, lng] order)
     const activeZonePolygons = useMemo(() => {
         return zones
-            .filter((zone) => zone.isActive === true && Array.isArray(zone.coordinates))
+            .filter((zone) => zone.isActive === true)
             .map((zone) => {
-                const positions: [number, number][] = (zone.coordinates ?? [])
-                    .map((pt) => (pt ? toValidLatLng(pt.lat, pt.lng) : null))
-                    .filter((coords): coords is [number, number] => coords !== null);
+                const positions = extractZoneLatLngVertices(zone);
 
                 return {
                     id: zone.id,
                     name: zone.name,
-                    description: zone.description,
+                    description: zone.description ?? undefined,
                     driverName: zone.driver?.name ?? null,
                     positions,
                 };

@@ -16,7 +16,7 @@ import {
   DARK_TILE_ATTRIBUTION,
   DARK_TILE_URL,
   createPackageIcon,
-  toValidLatLng,
+  extractZoneLatLngVertices,
   toValidNonZeroLatLng,
 } from '../utils/mapUtils';
 
@@ -130,12 +130,7 @@ export function PackageLocationPickerMap({
   const pinCoords = useMemo(() => toValidNonZeroLatLng(lat, lng), [lat, lng]);
 
   const zonePositions = useMemo(() => {
-    if (!selectedZone || !Array.isArray(selectedZone.coordinates)) {
-      return [];
-    }
-    return selectedZone.coordinates
-      .map((pt) => (pt ? toValidLatLng(pt.lat, pt.lng) : null))
-      .filter((coords): coords is [number, number] => coords !== null);
+    return extractZoneLatLngVertices(selectedZone);
   }, [selectedZone]);
 
   const pinIcon = useMemo(() => createPackageIcon('#0ea5e9'), []);
