@@ -215,6 +215,120 @@ export async function getDashboardStats(req: AuthRequest, res: Response) {
     }
 }
 
+function parseOptionalNullableDate(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return new Date(String(value));
+}
+
+export async function getPackageById(req: AuthRequest, res: Response) {
+  const id = String(req.params.id);
+  try {
+    const pkg = await PackageService.getPackageById(req.user!.companyId, id, {
+      userRole: req.user!.role,
+      userDriverId: req.user!.driverId || null,
+    });
+    res.json(pkg);
+  } catch (error: any) {
+    if (error?.message === "package_not_found") {
+      return res.status(404).json({ error: "package not found" });
+    }
+    if (error?.message === "not_authorized_for_zone") {
+      return res.status(403).json({ error: "not authorized for this zone" });
+    }
+    logger.error("Error in getPackageById:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+export async function updatePackage(req: AuthRequest, res: Response) {
+  const id = String(req.params.id);
+  const {
+    recipientName,
+    recipientAddress,
+    recipientPhone,
+    recipientEmail,
+    addressStreet,
+    addressNumber,
+    addressFloor,
+    addressCity,
+    addressZip,
+    addressReferences,
+    senderName,
+    senderAddress,
+    senderPhone,
+    weight,
+    volume,
+    zoneId,
+    lat,
+    lng,
+    estimatedDeliveryAt,
+    deliveryWindowStart,
+    deliveryWindowEnd,
+  } = req.body;
+
+  try {
+    const updated = await PackageService.updatePackage(
+      req.user!.companyId,
+      id,
+      req.user!.id,
+      {
+        recipientName,
+        recipientAddress,
+        recipientPhone,
+        recipientEmail,
+        addressStreet,
+        addressNumber,
+        addressFloor,
+        addressCity,
+        addressZip,
+        addressReferences,
+        senderName,
+        senderAddress,
+        senderPhone,
+        weight,
+        volume,
+        zoneId,
+        lat,
+        lng,
+        estimatedDeliveryAt: parseOptionalNullableDate(estimatedDeliveryAt),
+        deliveryWindowStart: parseOptionalNullableDate(deliveryWindowStart),
+        deliveryWindowEnd: parseOptionalNullableDate(deliveryWindowEnd),
+      }
+    );
+    res.json(updated);
+  } catch (error: any) {
+    if (error?.message === "package_not_found") {
+      return res.status(404).json({ error: "package not found" });
+    }
+    if (error?.message === "zone_not_found") {
+      return res.status(400).json({ error: "zone not found" });
+    }
+    if (error?.message === "invalid_delivery_window" || error?.message === "invalid_date_filter") {
+      return res.status(400).json({
+        error: "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
+      });
+    }
+    if (
+      typeof error?.message === "string" &&
+      error.message.startsWith("cannot_update_terminal_package:")
+    ) {
+      const [, status] = error.message.split(":");
+      return res.status(422).json({
+        error: "Cannot update a package that is already delivered or cancelled",
+        status,
+      });
+    }
+    if (error?.message === "cannot_reassign_zone_in_transit") {
+      return res.status(422).json({
+        error: "Cannot reassign zone while package is in_transit",
+      });
+    }
+    logger.error("Error in updatePackage:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
 export async function archivePackages(req: AuthRequest, res: Response) {
     const { packageIds } = req.body;
     if (!Array.isArray(packageIds) || packageIds.length === 0) {
@@ -224,6 +338,17 @@ export async function archivePackages(req: AuthRequest, res: Response) {
         const result = await PackageService.archivePackages(req.user!.companyId, packageIds);
         res.json({ count: result.count });
     } catch (error) {
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}
+
+export async function unarchivePackages(req: AuthRequest, res: Response) {
+    const { packageIds } = req.body;
+    try {
+        const result = await PackageService.unarchivePackages(req.user!.companyId, packageIds);
+        res.json({ count: result.count });
+    } catch (error) {
+        logger.error("Error in unarchivePackages:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 }

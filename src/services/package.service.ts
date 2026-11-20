@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma } from "../prisma";
 // Force recompile after prisma generate
 import { PackageStatus, Prisma } from "@prisma/client";
@@ -6,6 +7,31 @@ import { geocodeAddress } from "../utils/geocoder";
 import { saveBase64Image, deleteUploadedFile } from "../utils/fileUpload";
 import { ZoneService } from "./zone.service";
 import { parseDateBoundary } from "../schemas/package.schema";
+import { redis } from "../redis";
+
+export interface UpdatePackageInput {
+  recipientName?: string;
+  recipientAddress?: string;
+  recipientPhone?: string;
+  recipientEmail?: string | null;
+  addressStreet?: string | null;
+  addressNumber?: string | null;
+  addressFloor?: string | null;
+  addressCity?: string | null;
+  addressZip?: string | null;
+  addressReferences?: string | null;
+  senderName?: string | null;
+  senderAddress?: string | null;
+  senderPhone?: string | null;
+  weight?: number | null;
+  volume?: number | null;
+  zoneId?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  estimatedDeliveryAt?: Date | null;
+  deliveryWindowStart?: Date | null;
+  deliveryWindowEnd?: Date | null;
+}
 
 export class PackageService {
   private static resolveDateFilter(
@@ -171,6 +197,29 @@ export class PackageService {
       },
       data: { isArchived: true }
     });
+  }
+
+  static async unarchivePackages(companyId: string, packageIds: string[]) {
+    const uniqueIds = Array.from(new Set(packageIds));
+    const result = await prisma.package.updateMany({
+      where: {
+        companyId,
+        id: { in: uniqueIds },
+        isArchived: true,
+      },
+      data: { isArchived: false },
+    });
+
+    await redis.delPrefix(`packages:${companyId}:`);
+
+    if (result.count > 0) {
+      emitToRoom(`company-${companyId}`, "packages-unarchived", {
+        packageIds: uniqueIds,
+        count: result.count,
+      });
+    }
+
+    return result;
   }
 
   static async deletePackages(companyId: string, packageIds: string[]) {
@@ -718,6 +767,343 @@ export class PackageService {
   static async getMyPackages(companyId: string, driverId: string) {
     if (!companyId) throw new Error("company_id_required");
     return this.getPackagesByDriver(companyId, driverId);
+  }
+
+  static async getPackageById(
+    companyId: string,
+    packageId: string,
+    options?: { userRole?: string; userDriverId?: string | null }
+  ) {
+    const pkg = await prisma.package.findFirst({
+      where: { id: packageId, companyId },
+      include: {
+        zone: {
+          include: { driver: true },
+        },
+        driver: true,
+        history: {
+          include: {
+            user: {
+              select: { id: true, username: true, role: true },
+            },
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        },
+      },
+    });
+
+    if (!pkg) throw new Error("package_not_found");
+
+    if (options?.userRole === "driver") {
+      if (!PackageService.isDriverAuthorizedForPackage(pkg, options.userDriverId ?? null)) {
+        throw new Error("not_authorized_for_zone");
+      }
+    }
+
+    return pkg;
+  }
+
+  static async updatePackage(
+    companyId: string,
+    packageId: string,
+    userId: string,
+    data: UpdatePackageInput
+  ) {
+    const normalizeNullableText = (val: string | null | undefined): string | null | undefined => {
+      if (val === undefined) return undefined;
+      if (val === null) return null;
+      const trimmed = val.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const normalizeRequiredText = (val: string | undefined): string | undefined => {
+      if (val === undefined) return undefined;
+      return val.trim();
+    };
+
+    const assertValidOptionalDate = (val: Date | null | undefined) => {
+      if (val instanceof Date && Number.isNaN(val.getTime())) {
+        throw new Error("invalid_date_filter");
+      }
+    };
+
+    assertValidOptionalDate(data.estimatedDeliveryAt);
+    assertValidOptionalDate(data.deliveryWindowStart);
+    assertValidOptionalDate(data.deliveryWindowEnd);
+
+    const txResult = await prisma.$transaction(async (tx) => {
+      const initialPkg = await tx.package.findFirst({
+        where: { id: packageId, companyId },
+        select: { id: true, status: true, zoneId: true },
+      });
+      if (!initialPkg) {
+        throw new Error("package_not_found");
+      }
+      if (initialPkg.status === "delivered" || initialPkg.status === "cancelled") {
+        throw new Error(`cannot_update_terminal_package:${initialPkg.status}`);
+      }
+      if (
+        initialPkg.status === "in_transit" &&
+        data.zoneId !== undefined &&
+        data.zoneId !== initialPkg.zoneId
+      ) {
+        throw new Error("cannot_reassign_zone_in_transit");
+      }
+
+      let targetZone: { id: string; name: string; isActive: boolean; driverId: string | null } | null = null;
+      let targetDriverName: string | null = null;
+
+      if (typeof data.zoneId === "string") {
+        const zoneRows = await tx.$queryRaw<
+          { id: string; name: string; isActive: boolean; driverId: string | null }[]
+        >`
+          SELECT "id", "name", "isActive", "driverId"
+          FROM "Zone"
+          WHERE "id" = ${data.zoneId} AND "companyId" = ${companyId}
+          FOR SHARE
+        `;
+        if (zoneRows.length === 0) {
+          throw new Error("zone_not_found");
+        }
+        targetZone = zoneRows[0];
+        if (targetZone.driverId) {
+          const driver = await tx.driver.findFirst({
+            where: { id: targetZone.driverId, companyId },
+            select: { name: true },
+          });
+          targetDriverName = driver?.name ?? null;
+        }
+      }
+
+      const pkgRows = await tx.$queryRaw<
+        {
+          id: string;
+          trackingCode: string;
+          status: PackageStatus;
+          zoneId: string | null;
+          driverId: string | null;
+          deliveryWindowStart: Date | null;
+          deliveryWindowEnd: Date | null;
+        }[]
+      >`
+        SELECT "id", "trackingCode", "status", "zoneId", "driverId", "deliveryWindowStart", "deliveryWindowEnd"
+        FROM "Package"
+        WHERE "id" = ${packageId} AND "companyId" = ${companyId}
+        FOR UPDATE
+      `;
+      if (pkgRows.length === 0) {
+        throw new Error("package_not_found");
+      }
+      const lockedPkg = pkgRows[0];
+
+      if (lockedPkg.status === "delivered" || lockedPkg.status === "cancelled") {
+        throw new Error(`cannot_update_terminal_package:${lockedPkg.status}`);
+      }
+      if (
+        lockedPkg.status === "in_transit" &&
+        data.zoneId !== undefined &&
+        data.zoneId !== lockedPkg.zoneId
+      ) {
+        throw new Error("cannot_reassign_zone_in_transit");
+      }
+
+      const effectiveWindowStart =
+        data.deliveryWindowStart !== undefined
+          ? data.deliveryWindowStart
+          : lockedPkg.deliveryWindowStart;
+      const effectiveWindowEnd =
+        data.deliveryWindowEnd !== undefined
+          ? data.deliveryWindowEnd
+          : lockedPkg.deliveryWindowEnd;
+
+      if (effectiveWindowStart && effectiveWindowEnd && effectiveWindowStart > effectiveWindowEnd) {
+        throw new Error("invalid_delivery_window");
+      }
+
+      const zoneChanged = data.zoneId !== undefined && data.zoneId !== lockedPkg.zoneId;
+      let nextStatus: PackageStatus = lockedPkg.status;
+      let nextZoneId: string | null | undefined = undefined;
+      let nextDriverId: string | null | undefined = undefined;
+      let zoneNote: string | null = null;
+
+      if (zoneChanged) {
+        if (data.zoneId === null) {
+          nextZoneId = null;
+          nextDriverId = null;
+          nextStatus = "pending";
+          zoneNote = "Zone unassigned (status set to pending)";
+        } else if (targetZone) {
+          nextZoneId = targetZone.id;
+          if (targetZone.isActive && targetZone.driverId) {
+            nextDriverId = targetZone.driverId;
+            nextStatus = "assigned";
+            zoneNote = `Reassigned to zone ${targetZone.name} (assigned to driver ${targetDriverName ?? targetZone.driverId})`;
+          } else {
+            nextDriverId = null;
+            nextStatus = "pending";
+            zoneNote = `Reassigned to zone ${targetZone.name} (status set to pending)`;
+          }
+        }
+      }
+
+      const recipientName = normalizeRequiredText(data.recipientName);
+      const recipientAddress = normalizeRequiredText(data.recipientAddress);
+      const recipientPhone = normalizeRequiredText(data.recipientPhone);
+      const recipientEmail = normalizeNullableText(data.recipientEmail);
+      const addressStreet = normalizeNullableText(data.addressStreet);
+      const addressNumber = normalizeNullableText(data.addressNumber);
+      const addressFloor = normalizeNullableText(data.addressFloor);
+      const addressCity = normalizeNullableText(data.addressCity);
+      const addressZip = normalizeNullableText(data.addressZip);
+      const addressReferences = normalizeNullableText(data.addressReferences);
+      const senderName = normalizeNullableText(data.senderName);
+      const senderAddress = normalizeNullableText(data.senderAddress);
+      const senderPhone = normalizeNullableText(data.senderPhone);
+
+      const updateData: Prisma.PackageUncheckedUpdateInput = {
+        ...(recipientName !== undefined ? { recipientName } : {}),
+        ...(recipientAddress !== undefined ? { recipientAddress } : {}),
+        ...(recipientPhone !== undefined ? { recipientPhone } : {}),
+        ...(recipientEmail !== undefined ? { recipientEmail } : {}),
+        ...(addressStreet !== undefined ? { addressStreet } : {}),
+        ...(addressNumber !== undefined ? { addressNumber } : {}),
+        ...(addressFloor !== undefined ? { addressFloor } : {}),
+        ...(addressCity !== undefined ? { addressCity } : {}),
+        ...(addressZip !== undefined ? { addressZip } : {}),
+        ...(addressReferences !== undefined ? { addressReferences } : {}),
+        ...(senderName !== undefined ? { senderName } : {}),
+        ...(senderAddress !== undefined ? { senderAddress } : {}),
+        ...(senderPhone !== undefined ? { senderPhone } : {}),
+        ...(data.weight !== undefined ? { weight: data.weight } : {}),
+        ...(data.volume !== undefined ? { volume: data.volume } : {}),
+        ...(data.lat !== undefined ? { lat: data.lat } : {}),
+        ...(data.lng !== undefined ? { lng: data.lng } : {}),
+        ...(data.estimatedDeliveryAt !== undefined
+          ? { estimatedDeliveryAt: data.estimatedDeliveryAt }
+          : {}),
+        ...(data.deliveryWindowStart !== undefined
+          ? { deliveryWindowStart: data.deliveryWindowStart }
+          : {}),
+        ...(data.deliveryWindowEnd !== undefined
+          ? { deliveryWindowEnd: data.deliveryWindowEnd }
+          : {}),
+        ...(zoneChanged
+          ? {
+              zoneId: nextZoneId,
+              driverId: nextDriverId,
+              status: nextStatus,
+            }
+          : {}),
+      };
+
+      const changedFields: string[] = [];
+      const trackableFields: [keyof UpdatePackageInput, unknown][] = [
+        ["recipientName", recipientName],
+        ["recipientAddress", recipientAddress],
+        ["recipientPhone", recipientPhone],
+        ["recipientEmail", recipientEmail],
+        ["addressStreet", addressStreet],
+        ["addressNumber", addressNumber],
+        ["addressFloor", addressFloor],
+        ["addressCity", addressCity],
+        ["addressZip", addressZip],
+        ["addressReferences", addressReferences],
+        ["senderName", senderName],
+        ["senderAddress", senderAddress],
+        ["senderPhone", senderPhone],
+        ["weight", data.weight],
+        ["volume", data.volume],
+        ["lat", data.lat],
+        ["lng", data.lng],
+        ["estimatedDeliveryAt", data.estimatedDeliveryAt],
+        ["deliveryWindowStart", data.deliveryWindowStart],
+        ["deliveryWindowEnd", data.deliveryWindowEnd],
+      ];
+      for (const [field, val] of trackableFields) {
+        if (val !== undefined) {
+          changedFields.push(field);
+        }
+      }
+
+      const notesParts: string[] = [];
+      if (zoneNote) notesParts.push(zoneNote);
+      if (changedFields.length > 0) {
+        notesParts.push(`Updated fields: ${changedFields.join(", ")}`);
+      }
+      const notes = notesParts.length > 0 ? notesParts.join("; ") : "Package updated";
+
+      await tx.packageHistory.create({
+        data: {
+          packageId,
+          status: nextStatus,
+          userId,
+          notes,
+        },
+      });
+
+      const updated = await tx.package.update({
+        where: { id: packageId },
+        data: updateData,
+        include: {
+          zone: {
+            include: { driver: true },
+          },
+          driver: true,
+          history: {
+            include: {
+              user: {
+                select: { id: true, username: true, role: true },
+              },
+            },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          },
+        },
+      });
+
+      return {
+        updated,
+        previousStatus: lockedPkg.status,
+        previousDriverId: lockedPkg.driverId,
+        zoneChanged,
+      };
+    });
+
+    await redis.delPrefix(`packages:${companyId}:`);
+
+    const { updated, previousStatus, previousDriverId, zoneChanged } = txResult;
+
+    emitToRoom(`company-${companyId}`, "package-updated", updated);
+
+    if (updated.status !== previousStatus) {
+      emitToRoom(`company-${companyId}`, "package-status-updated", {
+        packageId: updated.id,
+        status: updated.status,
+        zoneId: updated.zoneId,
+        lat: updated.lat,
+        lng: updated.lng,
+        estimatedDeliveryAt: updated.estimatedDeliveryAt,
+      });
+    }
+
+    if (zoneChanged && updated.driverId && updated.driverId !== previousDriverId) {
+      emitToRoom(`company-${companyId}`, "package-assigned", {
+        packageId: updated.id,
+        driverId: updated.driverId,
+        driverName: updated.driver?.name,
+      });
+    }
+
+    emitToRoom(`company-${companyId}`, "business-event", {
+      id: `evt-${Date.now()}-${randomUUID()}`,
+      type: "SYSTEM",
+      title: zoneChanged ? "Zona de Paquete Reasignada" : "Paquete Actualizado",
+      description: zoneChanged
+        ? `Paquete #${updated.trackingCode} reasignado${updated.zone ? ` a zona ${updated.zone.name}` : " (sin zona)"}`
+        : `Se actualizaron los datos del paquete #${updated.trackingCode}`,
+      timestamp: Date.now(),
+    });
+
+    return updated;
   }
 
   static async getPackageHistory(

@@ -8,6 +8,7 @@ import { detectZone } from "../src/utils/geofencing";
 import { geocodeAddress } from "../src/utils/geocoder";
 import { PackageService } from "../src/services/package.service";
 import { swaggerSpec } from "../src/swagger";
+import * as websocketModule from "../src/websocket";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 const SLUG_A = `company-a-${Date.now()}`;
@@ -1014,5 +1015,626 @@ describe("Task 2.1.1 — GET /api/packages server-side search & filters", () => 
         "limit",
       ])
     );
+  });
+});
+
+// ─── Task 2.1.2 — Package Detail, Update & Unarchive ─────────────────────────
+describe("Task 2.1.2 — GET /api/packages/:id, PATCH /api/packages/:id & POST /api/packages/unarchive", () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  let mainCompanyId: string;
+  let otherCompanyId: string;
+  let adminToken: string;
+  let otherAdminToken: string;
+  let driver1Token: string;
+  let driver2Token: string;
+
+  let driver1Id: string;
+  let driver2Id: string;
+  let activeZone1Id: string;
+  let activeZone2Id: string;
+  let inactiveZoneId: string;
+  let noDriverActiveZoneId: string;
+  let otherTenantZoneId: string;
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  beforeAll(async () => {
+    const [regMain, regOther] = await Promise.all([
+      request(app).post("/api/auth/register-company").send({
+        companyName: "CRUD Main Co",
+        companySlug: `crud-main-${suffix}`,
+        username: `crud_admin_${suffix}`,
+        password: "securepassword123",
+      }),
+      request(app).post("/api/auth/register-company").send({
+        companyName: "CRUD Other Co",
+        companySlug: `crud-other-${suffix}`,
+        username: `crud_other_${suffix}`,
+        password: "securepassword123",
+      }),
+    ]);
+
+    expect(regMain.status).toBe(201);
+    expect(regOther.status).toBe(201);
+    mainCompanyId = regMain.body.company.id;
+    otherCompanyId = regOther.body.company.id;
+
+    const [loginMain, loginOther] = await Promise.all([
+      request(app).post("/api/auth/login").send({
+        username: `crud_admin_${suffix}`,
+        password: "securepassword123",
+      }),
+      request(app).post("/api/auth/login").send({
+        username: `crud_other_${suffix}`,
+        password: "securepassword123",
+      }),
+    ]);
+    adminToken = loginMain.body.token;
+    otherAdminToken = loginOther.body.token;
+
+    const [d1Res, d2Res] = await Promise.all([
+      request(app)
+        .post("/api/drivers")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ name: "CRUD Driver 1", username: `crud_d1_${suffix}`, password: "driverpass123" }),
+      request(app)
+        .post("/api/drivers")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ name: "CRUD Driver 2", username: `crud_d2_${suffix}`, password: "driverpass123" }),
+    ]);
+    expect(d1Res.status).toBe(201);
+    expect(d2Res.status).toBe(201);
+    driver1Id = d1Res.body.id;
+    driver2Id = d2Res.body.id;
+
+    const [l1, l2] = await Promise.all([
+      request(app).post("/api/auth/login").send({ username: `crud_d1_${suffix}`, password: "driverpass123" }),
+      request(app).post("/api/auth/login").send({ username: `crud_d2_${suffix}`, password: "driverpass123" }),
+    ]);
+    driver1Token = l1.body.token;
+    driver2Token = l2.body.token;
+
+    const [z1, z2, zInactive, zNoDrv, zOther] = await Promise.all([
+      prisma.zone.create({
+        data: { name: "CRUD Zone 1", companyId: mainCompanyId, driverId: driver1Id, isActive: true },
+      }),
+      prisma.zone.create({
+        data: { name: "CRUD Zone 2", companyId: mainCompanyId, driverId: driver2Id, isActive: true },
+      }),
+      prisma.zone.create({
+        data: { name: "CRUD Inactive Zone", companyId: mainCompanyId, driverId: driver2Id, isActive: false },
+      }),
+      prisma.zone.create({
+        data: { name: "CRUD No Driver Zone", companyId: mainCompanyId, driverId: null, isActive: false },
+      }),
+      prisma.zone.create({
+        data: { name: "Other Tenant Zone", companyId: otherCompanyId, isActive: true },
+      }),
+    ]);
+
+    activeZone1Id = z1.id;
+    activeZone2Id = z2.id;
+    inactiveZoneId = zInactive.id;
+    noDriverActiveZoneId = zNoDrv.id;
+    otherTenantZoneId = zOther.id;
+  });
+
+  afterAll(async () => {
+    const ids = [mainCompanyId, otherCompanyId].filter(Boolean);
+    if (ids.length > 0) {
+      await prisma.packageHistory.deleteMany({ where: { package: { companyId: { in: ids } } } });
+      await prisma.package.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.zone.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.user.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.driver.deleteMany({ where: { companyId: { in: ids } } });
+      await prisma.company.deleteMany({ where: { id: { in: ids } } });
+    }
+  });
+
+  describe("GET /api/packages/:id", () => {
+    let detailPkgId: string;
+
+    beforeAll(async () => {
+      const pkg = await prisma.package.create({
+        data: {
+          trackingCode: `DET-${suffix}`,
+          recipientName: "Laura Detalle",
+          recipientAddress: "Av. Colón 1500, Córdoba",
+          recipientPhone: "3514445566",
+          recipientEmail: "laura@example.com",
+          addressFloor: "4B",
+          addressCity: "Córdoba",
+          addressZip: "5000",
+          addressReferences: "Edificio azul",
+          deliveryWindowStart: new Date("2026-07-01T09:00:00.000Z"),
+          deliveryWindowEnd: new Date("2026-07-01T13:00:00.000Z"),
+          status: "delivered",
+          signatureUrl: "/uploads/sig-test.png",
+          photoUrl: "/uploads/photo-test.jpg",
+          companyId: mainCompanyId,
+          zoneId: activeZone1Id,
+          driverId: driver1Id,
+        },
+      });
+      detailPkgId = pkg.id;
+
+      await prisma.packageHistory.create({
+        data: {
+          packageId: detailPkgId,
+          status: "assigned",
+          notes: "First event",
+          createdAt: new Date("2026-07-01T08:00:00.000Z"),
+        },
+      });
+      await prisma.packageHistory.create({
+        data: {
+          packageId: detailPkgId,
+          status: "in_transit",
+          notes: "Second event",
+          createdAt: new Date("2026-07-01T10:00:00.000Z"),
+        },
+      });
+      await prisma.packageHistory.create({
+        data: {
+          packageId: detailPkgId,
+          status: "delivered",
+          notes: "Third event",
+          createdAt: new Date("2026-07-01T11:30:00.000Z"),
+        },
+      });
+    });
+
+    it("returns full package detail with zone, driver, evidences, and chronological history", async () => {
+      const res = await request(app)
+        .get(`/api/packages/${detailPkgId}`)
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(detailPkgId);
+      expect(res.body.recipientName).toBe("Laura Detalle");
+      expect(res.body.addressFloor).toBe("4B");
+      expect(res.body.addressCity).toBe("Córdoba");
+      expect(res.body.addressZip).toBe("5000");
+      expect(res.body.signatureUrl).toBe("/uploads/sig-test.png");
+      expect(res.body.photoUrl).toBe("/uploads/photo-test.jpg");
+      expect(res.body.zone?.id).toBe(activeZone1Id);
+      expect(res.body.driver?.id).toBe(driver1Id);
+      expect(Array.isArray(res.body.history)).toBe(true);
+      expect(res.body.history.map((h: any) => h.status)).toEqual([
+        "assigned",
+        "in_transit",
+        "delivered",
+      ]);
+      expect(res.body.history.map((h: any) => h.notes)).toEqual([
+        "First event",
+        "Second event",
+        "Third event",
+      ]);
+    });
+
+    it("enforces driver authorization and prevents route collision with static routes", async () => {
+      const authorizedDriverRes = await request(app)
+        .get(`/api/packages/${detailPkgId}`)
+        .set("Authorization", `Bearer ${driver1Token}`);
+      expect(authorizedDriverRes.status).toBe(200);
+      expect(authorizedDriverRes.body.id).toBe(detailPkgId);
+
+      const unauthorizedDriverRes = await request(app)
+        .get(`/api/packages/${detailPkgId}`)
+        .set("Authorization", `Bearer ${driver2Token}`);
+      expect(unauthorizedDriverRes.status).toBe(403);
+
+      // Static routes remain reachable and not captured by /:id
+      const myPackagesRes = await request(app)
+        .get("/api/packages/my-packages")
+        .set("Authorization", `Bearer ${driver1Token}`);
+      expect(myPackagesRes.status).toBe(200);
+
+      const statsRes = await request(app)
+        .get("/api/packages/stats")
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(statsRes.status).toBe(200);
+    });
+
+    it("returns 404 for non-existent or cross-tenant package and 400 for invalid UUID", async () => {
+      const missingRes = await request(app)
+        .get("/api/packages/00000000-0000-4000-8000-000000000000")
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(missingRes.status).toBe(404);
+
+      const crossTenantRes = await request(app)
+        .get(`/api/packages/${detailPkgId}`)
+        .set("Authorization", `Bearer ${otherAdminToken}`);
+      expect(crossTenantRes.status).toBe(404);
+
+      const invalidUuidRes = await request(app)
+        .get("/api/packages/not-a-valid-uuid")
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(invalidUuidRes.status).toBe(400);
+      expect(invalidUuidRes.body.error).toBe("Validation failed");
+    });
+  });
+
+  describe("PATCH /api/packages/:id", () => {
+    it("updates recipient, address, coordinates, and delivery window while creating history, emitting events, and invalidating Redis", async () => {
+      const createRes = await request(app)
+        .post("/api/packages")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          trackingCode: `UPD-BASE-${suffix}`,
+          recipientName: "Carlos Original",
+          recipientAddress: "Av. Maipú 100, Córdoba",
+          recipientPhone: "3511110000",
+          zoneId: activeZone1Id,
+          lat: -31.41,
+          lng: -64.18,
+        });
+      expect(createRes.status).toBe(201);
+      const pkgId = createRes.body.id;
+
+      const redisSpy = jest.spyOn(redis, "delPrefix").mockResolvedValue(undefined);
+      const emitSpy = jest.spyOn(websocketModule, "emitToRoom");
+
+      const patchRes = await request(app)
+        .patch(`/api/packages/${pkgId}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          recipientName: "Carlos Editado",
+          recipientPhone: "3512229999",
+          recipientEmail: "carlos.editado@example.com",
+          recipientAddress: "Bv. San Juan 500, Córdoba",
+          addressFloor: "2A",
+          addressCity: "Córdoba",
+          addressZip: "5000",
+          addressReferences: "Timbre 2A",
+          lat: -31.4215,
+          lng: -64.1888,
+          deliveryWindowStart: "2026-08-10T09:00:00-03:00",
+          deliveryWindowEnd: "2026-08-10T13:00:00-03:00",
+        });
+
+      expect(patchRes.status).toBe(200);
+      expect(patchRes.body.recipientName).toBe("Carlos Editado");
+      expect(patchRes.body.recipientPhone).toBe("3512229999");
+      expect(patchRes.body.recipientEmail).toBe("carlos.editado@example.com");
+      expect(patchRes.body.recipientAddress).toBe("Bv. San Juan 500, Córdoba");
+      expect(patchRes.body.addressFloor).toBe("2A");
+      expect(patchRes.body.addressCity).toBe("Córdoba");
+      expect(patchRes.body.addressZip).toBe("5000");
+      expect(patchRes.body.addressReferences).toBe("Timbre 2A");
+      expect(patchRes.body.lat).toBeCloseTo(-31.4215, 4);
+      expect(patchRes.body.lng).toBeCloseTo(-64.1888, 4);
+      expect(new Date(patchRes.body.deliveryWindowStart).toISOString()).toBe("2026-08-10T12:00:00.000Z");
+      expect(new Date(patchRes.body.deliveryWindowEnd).toISOString()).toBe("2026-08-10T16:00:00.000Z");
+      expect(patchRes.body.status).toBe("assigned");
+      expect(patchRes.body.driverId).toBe(driver1Id);
+      expect(patchRes.body.history.length).toBeGreaterThanOrEqual(2);
+      expect(patchRes.body.history[patchRes.body.history.length - 1].notes).toContain("Updated fields:");
+
+      expect(redisSpy).toHaveBeenCalledWith(`packages:${mainCompanyId}:`);
+      expect(emitSpy).toHaveBeenCalledWith(
+        `company-${mainCompanyId}`,
+        "package-updated",
+        expect.objectContaining({ id: pkgId })
+      );
+    });
+
+    it("synchronizes driverId, status, and PackageHistory when reassigning or clearing zoneId", async () => {
+      const pendingPkg = await prisma.package.create({
+        data: {
+          trackingCode: `UPD-ZONE-${suffix}`,
+          recipientName: "Lucía Zona",
+          recipientAddress: "Av. Vélez Sarsfield 200",
+          recipientPhone: "3513334444",
+          status: "pending",
+          companyId: mainCompanyId,
+          zoneId: null,
+          driverId: null,
+        },
+      });
+
+      // 1. pending (no zone) -> activeZone1 (driver1) => assigned + driver1
+      const toZone1 = await request(app)
+        .patch(`/api/packages/${pendingPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: activeZone1Id });
+      expect(toZone1.status).toBe(200);
+      expect(toZone1.body.zoneId).toBe(activeZone1Id);
+      expect(toZone1.body.driverId).toBe(driver1Id);
+      expect(toZone1.body.status).toBe("assigned");
+
+      // 2. activeZone1 (driver1) -> activeZone2 (driver2) => assigned + driver2
+      const toZone2 = await request(app)
+        .patch(`/api/packages/${pendingPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: activeZone2Id });
+      expect(toZone2.status).toBe(200);
+      expect(toZone2.body.zoneId).toBe(activeZone2Id);
+      expect(toZone2.body.driverId).toBe(driver2Id);
+      expect(toZone2.body.status).toBe("assigned");
+
+      // 3. activeZone2 -> inactiveZone => reverts to pending + driverId null
+      const toInactive = await request(app)
+        .patch(`/api/packages/${pendingPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: inactiveZoneId });
+      expect(toInactive.status).toBe(200);
+      expect(toInactive.body.zoneId).toBe(inactiveZoneId);
+      expect(toInactive.body.driverId).toBeNull();
+      expect(toInactive.body.status).toBe("pending");
+
+      // 4. inactiveZone -> activeZone1 -> null (unassign zone) => pending + null
+      await request(app)
+        .patch(`/api/packages/${pendingPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: activeZone1Id });
+
+      const clearZone = await request(app)
+        .patch(`/api/packages/${pendingPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: null });
+      expect(clearZone.status).toBe(200);
+      expect(clearZone.body.zoneId).toBeNull();
+      expect(clearZone.body.driverId).toBeNull();
+      expect(clearZone.body.status).toBe("pending");
+
+      // 5. Assign to zone with no driver => pending + driverId null
+      const toNoDriverZone = await request(app)
+        .patch(`/api/packages/${pendingPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: noDriverActiveZoneId });
+      expect(toNoDriverZone.status).toBe(200);
+      expect(toNoDriverZone.body.zoneId).toBe(noDriverActiveZoneId);
+      expect(toNoDriverZone.body.driverId).toBeNull();
+      expect(toNoDriverZone.body.status).toBe("pending");
+    });
+
+    it("protects delivered, cancelled, and in_transit zone reassignments with 422", async () => {
+      const [deliveredPkg, cancelledPkg, inTransitPkg] = await Promise.all([
+        prisma.package.create({
+          data: {
+            trackingCode: `UPD-DEL-${suffix}`,
+            recipientName: "Delivered Guard",
+            recipientAddress: "Calle Guard 1",
+            recipientPhone: "3510000001",
+            status: "delivered",
+            companyId: mainCompanyId,
+            zoneId: activeZone1Id,
+            driverId: driver1Id,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `UPD-CAN-${suffix}`,
+            recipientName: "Cancelled Guard",
+            recipientAddress: "Calle Guard 2",
+            recipientPhone: "3510000002",
+            status: "cancelled",
+            companyId: mainCompanyId,
+            zoneId: activeZone1Id,
+            driverId: driver1Id,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `UPD-TRN-${suffix}`,
+            recipientName: "Transit Guard",
+            recipientAddress: "Calle Guard 3",
+            recipientPhone: "3510000003",
+            status: "in_transit",
+            companyId: mainCompanyId,
+            zoneId: activeZone1Id,
+            driverId: driver1Id,
+          },
+        }),
+      ]);
+
+      const deliveredRes = await request(app)
+        .patch(`/api/packages/${deliveredPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: activeZone2Id });
+      expect(deliveredRes.status).toBe(422);
+
+      const cancelledRes = await request(app)
+        .patch(`/api/packages/${cancelledPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ recipientName: "Should Fail" });
+      expect(cancelledRes.status).toBe(422);
+
+      const inTransitZoneRes = await request(app)
+        .patch(`/api/packages/${inTransitPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: activeZone2Id });
+      expect(inTransitZoneRes.status).toBe(422);
+
+      // Non-zone recipient phone update while in_transit is allowed
+      const inTransitPhoneRes = await request(app)
+        .patch(`/api/packages/${inTransitPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ recipientPhone: "3519998888" });
+      expect(inTransitPhoneRes.status).toBe(200);
+      expect(inTransitPhoneRes.body.recipientPhone).toBe("3519998888");
+      expect(inTransitPhoneRes.body.zoneId).toBe(activeZone1Id);
+    });
+
+    it("rejects cross-tenant package/zone, invalid Zod payloads, invalid delivery windows, and driver role", async () => {
+      const targetPkg = await prisma.package.create({
+        data: {
+          trackingCode: `UPD-VAL-${suffix}`,
+          recipientName: "Validation Target",
+          recipientAddress: "Av. General Paz 400",
+          recipientPhone: "3517778888",
+          status: "pending",
+          deliveryWindowEnd: new Date("2026-09-01T12:00:00.000Z"),
+          companyId: mainCompanyId,
+          zoneId: activeZone1Id,
+        },
+      });
+
+      // Cross-tenant packageId -> 404
+      const crossTenantPkgRes = await request(app)
+        .patch(`/api/packages/${targetPkg.id}`)
+        .set("Authorization", `Bearer ${otherAdminToken}`)
+        .send({ recipientName: "Hacker" });
+      expect(crossTenantPkgRes.status).toBe(404);
+
+      // Missing packageId -> 404
+      const missingPkgRes = await request(app)
+        .patch("/api/packages/00000000-0000-4000-8000-000000000000")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ recipientName: "Missing" });
+      expect(missingPkgRes.status).toBe(404);
+
+      // Cross-tenant zoneId -> 400
+      const crossTenantZoneRes = await request(app)
+        .patch(`/api/packages/${targetPkg.id}`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ zoneId: otherTenantZoneId });
+      expect(crossTenantZoneRes.status).toBe(400);
+
+      // Driver role -> 403
+      const driverRes = await request(app)
+        .patch(`/api/packages/${targetPkg.id}`)
+        .set("Authorization", `Bearer ${driver1Token}`)
+        .send({ recipientName: "Driver Edit" });
+      expect(driverRes.status).toBe(403);
+
+      // Zod validations -> 400
+      const invalidPayloads = [
+        {},
+        { recipientName: "A" },
+        { recipientEmail: "not-an-email" },
+        { lat: 95, lng: -64 },
+        { lat: -31, lng: 185 },
+        { zoneId: "not-a-uuid" },
+        {
+          deliveryWindowStart: "2026-09-01T15:00:00Z",
+          deliveryWindowEnd: "2026-09-01T10:00:00Z",
+        },
+        // Violates existing DB deliveryWindowEnd (12:00:00Z)
+        { deliveryWindowStart: "2026-09-01T14:00:00Z" },
+      ];
+
+      for (const payload of invalidPayloads) {
+        const res = await request(app)
+          .patch(`/api/packages/${targetPkg.id}`)
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send(payload);
+        expect(res.status).toBe(400);
+      }
+    });
+  });
+
+  describe("POST /api/packages/unarchive", () => {
+    let archPkg1Id: string;
+    let archPkg2Id: string;
+    let otherArchPkgId: string;
+
+    beforeAll(async () => {
+      const [p1, p2, pOther] = await Promise.all([
+        prisma.package.create({
+          data: {
+            trackingCode: `UNARCH-1-${suffix}`,
+            recipientName: "Archived One",
+            recipientAddress: "Calle Archivo 1",
+            recipientPhone: "3511000001",
+            companyId: mainCompanyId,
+            isArchived: false,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `UNARCH-2-${suffix}`,
+            recipientName: "Archived Two",
+            recipientAddress: "Calle Archivo 2",
+            recipientPhone: "3511000002",
+            companyId: mainCompanyId,
+            isArchived: false,
+          },
+        }),
+        prisma.package.create({
+          data: {
+            trackingCode: `UNARCH-OTH-${suffix}`,
+            recipientName: "Other Archived",
+            recipientAddress: "Calle Archivo 3",
+            recipientPhone: "3511000003",
+            companyId: otherCompanyId,
+            isArchived: true,
+          },
+        }),
+      ]);
+      archPkg1Id = p1.id;
+      archPkg2Id = p2.id;
+      otherArchPkgId = pOther.id;
+    });
+
+    it("unarchives archived packages for the tenant, invalidates Redis cache, and isolates other tenants", async () => {
+      const archiveRes = await request(app)
+        .post("/api/packages/archive")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ packageIds: [archPkg1Id, archPkg2Id] });
+      expect(archiveRes.status).toBe(200);
+      expect(archiveRes.body.count).toBe(2);
+
+      const redisSpy = jest.spyOn(redis, "delPrefix").mockResolvedValue(undefined);
+
+      // Include a cross-tenant archived packageId: must NOT unarchive other tenant's package
+      const unarchiveRes = await request(app)
+        .post("/api/packages/unarchive")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ packageIds: [archPkg1Id, archPkg2Id, otherArchPkgId] });
+
+      expect(unarchiveRes.status).toBe(200);
+      expect(unarchiveRes.body.count).toBe(2);
+      expect(redisSpy).toHaveBeenCalledWith(`packages:${mainCompanyId}:`);
+
+      const [dbP1, dbP2, dbOther] = await Promise.all([
+        prisma.package.findUnique({ where: { id: archPkg1Id } }),
+        prisma.package.findUnique({ where: { id: archPkg2Id } }),
+        prisma.package.findUnique({ where: { id: otherArchPkgId } }),
+      ]);
+      expect(dbP1?.isArchived).toBe(false);
+      expect(dbP2?.isArchived).toBe(false);
+      expect(dbOther?.isArchived).toBe(true);
+
+      // Idempotent second call returns count: 0
+      const secondRes = await request(app)
+        .post("/api/packages/unarchive")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ packageIds: [archPkg1Id] });
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.body.count).toBe(0);
+    });
+
+    it("validates payload with Zod and enforces auth/roles", async () => {
+      const unauthRes = await request(app)
+        .post("/api/packages/unarchive")
+        .send({ packageIds: [archPkg1Id] });
+      expect(unauthRes.status).toBe(401);
+
+      const driverRes = await request(app)
+        .post("/api/packages/unarchive")
+        .set("Authorization", `Bearer ${driver1Token}`)
+        .send({ packageIds: [archPkg1Id] });
+      expect(driverRes.status).toBe(403);
+
+      for (const badBody of [{}, { packageIds: [] }, { packageIds: ["not-a-uuid"] }]) {
+        const badRes = await request(app)
+          .post("/api/packages/unarchive")
+          .set("Authorization", `Bearer ${adminToken}`)
+          .send(badBody);
+        expect(badRes.status).toBe(400);
+        expect(badRes.body.error).toBe("Validation failed");
+      }
+    });
+  });
+
+  it("documents GET/PATCH /api/packages/{id} and POST /api/packages/unarchive in Swagger spec", () => {
+    const paths = (swaggerSpec as any).paths ?? {};
+    expect(paths["/api/packages/{id}"]?.get).toBeDefined();
+    expect(paths["/api/packages/{id}"]?.patch).toBeDefined();
+    expect(paths["/api/packages/unarchive"]?.post).toBeDefined();
   });
 });

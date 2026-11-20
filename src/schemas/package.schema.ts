@@ -177,3 +177,58 @@ export const getPackagesByDriverSchema = z.object({
     driverId: z.string().uuid(),
   }),
 });
+
+export const getPackageByIdSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+  }),
+});
+
+export const updatePackageSchema = z.object({
+  params: z.object({
+    id: z.string().uuid(),
+  }),
+  body: z
+    .object({
+      recipientName: z.string().trim().min(2).optional(),
+      recipientAddress: z.string().trim().min(5).optional(),
+      recipientPhone: z.string().trim().min(3).optional(),
+      recipientEmail: z.string().trim().email().nullable().optional(),
+      addressStreet: z.string().trim().nullable().optional(),
+      addressNumber: z.string().trim().nullable().optional(),
+      addressFloor: z.string().trim().nullable().optional(),
+      addressCity: z.string().trim().nullable().optional(),
+      addressZip: z.string().trim().nullable().optional(),
+      addressReferences: z.string().trim().nullable().optional(),
+      senderName: z.string().trim().nullable().optional(),
+      senderAddress: z.string().trim().nullable().optional(),
+      senderPhone: z.string().trim().nullable().optional(),
+      weight: z.number().nonnegative().nullable().optional(),
+      volume: z.number().nonnegative().nullable().optional(),
+      zoneId: z.string().uuid().nullable().optional(),
+      lat: z.number().min(-90).max(90).nullable().optional(),
+      lng: z.number().min(-180).max(180).nullable().optional(),
+      estimatedDeliveryAt: isoDateTimeSchema.nullable().optional(),
+      deliveryWindowStart: isoDateTimeSchema.nullable().optional(),
+      deliveryWindowEnd: isoDateTimeSchema.nullable().optional(),
+    })
+    .refine((body) => Object.values(body).some((val) => val !== undefined), {
+      message: "At least one editable field must be provided",
+    })
+    .refine(
+      (body) => {
+        if (!body.deliveryWindowStart || !body.deliveryWindowEnd) return true;
+        return new Date(body.deliveryWindowStart) <= new Date(body.deliveryWindowEnd);
+      },
+      {
+        message: "deliveryWindowStart must be earlier than or equal to deliveryWindowEnd",
+        path: ["deliveryWindowStart"],
+      }
+    ),
+});
+
+export const unarchivePackagesSchema = z.object({
+  body: z.object({
+    packageIds: z.array(z.string().uuid()).min(1, "At least one packageId is required"),
+  }),
+});

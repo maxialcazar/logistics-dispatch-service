@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   getPackages,
   createPackage,
+  getPackageById,
+  updatePackage,
   getPackagesByDriver,
   updatePackageStatus,
   assignPackageToDriver,
@@ -9,6 +11,7 @@ import {
   getPackageHistory,
   getDashboardStats,
   archivePackages,
+  unarchivePackages,
   deletePackages
 } from "../controllers/packages.controller";
 import { auth } from "../middlewares/auth.middleware";
@@ -17,6 +20,9 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   getPackagesSchema,
   createPackageSchema,
+  getPackageByIdSchema,
+  updatePackageSchema,
+  unarchivePackagesSchema,
   updatePackageStatusSchema,
   assignPackageSchema,
   getPackagesByDriverSchema,
@@ -152,6 +158,53 @@ router.get("/", requireRole("dispatcher", "admin"), validate(getPackagesSchema),
  */
 router.post("/", requireRole("dispatcher", "admin"), validate(createPackageSchema), createPackage);
 
+// Archive Packages
+router.post("/archive", requireRole("dispatcher", "admin"), archivePackages);
+
+/**
+ * @openapi
+ * /api/packages/unarchive:
+ *   post:
+ *     summary: Unarchive one or more packages
+ *     tags: [Packages]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [packageIds]
+ *             properties:
+ *               packageIds:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *     responses:
+ *       200:
+ *         description: Packages unarchived
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *       400:
+ *         description: Validation failed
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
+router.post("/unarchive", requireRole("dispatcher", "admin"), validate(unarchivePackagesSchema), unarchivePackages);
+
+// Delete Packages (Permanent)
+router.post("/delete", requireRole("dispatcher", "admin"), deletePackages);
+
 /**
  * @openapi
  * /api/packages/stats:
@@ -164,14 +217,21 @@ router.post("/", requireRole("dispatcher", "admin"), validate(createPackageSchem
  *       200:
  *         description: Success
  */
-// Archive Packages
-router.post("/archive", requireRole("dispatcher", "admin"), archivePackages);
-
-// Delete Packages (Permanent)
-router.post("/delete", requireRole("dispatcher", "admin"), deletePackages);
-
-
 router.get("/stats", requireRole("dispatcher", "admin"), getDashboardStats);
+
+/**
+ * @openapi
+ * /api/packages/me:
+ *   get:
+ *     summary: Get packages of the current logged-in driver
+ *     tags: [Packages]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+router.get("/my-packages", auth, requireRole("driver"), getMyPackages);
 
 /**
  * @openapi
@@ -190,6 +250,138 @@ router.get("/stats", requireRole("dispatcher", "admin"), getDashboardStats);
  *         description: Success
  */
 router.get("/driver/:driverId", requireRole("dispatcher", "admin"), validate(getPackagesByDriverSchema), getPackagesByDriver);
+
+/**
+ * @openapi
+ * /api/packages/{id}:
+ *   get:
+ *     summary: Get complete package detail including zone, assigned driver, chronological history, and delivery evidences
+ *     tags: [Packages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Package detail
+ *       400:
+ *         description: Validation failed
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Driver not authorized for this package
+ *       404:
+ *         description: Package not found
+ */
+router.get("/:id", requireRole("dispatcher", "driver", "admin"), validate(getPackageByIdSchema), getPackageById);
+
+/**
+ * @openapi
+ * /api/packages/{id}:
+ *   patch:
+ *     summary: Update package recipient, address, coordinates, delivery window, or reassign zone
+ *     tags: [Packages]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               recipientName:
+ *                 type: string
+ *               recipientAddress:
+ *                 type: string
+ *               recipientPhone:
+ *                 type: string
+ *               recipientEmail:
+ *                 type: string
+ *                 format: email
+ *                 nullable: true
+ *               addressStreet:
+ *                 type: string
+ *                 nullable: true
+ *               addressNumber:
+ *                 type: string
+ *                 nullable: true
+ *               addressFloor:
+ *                 type: string
+ *                 nullable: true
+ *               addressCity:
+ *                 type: string
+ *                 nullable: true
+ *               addressZip:
+ *                 type: string
+ *                 nullable: true
+ *               addressReferences:
+ *                 type: string
+ *                 nullable: true
+ *               senderName:
+ *                 type: string
+ *                 nullable: true
+ *               senderAddress:
+ *                 type: string
+ *                 nullable: true
+ *               senderPhone:
+ *                 type: string
+ *                 nullable: true
+ *               weight:
+ *                 type: number
+ *                 nullable: true
+ *               volume:
+ *                 type: number
+ *                 nullable: true
+ *               zoneId:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *               lat:
+ *                 type: number
+ *                 nullable: true
+ *               lng:
+ *                 type: number
+ *                 nullable: true
+ *               estimatedDeliveryAt:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               deliveryWindowStart:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               deliveryWindowEnd:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Package updated
+ *       400:
+ *         description: Validation failed or zone not found
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Package not found
+ *       422:
+ *         description: Package cannot be edited or zone reassigned in current status
+ */
+router.patch("/:id", requireRole("dispatcher", "admin"), validate(updatePackageSchema), updatePackage);
 
 /**
  * @openapi
@@ -226,20 +418,6 @@ router.patch("/:packageId/status", requireRole("dispatcher", "driver", "admin"),
  *         description: Success
  */
 router.post("/:packageId/assign", requireRole("dispatcher", "admin"), validate(assignPackageSchema), assignPackageToDriver);
-
-/**
- * @openapi
- * /api/packages/me:
- *   get:
- *     summary: Get packages of the current logged-in driver
- *     tags: [Packages]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Success
- */
-router.get("/my-packages", auth, requireRole("driver"), getMyPackages);
 
 /**
  * @openapi
