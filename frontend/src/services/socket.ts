@@ -5,15 +5,41 @@ const URL = import.meta.env.VITE_API_URL || undefined;
 
 class SocketService {
   public socket: Socket | null = null;
+  private currentToken: string | null = null;
 
   connect(token: string): Socket {
-    if (this.socket) return this.socket;
+    if (this.socket) {
+      const currentAuthToken =
+        typeof this.socket.auth === 'object' && this.socket.auth !== null
+          ? (this.socket.auth as { token?: unknown }).token
+          : undefined;
+      const tokenChanged = this.currentToken !== token || currentAuthToken !== token;
 
+      this.currentToken = token;
+      this.socket.auth = { token };
+
+      if (tokenChanged) {
+        if (this.socket.connected || this.socket.active) {
+          this.socket.disconnect();
+        }
+        this.socket.connect();
+      } else if (!this.socket.connected) {
+        this.socket.connect();
+      }
+
+      return this.socket;
+    }
+
+    this.currentToken = token;
     this.socket = io(URL, {
       path: '/socket.io', // Explicitly set path often helps with Nginx
       auth: { token },
       transports: ['websocket', 'polling'], // Fallback options
-      reconnectionAttempts: 5,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 30000,
+      randomizationFactor: 0.5,
     });
 
     this.socket.on('connect', () => {
@@ -34,8 +60,10 @@ class SocketService {
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();
+      this.socket.removeAllListeners();
       this.socket = null;
     }
+    this.currentToken = null;
   }
 
   // Generic typed event listener
@@ -44,7 +72,7 @@ class SocketService {
       this.socket.on(event, callback);
   }
 
-  off(event: string, callback?: any) {
+  off<T>(event: string, callback?: (data: T) => void) {
       if (!this.socket) return;
       if (callback) {
           this.socket.off(event, callback);
