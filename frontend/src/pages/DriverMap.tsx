@@ -55,32 +55,28 @@ function FitBounds({ points }: { points: [number, number][] }) {
 export function DriverMap() {
     const { token } = useAuth();
     const [packages, setPackages] = useState<Package[]>([]);
-    const [myLoc, setMyLoc] = useState<[number, number] | null>(null);
 
     // Global Tracking
-    useDriverLocation();
+    const { location } = useDriverLocation();
+
+    const myLoc = useMemo<[number, number] | null>(
+        () => (location ? [location.lat, location.lng] : null),
+        [location]
+    );
 
     useEffect(() => {
         if (!token) return;
-        
-        // 1. Fetch Packages
+
+        let cancelled = false;
         packageService.getMyPackages(token).then(data => {
+            if (cancelled) return;
             const active = data.filter(p => !['delivered', 'cancelled'].includes(p.status) && p.lat && p.lng);
             setPackages(active);
         }).catch(console.error);
 
-        // 2. Watch Position (Local Map Only)
-        const watchId = navigator.geolocation.watchPosition(
-            (pos) => {
-                setMyLoc([pos.coords.latitude, pos.coords.longitude]);
-            },
-            () => {
-                // console.error("Geo error", err); // Handled by hook
-            },
-            { enableHighAccuracy: true }
-        );
-
-        return () => navigator.geolocation.clearWatch(watchId);
+        return () => {
+            cancelled = true;
+        };
     }, [token]);
 
     const points = useMemo(() => {
@@ -140,14 +136,6 @@ export function DriverMap() {
                     </Marker>
                 ))}
             </MapContainer>
-
-            {/* Warning if packages have no location */}
-            {packages.length > 0 && !packages.some(p => p.lat && p.lng) && (
-                <div className="absolute top-4 left-4 right-4 bg-yellow-500/90 text-black p-3 rounded-lg z-[1000] text-center text-sm font-bold shadow-lg">
-                    ⚠️ Tienes {packages.length} paquetes sin ubicación GPS.
-                    <br/>Revisa la lista para ver las direcciones.
-                </div>
-            )}
 
             {/* Bottom Floating Stats */}
             <div className="absolute bottom-20 left-4 right-4 bg-slate-900/90 backdrop-blur border border-slate-700 p-4 rounded-xl z-[1000] shadow-2xl flex justify-between items-center">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { driverService } from '../services/driverService';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ interface TrackedLocation extends DriverCoordinates {
 }
 
 export interface UseDriverLocationResult {
+    location: DriverCoordinates | null;
     getCurrentLocation: () => Promise<DriverCoordinates | null>;
 }
 
@@ -38,6 +39,31 @@ export function useDriverLocation(): UseDriverLocationResult {
     const isDriver = user?.role === 'driver';
     const lastUpdate = useRef<number>(0);
     const latestLocationRef = useRef<TrackedLocation | null>(null);
+    const [trackedLocation, setTrackedLocation] = useState<{
+        token: string;
+        coords: DriverCoordinates;
+    } | null>(null);
+
+    const recordValidLocation = useCallback(
+        (lat: number, lng: number, activeToken: string | null, driverActive: boolean) => {
+            const coords = { lat, lng };
+            latestLocationRef.current = {
+                ...coords,
+                updatedAt: Date.now(),
+            };
+            if (!activeToken || !driverActive) return;
+
+            setTrackedLocation((prev) =>
+                prev &&
+                prev.token === activeToken &&
+                prev.coords.lat === lat &&
+                prev.coords.lng === lng
+                    ? prev
+                    : { token: activeToken, coords }
+            );
+        },
+        []
+    );
 
     useEffect(() => {
         if (!token || !isDriver) {
@@ -55,11 +81,7 @@ export function useDriverLocation(): UseDriverLocationResult {
 
             // Keep the latest valid fix cached locally even while offline or throttled
             if (hasValidCoords) {
-                latestLocationRef.current = {
-                    lat: latitude,
-                    lng: longitude,
-                    updatedAt: Date.now(),
-                };
+                recordValidLocation(latitude, longitude, token, isDriver);
             }
 
             // Skip location updates when offline — no point trying to reach the server
@@ -93,7 +115,7 @@ export function useDriverLocation(): UseDriverLocationResult {
         return () => {
             navigator.geolocation.clearWatch(watchId);
         };
-    }, [token, isDriver]);
+    }, [token, isDriver, recordValidLocation]);
 
     const getValidLastKnown = useCallback((maxAgeMs: number): DriverCoordinates | null => {
         const cached = latestLocationRef.current;
@@ -135,10 +157,7 @@ export function useDriverLocation(): UseDriverLocationResult {
                         const { latitude, longitude } = pos.coords;
                         if (isValidCoordinates(latitude, longitude)) {
                             const coords = { lat: latitude, lng: longitude };
-                            latestLocationRef.current = {
-                                ...coords,
-                                updatedAt: Date.now(),
-                            };
+                            recordValidLocation(latitude, longitude, token, isDriver);
                             finish(coords);
                             return;
                         }
@@ -157,7 +176,12 @@ export function useDriverLocation(): UseDriverLocationResult {
                 finish(getValidLastKnown(FALLBACK_LOCATION_MAX_AGE_MS));
             }
         });
-    }, [getValidLastKnown]);
+    }, [getValidLastKnown, recordValidLocation, token, isDriver]);
 
-    return { getCurrentLocation };
+    const location = useMemo<DriverCoordinates | null>(
+        () => (token && isDriver && trackedLocation?.token === token ? trackedLocation.coords : null),
+        [token, isDriver, trackedLocation]
+    );
+
+    return { location, getCurrentLocation };
 }
