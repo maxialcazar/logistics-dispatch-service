@@ -1,4 +1,5 @@
 
+import { useEffect, useRef, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from 'sonner';
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -11,7 +12,8 @@ import { DriversPage } from "./pages/DriversPage";
 import { DispatchPage } from "./pages/DispatchPage"; 
 import { MonitorPage } from "./pages/MonitorPage";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { SocketProvider } from "./context/SocketContext";
+import { NotificationProvider, useNotifications } from "./context/NotificationContext";
+import { SocketProvider, useSocket } from "./context/SocketContext";
 import { DriverLayout } from "./layouts/DriverLayout";
 import { DriverDashboard } from "./pages/DriverDashboard";
 import { DriverMap } from "./pages/DriverMap";
@@ -26,7 +28,7 @@ function RoleGuard({
     children,
 }: {
     allowedRoles: UserRole[];
-    children: React.ReactNode;
+    children: ReactNode;
 }) {
     const { token, user } = useAuth();
 
@@ -52,7 +54,7 @@ function ProtectedRoute({
     children,
 }: {
     allowedRoles?: UserRole[];
-    children: React.ReactNode;
+    children: ReactNode;
 }) {
     const { token } = useAuth();
     if (!token) {
@@ -73,43 +75,83 @@ function ProtectedRoute({
     return authenticatedContent;
 }
 
-import { NotificationProvider, useNotifications } from "./context/NotificationContext";
-import { useSocket } from "./context/SocketContext";
-import { useEffect } from "react";
+interface PackageUpdatePayload {
+    packageId?: string;
+    trackingCode?: string;
+    status?: string;
+}
+
+interface DriverStatusPayload {
+    name?: string;
+    status?: string;
+}
+
+interface BusinessEventPayload {
+    type?: string;
+    title?: string;
+    description?: string;
+}
 
 function NotificationListener() {
     const { socket } = useSocket();
-    const { addNotification } = useNotifications();
+    const { addNotification, preferences } = useNotifications();
+    const preferencesRef = useRef(preferences);
+
+    useEffect(() => {
+        preferencesRef.current = preferences;
+    }, [preferences]);
 
     useEffect(() => {
         if (!socket) return;
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const handlePackageUpdate = (data: any) => {
+
+        const handlePackageUpdate = (data: PackageUpdatePayload) => {
+            if (!data?.status) return;
+            const prefs = preferencesRef.current;
+            const pkgLabel = data.trackingCode || data.packageId || 'sin código';
+
             if (data.status === 'in_transit') {
-                addNotification('Paquete en Camino', `El paquete ${data.packageId} está en camino`, 'info');
+                if (!prefs.packageUpdates) return;
+                addNotification('Paquete en Camino', `El paquete ${pkgLabel} está en camino`, 'info');
             } else if (data.status === 'delivered') {
-                addNotification('Paquete Entregado', `El paquete ${data.packageId} ha sido entregado`, 'success');
-            } else if (data.status === 'cancelled') {
-                addNotification('Paquete Cancelado', `El paquete ${data.packageId} ha sido cancelado`, 'warning');
+                if (!prefs.packageUpdates) return;
+                addNotification('Paquete Entregado', `El paquete ${pkgLabel} ha sido entregado`, 'success');
+            } else if (data.status === 'cancelled' || data.status === 'failed') {
+                if (!prefs.incidentAlerts) return;
+                const isFailed = data.status === 'failed';
+                addNotification(
+                    isFailed ? 'Incidencia de Entrega' : 'Paquete Cancelado',
+                    `El paquete ${pkgLabel} ha sido ${isFailed ? 'reportado con incidencia' : 'cancelado'}`,
+                    isFailed ? 'error' : 'warning'
+                );
             }
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const handleDriverStatus = (data: any) => {
-             if (data.status === 'online') {
-                  addNotification('Conductor Conectado', `${data.name || 'Un conductor'} se ha conectado`, 'info');
-             } else if (data.status === 'offline') {
-                  addNotification('Conductor Desconectado', `${data.name || 'Un conductor'} se ha desconectado`, 'warning');
-             }
+        const handleDriverStatus = (data: DriverStatusPayload) => {
+            if (!preferencesRef.current.driverAlerts) return;
+            if (data?.status === 'online') {
+                addNotification('Conductor Conectado', `${data.name || 'Un conductor'} se ha conectado`, 'info');
+            } else if (data?.status === 'offline') {
+                addNotification('Conductor Desconectado', `${data.name || 'Un conductor'} se ha desconectado`, 'warning');
+            }
+        };
+
+        const handleBusinessEvent = (event: BusinessEventPayload) => {
+            if (event?.type !== 'ISSUE' || !preferencesRef.current.incidentAlerts) return;
+            addNotification(
+                event.title || 'Incidencia Operativa',
+                event.description || 'Se detectó una incidencia en la operación',
+                'error'
+            );
         };
 
         socket.on('package-status-updated', handlePackageUpdate);
         socket.on('driver-status-updated', handleDriverStatus);
+        socket.on('business-event', handleBusinessEvent);
 
         return () => {
             socket.off('package-status-updated', handlePackageUpdate);
             socket.off('driver-status-updated', handleDriverStatus);
+            socket.off('business-event', handleBusinessEvent);
         };
     }, [socket, addNotification]);
 

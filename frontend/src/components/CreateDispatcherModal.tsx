@@ -8,9 +8,10 @@ import { Modal } from './Modal';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  onCreated?: () => void;
 }
 
-export function CreateDispatcherModal({ isOpen, onClose }: Props) {
+export function CreateDispatcherModal({ isOpen, onClose, onCreated }: Props) {
   const { token } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -35,6 +36,7 @@ export function CreateDispatcherModal({ isOpen, onClose }: Props) {
     try {
       await userService.createDispatcher(token, { username, password });
       toast.success('Despachador creado exitosamente', { id: toastId });
+      onCreated?.();
       onClose();
       setUsername('');
       setPassword('');

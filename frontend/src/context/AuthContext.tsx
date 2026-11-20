@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { apiClient, setUnauthorizedHandler } from '../services/apiClient';
-import { mergeMeIntoUser, normalizeUserRecord, type User } from '../utils/authSession';
+import { mergeMeIntoUser, normalizeUserRecord, type CompanyInfo, type User } from '../utils/authSession';
 
 interface AuthContextType {
   token: string | null;
   user: User | null;
   login: (token: string, userData: User) => void;
   logout: () => void;
+  updateCompany: (company: CompanyInfo) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -14,6 +15,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   login: () => {},
   logout: () => {},
+  updateCompany: () => {},
 });
 
 function readStoredToken(): string | null {
@@ -64,6 +66,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const updateCompany = useCallback((company: CompanyInfo) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const nextCompany: CompanyInfo = {
+        ...(prev.company ?? {}),
+        id: company.id ?? prev.company?.id,
+        name: company.name,
+        slug: company.slug,
+      };
+      const nextUser: User = {
+        ...prev,
+        companyId: nextCompany.id ?? prev.companyId,
+        company: nextCompany,
+      };
+      try {
+        localStorage.setItem('user', JSON.stringify(nextUser));
+      } catch {
+        // Ignore storage errors in restricted environments
+      }
+      return nextUser;
+    });
+  }, []);
+
   useEffect(() => {
     setUnauthorizedHandler(logout);
     return () => setUnauthorizedHandler(null);
@@ -107,10 +132,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token, user?.company]);
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, login, logout, updateCompany }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
