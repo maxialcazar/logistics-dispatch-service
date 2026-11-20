@@ -1,15 +1,27 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { normalizeUserRecord } from '../utils/authSession';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User } from 'lucide-react';
+import { Lock, Truck, User } from 'lucide-react';
 import { ApiError, apiClient } from '../services/apiClient';
+
+interface RawCompanyResponse {
+  id?: string | number;
+  name?: string;
+  slug?: string;
+}
 
 interface LoginResponse {
   token?: string;
+  company?: RawCompanyResponse;
   user?: {
     id?: string | number;
     username?: string;
     role?: string;
+    companyId?: string | number;
+    companyName?: string;
+    companySlug?: string;
+    company?: RawCompanyResponse;
   };
 }
 
@@ -33,30 +45,18 @@ export function Login() {
         { username, password },
         { skipAuthHandler: true, token: null }
       );
-      const user = data?.user;
-      const hasValidUserId =
-        (typeof user?.id === 'string' && user.id.trim().length > 0) ||
-        (typeof user?.id === 'number' && Number.isFinite(user.id));
+      const normalizedUser = normalizeUserRecord(data?.user, data?.company);
 
       if (
         typeof data?.token !== 'string' ||
         !data.token.trim() ||
-        !user ||
-        !hasValidUserId ||
-        typeof user.username !== 'string' ||
-        !user.username.trim() ||
-        typeof user.role !== 'string' ||
-        !user.role.trim()
+        !normalizedUser
       ) {
         setError('Respuesta inválida del servidor al iniciar sesión');
         return;
       }
 
-      login(data.token, {
-        id: String(user.id),
-        username: user.username,
-        role: user.role,
-      });
+      login(data.token, normalizedUser);
       navigate('/');
       
     } catch (err: unknown) {
@@ -76,10 +76,12 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-slate-900 p-8 shadow-2xl border border-slate-800">
         <div className="text-center">
-            <div className="mx-auto h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center mb-4">
-               <Lock className="h-6 w-6 text-blue-500" />
-            </div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Logistics OS</h2>
+          <div className="mx-auto h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-900/40">
+            <Truck className="h-6 w-6 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            Logistics <span className="text-blue-400">OS</span>
+          </h1>
           <p className="mt-2 text-sm text-slate-400">Inicia sesión para acceder al sistema</p>
         </div>
 

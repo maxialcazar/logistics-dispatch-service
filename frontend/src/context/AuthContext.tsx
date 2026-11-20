@@ -1,12 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { setUnauthorizedHandler } from '../services/apiClient';
-
-// NOTE: In a real app, this should match your backend response
-interface User {
-  id: string;
-  username: string;
-  role: string;
-}
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { apiClient, setUnauthorizedHandler } from '../services/apiClient';
+import { mergeMeIntoUser, normalizeUserRecord, type User } from '../utils/authSession';
 
 interface AuthContextType {
   token: string | null;
@@ -22,22 +16,50 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [user, setUser] = useState<User | null>(
-    localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null
-  );
+function readStoredToken(): string | null {
+  try {
+    return localStorage.getItem('token');
+  } catch {
+    return null;
+  }
+}
 
-  const login = (newToken: string, userData: User) => {
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+function readStoredUser(): User | null {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return normalizeUserRecord(parsed);
+  } catch {
+    return null;
+  }
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [token, setToken] = useState<string | null>(readStoredToken);
+  const [user, setUser] = useState<User | null>(readStoredUser);
+  const hydratedTokenRef = useRef<string | null>(null);
+
+  const login = useCallback((newToken: string, userData: User) => {
+    hydratedTokenRef.current = userData.company ? newToken : null;
+    try {
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch {
+      // Ignore storage errors in restricted environments
+    }
     setToken(newToken);
     setUser(userData);
-  };
+  }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    hydratedTokenRef.current = null;
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    } catch {
+      // Ignore storage errors in restricted environments
+    }
     setToken(null);
     setUser(null);
   }, []);
@@ -47,10 +69,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [logout]);
 
-  // Optional: Validate token on mount
+  // Hydrate missing tenant/company info (e.g. legacy localStorage sessions or minimal login payload)
   useEffect(() => {
-    // If we wanted to, we could verify the token with the backend here
-  }, []);
+    if (!token || user?.company || hydratedTokenRef.current === token) {
+      return;
+    }
+
+    let cancelled = false;
+
+    apiClient
+      .get<unknown>('/api/auth/me', { token })
+      .then((meData) => {
+        if (cancelled) return;
+        hydratedTokenRef.current = token;
+
+        setUser((prev) => {
+          const nextUser = mergeMeIntoUser(meData, prev);
+          if (nextUser) {
+            try {
+              localStorage.setItem('user', JSON.stringify(nextUser));
+            } catch {
+              // Ignore storage errors in restricted environments
+            }
+          }
+          return nextUser;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          hydratedTokenRef.current = token;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.company]);
 
   return (
     <AuthContext.Provider value={{ token, user, login, logout }}>

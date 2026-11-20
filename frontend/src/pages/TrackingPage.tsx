@@ -276,7 +276,9 @@ export function TrackingPage() {
               <Package className="h-5 w-5 text-blue-400" />
             </div>
             <div>
-              <span className="block text-base font-bold tracking-tight">Logistics OS</span>
+              <span className="block text-base font-bold tracking-tight">
+                Logistics <span className="text-blue-400">OS</span>
+              </span>
               <span className="block text-xs text-slate-400">Seguimiento Público de Envíos</span>
             </div>
           </Link>
