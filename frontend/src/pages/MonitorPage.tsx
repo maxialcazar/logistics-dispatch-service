@@ -15,11 +15,35 @@ interface ActivePackage {
     id: string; 
     trackingCode: string; 
     driverId?: string; 
+    zoneId?: string;
+    zone?: { id: string; name?: string };
     status: string;
-    lat?: number;
-    lng?: number;
+    lat?: number | null;
+    lng?: number | null;
     recipientAddress?: string;
 }
+
+const isValidCoordinate = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isFinite(value);
+
+const hasValidCoordinates = (
+    pkg: ActivePackage
+): pkg is ActivePackage & { lat: number; lng: number } =>
+    isValidCoordinate(pkg.lat) && isValidCoordinate(pkg.lng);
+
+const getPackageZoneId = (pkg: ActivePackage): string | undefined =>
+    pkg.zoneId ?? pkg.zone?.id;
+
+const doesPackageMatchDriver = (pkg: ActivePackage, driver: Driver): boolean => {
+    if (pkg.driverId && pkg.driverId === driver.id) {
+        return true;
+    }
+    const pkgZoneId = getPackageZoneId(pkg);
+    if (!pkgZoneId) {
+        return false;
+    }
+    return driver.zones?.some((z) => z.id === pkgZoneId) ?? false;
+};
 
 export function MonitorPage() {
     const { token } = useAuth();
@@ -51,7 +75,7 @@ export function MonitorPage() {
                     packageService.getPackages(token, undefined, 1, 1000), 
                 ]);
                 setZones(z.items || []);
-                const mappedDrivers = (d.items || []).map((drv: any) => ({
+                const mappedDrivers = (d.items || []).map((drv) => ({
                     ...drv,
                     zones: drv.zones || []
                 }));
@@ -100,6 +124,59 @@ export function MonitorPage() {
         };
     }, [socket]);
 
+    const normalizedSearch = packageSearch.trim().toLowerCase();
+
+    // Derived Filtered Packages (synced with zone, driver, and search filters)
+    const filteredPackages = useMemo(() => {
+        const selectedDriverList =
+            selectedDrivers.length > 0
+                ? drivers.filter((d) => selectedDrivers.includes(d.id))
+                : [];
+
+        return activePackages.filter((pkg) => {
+            if (selectedZones.length > 0) {
+                const pkgZoneId = getPackageZoneId(pkg);
+                if (!pkgZoneId || !selectedZones.includes(pkgZoneId)) {
+                    return false;
+                }
+            }
+
+            if (selectedDrivers.length > 0) {
+                const matchesSelectedDriver = selectedDriverList.some((driver) =>
+                    doesPackageMatchDriver(pkg, driver)
+                );
+                if (!matchesSelectedDriver) {
+                    return false;
+                }
+            }
+
+            if (normalizedSearch.length > 0) {
+                const tracking = (pkg.trackingCode ?? '').toLowerCase();
+                if (!tracking.includes(normalizedSearch)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }, [activePackages, drivers, selectedZones, selectedDrivers, normalizedSearch]);
+
+    // Map-ready Packages (omit entries without finite numeric coordinates; never fallback to 0, 0)
+    const mapPackages = useMemo(
+        () =>
+            filteredPackages
+                .filter(hasValidCoordinates)
+                .map((p) => ({
+                    id: p.id,
+                    trackingCode: p.trackingCode,
+                    lat: p.lat,
+                    lng: p.lng,
+                    status: p.status,
+                    recipientAddress: p.recipientAddress || 'Sin Dirección',
+                })),
+        [filteredPackages]
+    );
+
     // Derived Visible Drivers
     const visibleDriverIds = useMemo(() => {
         // Start with all drivers
@@ -107,28 +184,25 @@ export function MonitorPage() {
 
         // 1. Filter by Zones (OR logic: if driver has ANY of selected zones)
         if (selectedZones.length > 0) {
-            filtered = filtered.filter(d => 
-                d.zones?.some(z => selectedZones.includes(z.id))
+            filtered = filtered.filter((d) =>
+                d.zones?.some((z) => selectedZones.includes(z.id))
             );
         }
 
         // 2. Filter by Specific Drivers (OR logic)
         if (selectedDrivers.length > 0) {
-            filtered = filtered.filter(d => selectedDrivers.includes(d.id));
+            filtered = filtered.filter((d) => selectedDrivers.includes(d.id));
         }
 
-        // 3. Filter by Package (AND logic: driver must carry matching package)
-        if (packageSearch.length > 2) {
-            // Find packages that match search
-            const matches = activePackages.filter(p => 
-                p.trackingCode.toLowerCase().includes(packageSearch.toLowerCase())
+        // 3. Filter by Package (AND logic: driver covers zone of matching package, or matches p.driverId fallback)
+        if (normalizedSearch.length > 0) {
+            filtered = filtered.filter((d) =>
+                filteredPackages.some((pkg) => doesPackageMatchDriver(pkg, d))
             );
-            const driverIds = matches.map(p => p.driverId).filter(Boolean);
-            filtered = filtered.filter(d => driverIds.includes(d.id));
         }
 
-        return filtered.map(d => d.id);
-    }, [drivers, activePackages, selectedZones, selectedDrivers, packageSearch]);
+        return filtered.map((d) => d.id);
+    }, [drivers, filteredPackages, selectedZones, selectedDrivers, normalizedSearch]);
 
     // Helpers to toggle filters
     const toggleZone = (id: string) => {
@@ -268,14 +342,7 @@ export function MonitorPage() {
                  <LiveMap 
                     visibleDriverIds={visibleDriverIds} 
                     allDrivers={drivers} 
-                    packages={activePackages.map(p => ({
-                        id: p.id,
-                        trackingCode: p.trackingCode,
-                        lat: p.lat || 0,
-                        lng: p.lng || 0,
-                        status: p.status,
-                        recipientAddress: p.recipientAddress || 'Sin Dirección'
-                    }))}
+                    packages={mapPackages}
                  />
             </div>
         </div>
